@@ -69,8 +69,7 @@ services:
       MH_MONGO_URI: admin:crapisecretpassword@benchmark-crapi-mongo:27017
       MH_STORAGE: mongodb
     depends_on:
-      benchmark-crapi-mongo:
-        condition: service_healthy
+      - benchmark-crapi-mongo
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8025"]
       interval: 5s
@@ -85,12 +84,9 @@ services:
     volumes:
       - ./benchmarks/docker/realistic/crapi-keys:/app/keys:ro
     depends_on:
-      benchmark-crapi-postgres:
-        condition: service_healthy
-      benchmark-crapi-mongo:
-        condition: service_healthy
-      benchmark-crapi-mailhog:
-        condition: service_healthy
+      - benchmark-crapi-postgres
+      - benchmark-crapi-mongo
+      - benchmark-crapi-mailhog
     environment:
       LOG_LEVEL: INFO
       DB_HOST: benchmark-crapi-postgres
@@ -127,13 +123,11 @@ services:
     image: crapi/crapi-community@sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687
     profiles: ["realistic"]
     depends_on:
-      benchmark-crapi-postgres:
-        condition: service_healthy
-      benchmark-crapi-mongo:
-        condition: service_healthy
-      benchmark-crapi-identity:
-        condition: service_healthy
+      - benchmark-crapi-postgres
+      - benchmark-crapi-mongo
+      - benchmark-crapi-identity
     environment:
+      LOG_LEVEL: INFO
       IDENTITY_SERVICE: benchmark-crapi-identity:8080
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
@@ -159,15 +153,12 @@ services:
     image: crapi/crapi-workshop@sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a
     profiles: ["realistic"]
     depends_on:
-      benchmark-crapi-postgres:
-        condition: service_healthy
-      benchmark-crapi-mongo:
-        condition: service_healthy
-      benchmark-crapi-identity:
-        condition: service_healthy
-      benchmark-crapi-community:
-        condition: service_healthy
+      - benchmark-crapi-postgres
+      - benchmark-crapi-mongo
+      - benchmark-crapi-identity
+      - benchmark-crapi-community
     environment:
+      LOG_LEVEL: INFO
       IDENTITY_SERVICE: benchmark-crapi-identity:8080
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
@@ -182,24 +173,22 @@ services:
       SECRET_KEY: crapi
       SERVER_PORT: "8000"
       TLS_ENABLED: "false"
+      FILES_LIMIT: "1000"
     healthcheck:
       test: ["CMD-SHELL", "/app/health.sh"]
       interval: 5s
       timeout: 5s
-      retries: 24
-      start_period: 30s
+      retries: 30
+      start_period: 90s
 
   benchmark-crapi-web:
     <<: *realistic_common
     image: crapi/crapi-web@sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504
     profiles: ["realistic"]
     depends_on:
-      benchmark-crapi-identity:
-        condition: service_healthy
-      benchmark-crapi-community:
-        condition: service_healthy
-      benchmark-crapi-workshop:
-        condition: service_healthy
+      - benchmark-crapi-identity
+      - benchmark-crapi-community
+      - benchmark-crapi-workshop
     environment:
       COMMUNITY_SERVICE: benchmark-crapi-community:8087
       IDENTITY_SERVICE: benchmark-crapi-identity:8080
@@ -218,8 +207,7 @@ services:
     image: nginx@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
     profiles: ["realistic"]
     depends_on:
-      benchmark-crapi-web:
-        condition: service_healthy
+      - benchmark-crapi-web
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1/health || exit 1"]
       interval: 5s

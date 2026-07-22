@@ -302,6 +302,7 @@ jobs:
           echo "Realistic fixtures failed health check"
           docker compose -f docker-compose.realistic.yml --profile realistic ps
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-identity --tail 120 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-workshop --tail 120 || true
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-web --tail 80 || true
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-proxy --tail 80 || true
           exit 1
@@ -496,6 +497,7 @@ jobs:
           echo "Realistic fixtures failed health check"
           docker compose -f docker-compose.realistic.yml --profile realistic ps
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-identity --tail 120 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-workshop --tail 120 || true
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-web --tail 80 || true
           docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-proxy --tail 80 || true
           exit 1
