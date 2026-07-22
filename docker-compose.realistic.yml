@@ -39,53 +39,88 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: crapisecretpassword
       POSTGRES_DB: crapi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d crapi"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
 
   benchmark-crapi-mongo:
     <<: *realistic_common
     image: mongo@sha256:52c42cbab240b3c5b1748582cc13ef46d521ddacae002bbbda645cebed270ec0
     profiles: ["realistic"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: crapisecretpassword
     command: ["mongod", "--quiet", "--logpath", "/dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongo benchmark-crapi-mongo:27017/test --quiet"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
 
   benchmark-crapi-mailhog:
     <<: *realistic_common
     image: crapi/mailhog@sha256:75119d12ee43e5405a92c538bfa2a9e0811fd0d99cc8185dd44a125ed4db34e6
     profiles: ["realistic"]
+    environment:
+      MH_MONGO_URI: admin:crapisecretpassword@benchmark-crapi-mongo:27017
+      MH_STORAGE: mongodb
+    depends_on:
+      benchmark-crapi-mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8025"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
 
   benchmark-crapi-identity:
     <<: *realistic_common
     image: crapi/crapi-identity@sha256:29099da8ad457e303c46dabb8b913b06cb583616f850d116359dfc69d07f1491
     profiles: ["realistic"]
     depends_on:
-      - benchmark-crapi-postgres
-      - benchmark-crapi-mongo
-      - benchmark-crapi-mailhog
+      benchmark-crapi-postgres:
+        condition: service_healthy
+      benchmark-crapi-mongo:
+        condition: service_healthy
+      benchmark-crapi-mailhog:
+        condition: service_healthy
     environment:
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
       DB_USER: admin
       DB_PASSWORD: crapisecretpassword
       DB_NAME: crapi
-      MONGO_DB_HOST: benchmark-crapi-mongo
-      MONGO_DB_PORT: "27017"
-      MONGO_DB_USER: admin
-      MONGO_DB_PASSWORD: crapisecretpassword
-      MONGO_DB_NAME: crapi
-      SMTP_HOST: benchmark-crapi-mailhog
-      SMTP_PORT: "1025"
-      SMTP_EMAIL: noreply@example.com
-      SMTP_PASS: mailhog
-      SMTP_FROM: noreply@example.com
-      JWT_SECRET: crapi-jwt-secret-benchmark
       SERVER_PORT: "8080"
+      JWT_SECRET: crapi
+      MAILHOG_HOST: benchmark-crapi-mailhog
+      MAILHOG_PORT: "1025"
+      MAILHOG_DOMAIN: example.com
+      TLS_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/app/health.sh"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
 
   benchmark-crapi-community:
     <<: *realistic_common
     image: crapi/crapi-community@sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687
     profiles: ["realistic"]
     depends_on:
-      - benchmark-crapi-postgres
-      - benchmark-crapi-mongo
+      benchmark-crapi-postgres:
+        condition: service_healthy
+      benchmark-crapi-mongo:
+        condition: service_healthy
+      benchmark-crapi-identity:
+        condition: service_healthy
     environment:
+      IDENTITY_SERVICE: benchmark-crapi-identity:8080
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
       DB_USER: admin
@@ -96,17 +131,30 @@ services:
       MONGO_DB_USER: admin
       MONGO_DB_PASSWORD: crapisecretpassword
       MONGO_DB_NAME: crapi
-      JWT_SECRET: crapi-jwt-secret-benchmark
-      SERVER_PORT: "8080"
+      SERVER_PORT: "8087"
+      TLS_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/app/health.sh"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
 
   benchmark-crapi-workshop:
     <<: *realistic_common
     image: crapi/crapi-workshop@sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a
     profiles: ["realistic"]
     depends_on:
-      - benchmark-crapi-postgres
-      - benchmark-crapi-mongo
+      benchmark-crapi-postgres:
+        condition: service_healthy
+      benchmark-crapi-mongo:
+        condition: service_healthy
+      benchmark-crapi-identity:
+        condition: service_healthy
+      benchmark-crapi-community:
+        condition: service_healthy
     environment:
+      IDENTITY_SERVICE: benchmark-crapi-identity:8080
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
       DB_USER: admin
@@ -117,35 +165,53 @@ services:
       MONGO_DB_USER: admin
       MONGO_DB_PASSWORD: crapisecretpassword
       MONGO_DB_NAME: crapi
-      JWT_SECRET: crapi-jwt-secret-benchmark
-      SERVER_PORT: "8080"
+      SECRET_KEY: crapi
+      SERVER_PORT: "8000"
+      TLS_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/app/health.sh"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
 
   benchmark-crapi-web:
     <<: *realistic_common
     image: crapi/crapi-web@sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504
     profiles: ["realistic"]
     depends_on:
-      - benchmark-crapi-identity
-      - benchmark-crapi-community
-      - benchmark-crapi-workshop
+      benchmark-crapi-identity:
+        condition: service_healthy
+      benchmark-crapi-community:
+        condition: service_healthy
+      benchmark-crapi-workshop:
+        condition: service_healthy
     environment:
-      IDENTITY_SERVER: http://benchmark-crapi-identity:8080
-      COMMUNITY_SERVER: http://benchmark-crapi-community:8080
-      WORKSHOP_SERVER: http://benchmark-crapi-workshop:8080
-      JWT_SECRET: crapi-jwt-secret-benchmark
+      COMMUNITY_SERVICE: benchmark-crapi-community:8087
+      IDENTITY_SERVICE: benchmark-crapi-identity:8080
+      WORKSHOP_SERVICE: benchmark-crapi-workshop:8000
+      MAILHOG_WEB_SERVICE: benchmark-crapi-mailhog:8025
+      TLS_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:80/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
 
   benchmark-crapi-proxy:
     <<: *realistic_common
     image: nginx@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
     profiles: ["realistic"]
     depends_on:
-      - benchmark-crapi-web
+      benchmark-crapi-web:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 24
-      start_period: 60s
+      start_period: 15s
     volumes:
       - ./benchmarks/docker/realistic/nginx/crapi-proxy.conf:/etc/nginx/conf.d/default.conf:ro
       - ./benchmarks/docker/realistic/certs/server.crt:/etc/nginx/certs/server.crt:ro
