@@ -178,6 +178,17 @@ class Settings(BaseSettings):
         default="/var/siber/benchmark",
         description="Isolated storage for benchmark APK artifacts (not customer upload path)",
     )
+    benchmark_ca_cert_path: str = Field(
+        default="",
+        description="Optional PEM bundle for trusting pinned realistic benchmark TLS certificates",
+    )
+    benchmark_active_realistic_enabled: bool = Field(
+        default=False,
+        description="Gate for active realistic suites (phase 11.3); remains disabled in 11.1",
+    )
+    benchmark_realistic_startup_seconds: int = Field(default=120, ge=30, le=600)
+    benchmark_realistic_suite_timeout_seconds: int = Field(default=90, ge=30, le=600)
+    benchmark_realistic_job_timeout_seconds: int = Field(default=300, ge=60, le=3600)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

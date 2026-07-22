@@ -7,14 +7,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.benchmark.manifests import repo_benchmarks_root
+from app.benchmark.manifests import REALISTIC_PASSIVE_SUITES, repo_benchmarks_root
 
 SMOKE_BASELINE_NAME = "smoke-v1.1.0"
 SMOKE_BASELINE_FILENAME = f"{SMOKE_BASELINE_NAME}.json"
+REALISTIC_BASELINE_NAME = "realistic-passive-v1.0.0"
+REALISTIC_BASELINE_FILENAME = f"{REALISTIC_BASELINE_NAME}.json"
 
 
 def smoke_baseline_path() -> Path:
     path = repo_benchmarks_root() / "baselines" / SMOKE_BASELINE_FILENAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def realistic_baseline_path() -> Path:
+    path = repo_benchmarks_root() / "baselines" / REALISTIC_BASELINE_FILENAME
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -26,24 +34,44 @@ def load_smoke_baseline() -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_baseline(suite: str) -> dict[str, Any] | None:
-    """Return suite metrics merged with smoke baseline metadata."""
-    smoke = load_smoke_baseline()
-    if smoke is None:
+def load_realistic_baseline() -> dict[str, Any] | None:
+    path = realistic_baseline_path()
+    if not path.is_file():
         return None
-    suite_data = smoke.get("suites", {}).get(suite)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _suite_baseline_payload(root: dict[str, Any], suite: str) -> dict[str, Any] | None:
+    suite_data = root.get("suites", {}).get(suite)
     if suite_data is None:
         return None
     return {
         **suite_data,
-        "baseline_name": smoke.get("baseline_name"),
-        "baseline_type": smoke.get("baseline_type"),
-        "fixture_version": smoke.get("fixture_version"),
-        "ground_truth_version": smoke.get("ground_truth_version"),
-        "git_commit": smoke.get("git_commit"),
-        "scanner_versions": smoke.get("scanner_versions"),
-        "scope": smoke.get("scope"),
+        "baseline_name": root.get("baseline_name"),
+        "baseline_type": root.get("baseline_type"),
+        "fixture_version": root.get("fixture_version"),
+        "ground_truth_version": root.get("ground_truth_version"),
+        "git_commit": root.get("git_commit"),
+        "scanner_versions": root.get("scanner_versions"),
+        "scope": root.get("scope"),
+        "subset": root.get("subset"),
+        "image_digests": root.get("image_digests"),
+        "fixture_startup_seconds": root.get("fixture_startup_seconds"),
     }
+
+
+def load_baseline(suite: str) -> dict[str, Any] | None:
+    """Return suite metrics merged with baseline metadata."""
+    if suite in REALISTIC_PASSIVE_SUITES:
+        realistic = load_realistic_baseline()
+        if realistic is None:
+            return None
+        return _suite_baseline_payload(realistic, suite)
+
+    smoke = load_smoke_baseline()
+    if smoke is None:
+        return None
+    return _suite_baseline_payload(smoke, suite)
 
 
 def suite_metrics_payload(

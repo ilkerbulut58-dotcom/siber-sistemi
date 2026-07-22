@@ -1,0 +1,6 @@
+expected_keys:
+  - missing-header-content-security-policy
+  - missing-header-strict-transport-security
+  - server-disclosure
+  - permissive-cors
+  - exposed-api-docs

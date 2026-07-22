@@ -1,9 +1,11 @@
 """Passive HTTP security checks (Safe Scan)."""
 
 import logging
+import os
 import re
 import ssl
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -41,6 +43,37 @@ SECURITY_HEADERS: dict[str, dict[str, str]] = {
 }
 
 SERVER_DISCLOSURE = re.compile(r"(apache|nginx|iis|php|express|asp\.net)", re.I)
+
+
+def _benchmark_ca_path() -> Path | None:
+    env_path = os.environ.get("BENCHMARK_CA_CERT_PATH", "").strip()
+    if env_path:
+        path = Path(env_path)
+        if path.is_file():
+            return path
+    default = (
+        Path(__file__).resolve().parents[3]
+        / "benchmarks"
+        / "docker"
+        / "realistic"
+        / "certs"
+        / "ca.crt"
+    )
+    return default if default.is_file() else None
+
+
+def _benchmark_ssl_context() -> ssl.SSLContext:
+    ca_path = _benchmark_ca_path()
+    if ca_path is not None:
+        return ssl.create_default_context(cafile=str(ca_path))
+    return ssl.create_default_context()
+
+
+def _httpx_verify():
+    ca_path = _benchmark_ca_path()
+    if ca_path is not None:
+        return str(ca_path)
+    return True
 
 
 async def scan_http_redirect(hostname: str, https_url: str) -> list[RawFinding]:
@@ -183,7 +216,7 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
 
     findings: list[RawFinding] = []
     try:
-        context = ssl.create_default_context()
+        context = _benchmark_ssl_context()
         with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock, context.wrap_socket(
             sock, server_hostname=parsed.hostname
         ) as ssock:
@@ -234,7 +267,7 @@ async def run_passive_http_scan(target_url: str) -> list[RawFinding]:
         findings.extend(await scan_http_redirect(hostname, target_url))
 
     try:
-        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, verify=_httpx_verify()) as client:
             response = await client.get(target_url)
             findings.extend(await scan_security_headers(target_url, response))
             findings.extend(await scan_disclosure_headers(target_url, response))

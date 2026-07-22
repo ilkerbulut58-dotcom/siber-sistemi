@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.benchmark.security import assert_scan_profile_allowed
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.models.scan import AuthorizationAcceptance, ScanJob, ScanProfile, ScanStatus
@@ -75,6 +76,7 @@ class ScanService:
             )
 
         profile = await self.get_profile(data.scan_profile)
+        assert_scan_profile_allowed(profile.name)
         target = str(data.target_url)
         if not settings.skip_domain_verification and domain.hostname not in target:
             raise AppError(

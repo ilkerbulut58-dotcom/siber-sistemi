@@ -1,0 +1,72 @@
+target: web-realistic-juice-shop
+target_type: web
+target_reference: https://benchmark-juice-proxy/
+environment: benchmark
+expected_findings:
+  - expected_key: missing-header-content-security-policy
+    title: Content Security Policy eksik
+    category: missing-header-content-security-policy
+    severity: medium
+    automation_support: supported
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-csp
+  - expected_key: missing-header-strict-transport-security
+    title: HSTS eksik
+    category: missing-header-strict-transport-security
+    severity: medium
+    automation_support: supported
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-hsts
+  - expected_key: missing-header-x-content-type-options
+    title: X-Content-Type-Options eksik
+    category: missing-header-x-content-type-options
+    severity: low
+    automation_support: supported
+    detection_required: true
+  - expected_key: x-powered-by-disclosure
+    title: X-Powered-By ifşası
+    category: x-powered-by-disclosure
+    severity: info
+    automation_support: supported
+    detection_required: true
+  - expected_key: server-disclosure
+    title: Sunucu yazılım bilgisi görünüyor
+    category: server-disclosure
+    severity: info
+    automation_support: supported
+    detection_required: true
+  - expected_key: insecure-cookie-flags
+    title: Cookie güvenlik bayrakları eksik
+    category: insecure-cookie-flags
+    severity: medium
+    automation_support: supported
+    detection_required: false
+  - expected_key: exposed-api-docs
+    title: API dokümantasyonu açık
+    category: exposed-api-docs
+    severity: medium
+    automation_support: partially_supported
+    detection_required: true
+    framework_refs:
+      - framework: OWASP_TOP_10
+        control: A05:2021
+  - expected_key: stored-xss-signal
+    title: Stored XSS sinyali
+    category: xss-stored
+    severity: high
+    automation_support: manual_only
+    detection_required: false
+    framework_refs:
+      - framework: OWASP_TOP_10
+        control: A03:2021
+  - expected_key: broken-access-control-admin
+    title: Broken access control (admin)
+    category: broken-access-control
+    severity: high
+    automation_support: unsupported
+    detection_required: false
+    framework_refs:
+      - framework: OWASP_TOP_10
+        control: A01:2021

@@ -1,0 +1,67 @@
+{
+  "baseline_name": "realistic-passive-v1.0.0",
+  "baseline_type": "realistic_pinned_passive",
+  "description": "Pinned Juice Shop and crAPI passive main-subset calibration only. Does not represent general product security accuracy. Captures the current pinned realistic passive subset quality level for regression protection.",
+  "fixture_version": "1.0.0",
+  "ground_truth_version": "1.0.0",
+  "subset": "main",
+  "scope": [
+    "web-realistic-passive",
+    "api-realistic-passive"
+  ],
+  "created_at": "2026-07-22T20:04:00+00:00",
+  "git_commit": "743a5a3ce4c4b258696b31910d90f8b1ad4bafd4",
+  "calibration_ci_run_id": "29931730000",
+  "calibration_attempts": 2,
+  "fixture_startup_seconds": 38,
+  "image_digests": {
+    "juice-shop": "sha256:2765a26de7647609099a338d5b7f61085d95903c8703bb70f03fcc4b12f0818d",
+    "nginx-alpine": "sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591",
+    "crapi-web": "sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504",
+    "crapi-identity": "sha256:29099da8ad457e303c46dabb8b913b06cb583616f850d116359dfc69d07f1491",
+    "crapi-community": "sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687",
+    "crapi-workshop": "sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a",
+    "crapi-mailhog": "sha256:75119d12ee43e5405a92c538bfa2a9e0811fd0d99cc8185dd44a125ed4db34e6",
+    "postgres-14": "sha256:2a453914efff6156786247b2399e6f9f18d7fc37e1ca5574a23aba172cf37d3e",
+    "mongo-4.4": "sha256:52c42cbab240b3c5b1748582cc13ef46d521ddacae002bbbda645cebed270ec0"
+  },
+  "scanner_versions": {
+    "app": "0.1.0",
+    "fixture_version": "1.0.0",
+    "images_lock_schema": 1
+  },
+  "suites": {
+    "web-realistic-passive": {
+      "run_id": "calibration-29931730000-web-main",
+      "true_positive_count": 3,
+      "false_negative_count": 2,
+      "confirmed_false_positive_count": 1,
+      "additional_valid_finding_count": 0,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 0,
+      "precision": 0.75,
+      "recall": 0.6,
+      "f1_score": 0.667,
+      "duration_seconds": 35.0
+    },
+    "api-realistic-passive": {
+      "run_id": "calibration-29931730000-api-main",
+      "true_positive_count": 3,
+      "false_negative_count": 2,
+      "confirmed_false_positive_count": 3,
+      "additional_valid_finding_count": 0,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 0,
+      "precision": 0.5,
+      "recall": 0.6,
+      "f1_score": 0.545,
+      "duration_seconds": 4.3
+    }
+  }
+}

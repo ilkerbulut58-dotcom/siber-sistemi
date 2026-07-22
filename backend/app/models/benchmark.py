@@ -27,6 +27,13 @@ class BenchmarkRunStatus(enum.StrEnum):
     FAILED = "failed"
 
 
+class AutomationSupport(enum.StrEnum):
+    SUPPORTED = "supported"
+    PARTIALLY_SUPPORTED = "partially_supported"
+    MANUAL_ONLY = "manual_only"
+    UNSUPPORTED = "unsupported"
+
+
 class BenchmarkClassification(enum.StrEnum):
     TRUE_POSITIVE = "true_positive"
     FALSE_NEGATIVE = "false_negative"
@@ -70,6 +77,10 @@ class ExpectedFinding(Base, TimestampMixin):
     accepted_alternative_keys: Mapped[list[str] | None] = mapped_column(JSON)
     expected_risk_score: Mapped[float | None] = mapped_column(Float)
     expected_ai_review_status: Mapped[str | None] = mapped_column(String(50))
+    automation_support: Mapped[str] = mapped_column(
+        String(30), nullable=False, default=AutomationSupport.SUPPORTED
+    )
+    framework_refs: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
 
 
 class BenchmarkRun(Base, TimestampMixin):

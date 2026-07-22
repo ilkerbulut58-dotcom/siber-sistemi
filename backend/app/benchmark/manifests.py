@@ -9,9 +9,29 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.benchmark.fixtures import BenchmarkFixture, load_fixture
 
-ALLOWED_SUITES = frozenset({"web-smoke", "api-smoke", "android-smoke"})
-ALLOWED_DOCKER_SERVICES = frozenset({"benchmark-web", "benchmark-api"})
-ALLOWED_TARGET_HOSTS = frozenset(
+SMOKE_SUITES = frozenset({"web-smoke", "api-smoke", "android-smoke"})
+REALISTIC_PASSIVE_SUITES = frozenset({"web-realistic-passive", "api-realistic-passive"})
+ACTIVE_REALISTIC_SUITES = frozenset({"web-realistic-active", "api-realistic-active"})
+ALLOWED_SUITES = SMOKE_SUITES | REALISTIC_PASSIVE_SUITES | ACTIVE_REALISTIC_SUITES
+
+SMOKE_DOCKER_SERVICES = frozenset({"benchmark-web", "benchmark-api"})
+REALISTIC_DOCKER_SERVICES = frozenset(
+    {
+        "benchmark-juice-shop",
+        "benchmark-juice-proxy",
+        "benchmark-crapi-web",
+        "benchmark-crapi-identity",
+        "benchmark-crapi-community",
+        "benchmark-crapi-workshop",
+        "benchmark-crapi-mailhog",
+        "benchmark-crapi-postgres",
+        "benchmark-crapi-mongo",
+        "benchmark-crapi-proxy",
+    }
+)
+ALLOWED_DOCKER_SERVICES = SMOKE_DOCKER_SERVICES | REALISTIC_DOCKER_SERVICES
+
+SMOKE_TARGET_HOSTS = frozenset(
     {
         "127.0.0.1",
         "localhost",
@@ -19,6 +39,15 @@ ALLOWED_TARGET_HOSTS = frozenset(
         "benchmark-api",
     }
 )
+REALISTIC_TARGET_HOSTS = frozenset(
+    {
+        "benchmark-juice-proxy",
+        "benchmark-crapi-proxy",
+        "benchmark-juice-shop",
+        "benchmark-crapi-web",
+    }
+)
+ALLOWED_TARGET_HOSTS = SMOKE_TARGET_HOSTS | REALISTIC_TARGET_HOSTS
 
 
 class SuiteTargetManifest(BaseModel):
@@ -31,6 +60,8 @@ class SuiteTargetManifest(BaseModel):
     hostname: str | None = None
     artifact_script: str | None = None
     ground_truth: str
+    subset_manifest: str | None = None
+    blocked: bool = False
 
     @field_validator("docker_services")
     @classmethod
@@ -63,6 +94,7 @@ class BenchmarkSuiteManifest(BaseModel):
     fixture_set: str = "smoke"
     description: str | None = None
     targets: list[SuiteTargetManifest]
+    blocked: bool = False
 
     @field_validator("suite")
     @classmethod
@@ -73,7 +105,12 @@ class BenchmarkSuiteManifest(BaseModel):
 
 
 def repo_benchmarks_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "benchmarks"
+    module_root = Path(__file__).resolve()
+    container_layout = module_root.parents[2] / "benchmarks"
+    repo_layout = module_root.parents[3] / "benchmarks"
+    if container_layout.is_dir():
+        return container_layout
+    return repo_layout
 
 
 def load_suite_manifest(suite: str) -> BenchmarkSuiteManifest:

@@ -1,0 +1,17 @@
+suite: web-realistic-active
+version: "1.0.0"
+fixture_set: realistic-active
+description: Stub — active Juice Shop benchmark blocked until phase 11.3
+blocked: true
+targets:
+  - name: web-realistic-juice-shop-active
+    target_type: web
+    scan_profile: benchmark-active-web
+    blocked: true
+    docker_services:
+      - benchmark-juice-shop
+      - benchmark-juice-proxy
+    health_url: https://benchmark-juice-proxy/
+    target_url: https://benchmark-juice-proxy/
+    hostname: benchmark-juice-proxy
+    ground_truth: fixtures/web-realistic-passive/ground-truth.yaml
