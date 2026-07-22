@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 _scanner_stats: ContextVar[list[ScannerRunStats] | None] = ContextVar("scanner_run_stats", default=None)
+_pending_enrich: ContextVar[dict[str, dict[str, Any]] | None] = ContextVar("scanner_pending_enrich", default=None)
 
 
 @dataclass
@@ -24,20 +25,28 @@ class ScannerRunStats:
         return asdict(self)
 
 
-_pending_enrich: ContextVar[dict[str, dict[str, Any]] | None] = ContextVar("scanner_pending_enrich", default=None)
+def _stats_bucket() -> list[ScannerRunStats]:
+    bucket = _scanner_stats.get()
+    if bucket is None:
+        bucket = []
+        _scanner_stats.set(bucket)
+    return bucket
+
+
+def _pending_bucket() -> dict[str, dict[str, Any]]:
+    bucket = _pending_enrich.get()
+    if bucket is None:
+        bucket = {}
+        _pending_enrich.set(bucket)
+    return bucket
 
 
 def set_pending_scanner_enrich(scanner_name: str, **fields: Any) -> None:
-    pending = dict(_pending_enrich.get() or {})
-    pending[scanner_name] = fields
-    _pending_enrich.set(pending)
+    _pending_bucket()[scanner_name] = fields
 
 
 def pop_pending_scanner_enrich(scanner_name: str) -> dict[str, Any]:
-    pending = dict(_pending_enrich.get() or {})
-    values = pending.pop(scanner_name, {})
-    _pending_enrich.set(pending)
-    return values
+    return _pending_bucket().pop(scanner_name, {})
 
 
 def reset_scanner_stats() -> None:
@@ -46,9 +55,7 @@ def reset_scanner_stats() -> None:
 
 
 def record_scanner_stats(stats: ScannerRunStats) -> None:
-    current = list(_scanner_stats.get() or [])
-    current.append(stats)
-    _scanner_stats.set(current)
+    _stats_bucket().append(stats)
 
 
 def get_scanner_stats() -> list[ScannerRunStats]:
@@ -56,8 +63,7 @@ def get_scanner_stats() -> list[ScannerRunStats]:
 
 
 def enrich_scanner_stats(scanner_name: str, **fields: Any) -> None:
-    current = _scanner_stats.get() or []
-    for item in reversed(current):
+    for item in reversed(_stats_bucket()):
         if item.scanner_name != scanner_name:
             continue
         for key, value in fields.items():
