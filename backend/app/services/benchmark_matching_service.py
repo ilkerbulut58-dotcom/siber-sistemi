@@ -102,9 +102,7 @@ def _relaxed_match(expected, finding: Finding) -> bool:
         return True
     if expected.category and expected.category.lower() in (finding.title or "").lower():
         return True
-    if expected.expected_key.lower() in (finding.title or "").lower():
-        return True
-    return False
+    return expected.expected_key.lower() in (finding.title or "").lower()
 
 
 def _would_match(expected, finding: Finding) -> bool:

@@ -30,7 +30,7 @@ def correlate_findings(raw_findings: list[RawFinding]) -> list[CorrelatedFinding
         groups[_grouping_key(raw)].append(raw)
 
     correlated: list[CorrelatedFinding] = []
-    for (correlation_key, group_token), items in groups.items():
+    for (correlation_key, _group_token), items in groups.items():
         primary_url = normalize_url(items[0].affected_url)
         correlated.append(_merge_group(correlation_key, primary_url, items))
 

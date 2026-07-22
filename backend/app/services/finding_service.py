@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analysis.correlation_rules import SECRET_CORRELATION_KEYS, normalize_url, secret_identity_token
+from app.analysis.correlation_rules import normalize_url, secret_identity_token
 from app.analysis.pipeline import analyze_scan_findings
 from app.analysis.types import AnalyzedFinding
 from app.core.exceptions import AppError
