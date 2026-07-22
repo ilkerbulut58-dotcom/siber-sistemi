@@ -7,11 +7,11 @@ import json
 import logging
 import os
 import shutil
-from pathlib import Path
 from typing import Any
 
 import httpx
 
+from app.benchmark.manifests import repo_benchmarks_root
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -19,12 +19,8 @@ logger = logging.getLogger(__name__)
 NUCLEI_IMAGE_VERSION = "3.3.7"
 
 
-def _repo_benchmarks_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "benchmarks"
-
-
 def _load_images_lock() -> dict[str, Any]:
-    lock_path = _repo_benchmarks_root() / "docker" / "images.lock.json"
+    lock_path = repo_benchmarks_root() / "docker" / "images.lock.json"
     with lock_path.open(encoding="utf-8") as stream:
         return json.load(stream)
 
