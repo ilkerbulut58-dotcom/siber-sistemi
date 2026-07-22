@@ -4,7 +4,7 @@ services:
     profiles: ["benchmark"]
     networks: [benchmark_internal]
     ports:
-      - "127.0.0.1:18080:8080"
+      - "18080:8080"
     volumes:
       - ./benchmarks/docker/web.conf:/etc/nginx/conf.d/default.conf:ro
   benchmark-api:
@@ -12,9 +12,9 @@ services:
     profiles: ["benchmark"]
     networks: [benchmark_internal]
     ports:
-      - "127.0.0.1:18081:8080"
+      - "18081:8080"
     volumes:
       - ./benchmarks/docker/api.conf:/etc/nginx/conf.d/default.conf:ro
 networks:
   benchmark_internal:
-    internal: true
+    driver: bridge

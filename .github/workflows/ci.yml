@@ -176,7 +176,7 @@ jobs:
             web_ok=0
             api_ok=0
             curl -sf http://127.0.0.1:18080/ >/dev/null && web_ok=1 || true
-            curl -sf http://127.0.0.1:18081/ >/dev/null && api_ok=1 || true
+            curl -sf http://127.0.0.1:18081/api/health >/dev/null && api_ok=1 || true
             if [ "$web_ok" = "1" ] && [ "$api_ok" = "1" ]; then
               echo "Benchmark fixtures healthy"
               exit 0
@@ -276,7 +276,7 @@ jobs:
             web_ok=0
             api_ok=0
             curl -sf http://127.0.0.1:18080/ >/dev/null && web_ok=1 || true
-            curl -sf http://127.0.0.1:18081/ >/dev/null && api_ok=1 || true
+            curl -sf http://127.0.0.1:18081/api/health >/dev/null && api_ok=1 || true
             if [ "$web_ok" = "1" ] && [ "$api_ok" = "1" ]; then
               echo "Benchmark fixtures healthy"
               exit 0
