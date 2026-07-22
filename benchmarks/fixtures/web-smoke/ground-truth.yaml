@@ -1,0 +1,53 @@
+target: web-security-test-1
+target_type: web
+target_reference: http://127.0.0.1:18080/
+environment: benchmark
+expected_findings:
+  - expected_key: missing-header-content-security-policy
+    title: Content Security Policy eksik
+    category: missing-header-content-security-policy
+    severity: medium
+    affected_location: /
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-csp
+      - content-security-policy-missing
+  - expected_key: missing-header-strict-transport-security
+    title: HSTS eksik
+    category: missing-header-strict-transport-security
+    severity: medium
+    affected_location: /
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-hsts
+  - expected_key: missing-header-x-content-type-options
+    title: X-Content-Type-Options eksik
+    category: missing-header-x-content-type-options
+    severity: low
+    affected_location: /
+    detection_required: true
+  - expected_key: x-powered-by-disclosure
+    title: X-Powered-By ifşası
+    category: x-powered-by-disclosure
+    severity: info
+    affected_location: /
+    detection_required: true
+  - expected_key: insecure-cookie-flags
+    title: Cookie güvenlik bayrakları eksik
+    category: insecure-cookie-flags
+    severity: medium
+    affected_location: /
+    detection_required: true
+  - expected_key: hardcoded-password
+    title: Hardcoded password sinyali
+    category: hardcoded-password
+    severity: high
+    affected_location: /
+    detection_required: true
+  - expected_key: security-txt-present
+    title: Security.txt mevcut
+    category: security-txt-present
+    severity: info
+    affected_location: /.well-known/security.txt
+    detection_required: false
+    description: Informational coverage — not all scanners emit a dedicated finding.

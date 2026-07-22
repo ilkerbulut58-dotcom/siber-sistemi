@@ -1,0 +1,14 @@
+suite: web-smoke
+version: "1.0.0"
+fixture_set: smoke
+description: Deterministic closed-network web security fixture
+targets:
+  - name: web-security-test-1
+    target_type: web
+    scan_profile: safe
+    docker_services:
+      - benchmark-web
+    health_url: http://127.0.0.1:18080/
+    target_url: http://127.0.0.1:18080/
+    hostname: benchmark-web.local
+    ground_truth: fixtures/web-smoke/ground-truth.yaml

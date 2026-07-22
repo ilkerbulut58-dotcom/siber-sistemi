@@ -1,0 +1,12 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-9.1.1, pluggy-1.6.0 -- C:\GOGAPP\SIBER Sistemi\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\GOGAPP\SIBER Sistemi\backend
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_pdf_utils.py::test_pdf_renders_turkish_characters PASSED      [100%]
+
+============================== 1 passed in 0.94s ==============================

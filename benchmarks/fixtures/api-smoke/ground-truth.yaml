@@ -1,0 +1,43 @@
+target: api-security-test-1
+target_type: api
+target_reference: http://127.0.0.1:18081/api/health
+environment: benchmark
+expected_findings:
+  - expected_key: missing-header-content-security-policy
+    title: Content Security Policy eksik
+    category: missing-header-content-security-policy
+    severity: medium
+    affected_location: /api/health
+    detection_required: true
+  - expected_key: missing-header-strict-transport-security
+    title: HSTS eksik
+    category: missing-header-strict-transport-security
+    severity: medium
+    affected_location: /api/health
+    detection_required: true
+  - expected_key: missing-header-x-content-type-options
+    title: X-Content-Type-Options eksik
+    category: missing-header-x-content-type-options
+    severity: low
+    affected_location: /api/health
+    detection_required: true
+  - expected_key: x-powered-by-disclosure
+    title: X-Powered-By ifşası
+    category: x-powered-by-disclosure
+    severity: info
+    affected_location: /api/health
+    detection_required: true
+  - expected_key: permissive-cors
+    title: Permissive CORS
+    category: permissive-cors
+    severity: info
+    affected_location: /api/health
+    detection_required: false
+    description: Informational — passive scanner may not emit a dedicated CORS finding today.
+  - expected_key: public-api-docs
+    title: Public API documentation
+    category: public-api-docs
+    severity: info
+    affected_location: /api/docs
+    detection_required: false
+    description: Unsupported passive coverage marker for future expansion.

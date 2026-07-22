@@ -1,0 +1,42 @@
+target: android-security-test-1
+target_type: android
+target_reference: fixtures/android-smoke/build_fixture_apk.py
+environment: benchmark
+expected_findings:
+  - expected_key: mobile-debuggable
+    title: Debuggable uygulama
+    category: mobile-debuggable
+    severity: high
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-allow-backup
+    title: Android yedekleme etkin
+    category: mobile-allow-backup
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-cleartext-traffic
+    title: Cleartext traffic etkin
+    category: mobile-cleartext-traffic
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-exported-component
+    title: Exported component
+    category: mobile-exported-component
+    severity: high
+    affected_location: .ExportedActivity
+    detection_required: true
+  - expected_key: mobile-permission-read_sms
+    title: Tehlikeli izin READ_SMS
+    category: mobile-permission-read_sms
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-secret-fake_api_key
+    title: Fake API key sinyali
+    category: mobile-secret-fake_api_key
+    severity: high
+    affected_location: res/values/strings.xml
+    detection_required: false
+    description: Secret pattern coverage may vary; tracked but not gate-critical initially.

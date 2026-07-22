@@ -1,0 +1,10 @@
+suite: android-smoke
+version: "1.0.0"
+fixture_set: smoke
+description: Deterministic local APK static analysis fixture
+targets:
+  - name: android-security-test-1
+    target_type: android
+    docker_services: []
+    artifact_script: fixtures/android-smoke/build_fixture_apk.py
+    ground_truth: fixtures/android-smoke/ground-truth.yaml

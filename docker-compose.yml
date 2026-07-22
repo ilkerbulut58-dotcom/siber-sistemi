@@ -1,0 +1,116 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: siber-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-siber}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-siber}
+      POSTGRES_DB: ${POSTGRES_DB:-siber}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siber} -d ${POSTGRES_DB:-siber}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siber-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: siber-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siber-network
+
+  api:
+    build:
+      context: ./backend
+      target: development
+    container_name: siber-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-siber}:${POSTGRES_PASSWORD:-siber}@postgres:5432/${POSTGRES_DB:-siber}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - siber-network
+
+  worker:
+    build:
+      context: ./backend
+      target: development
+    container_name: siber-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-siber}:${POSTGRES_PASSWORD:-siber}@postgres:5432/${POSTGRES_DB:-siber}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - siber-network
+    profiles:
+      - workers
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: siber-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - siber-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  siber-network:
+    driver: bridge

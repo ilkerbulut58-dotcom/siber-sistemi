@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <title>SIBER Mobil Güvenlik Raporu — {{ app.package_name or app.original_filename }}</title>
+  <style>
+    body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; margin: 32px; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .meta { color: #555; margin-bottom: 24px; }
+    .summary { background: #f4f6f8; border: 1px solid #ddd; padding: 12px 16px; margin-bottom: 24px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 6px; }
+    .critical { background: #fee; color: #900; }
+    .high { background: #fed; color: #a40; }
+    .medium { background: #ffd; color: #860; }
+    .low { background: #def; color: #046; }
+    .info { background: #eee; color: #444; }
+    .finding { border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
+    .finding h3 { margin: 8px 0 4px; font-size: 14px; }
+    .muted { color: #666; font-size: 11px; }
+    .limitations { font-size: 11px; color: #666; margin-top: 24px; border-top: 1px solid #ddd; padding-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>SIBER Mobil Uygulama Güvenlik Raporu</h1>
+  <p class="meta">
+    Uygulama: <strong>{{ app.application_name or app.original_filename }}</strong><br/>
+    Paket: {{ app.package_name or "—" }} · Platform: {{ app.platform }}<br/>
+    Sürüm: {{ app.version_name or "—" }} ({{ app.version_code or "—" }})<br/>
+    SHA-256: <code>{{ app.sha256 }}</code><br/>
+    Güvenlik skoru: {{ app.security_score if app.security_score is not none else "—" }}/100<br/>
+    Analiz tarihi: {{ analyzed_at }} · Rapor: {{ generated_at }}
+  </p>
+
+  <div class="summary">
+    <strong>Özet:</strong> {{ risk_summary }}<br/>
+    {% for sev, count in severity_counts.items() if count %}
+      <span class="badge {{ sev }}">{{ severity_labels[sev] }}: {{ count }}</span>
+    {% endfor %}
+    {% if masvs_categories %}
+    <br/><strong>MASVS:</strong>
+    {% for cat, count in masvs_categories.items() %}
+      {{ cat }} ({{ count }}){% if not loop.last %}, {% endif %}
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {% if findings %}
+  <h2>Bulgular ({{ findings|length }})</h2>
+  {% for f in findings %}
+  <div class="finding">
+    <span class="badge {{ f.severity }}">{{ severity_labels.get(f.severity, f.severity) }}</span>
+    <h3>{{ f.title }}</h3>
+    {% if f.affected_component %}
+    <p class="muted">Bileşen: {{ f.affected_component }}</p>
+    {% endif %}
+    {% if f.masvs_category %}
+    <p class="muted">MASVS: {{ f.masvs_category }}</p>
+    {% endif %}
+    {% if f.description %}
+    <p>{{ f.description }}</p>
+    {% endif %}
+    {% if f.remediation %}
+    <p><strong>Öneri:</strong> {{ f.remediation }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p>Statik analiz sonucunda bulgu tespit edilmedi.</p>
+  {% endif %}
+
+  <div class="limitations">
+    <strong>Test kapsamı ve sınırlamalar:</strong>
+    <ul>
+      <li>Yalnızca statik APK dosya analizi uygulanmıştır.</li>
+      <li>Dinamik saldırı, kod çalıştırma, cihaz istismarı veya runtime manipülasyonu yapılmamıştır.</li>
+      <li>Secret pattern eşleşmeleri false positive içerebilir; manuel doğrulama önerilir.</li>
+      <li>Bu rapor bir penetrasyon testi sertifikası veya uyumluluk garantisi değildir.</li>
+      <li>Detaylı kapsam: docs/customer-scope-and-limits.md</li>
+    </ul>
+  </div>
+</body>
+</html>

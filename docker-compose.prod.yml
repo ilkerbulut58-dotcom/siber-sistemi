@@ -1,0 +1,228 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: siber-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - siber-network
+      - mobile-analysis-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: siber-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - siber-network
+      - mobile-analysis-network
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: siber-zap
+    restart: unless-stopped
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - "0.0.0.0"
+      - -port
+      - "8080"
+      - -config
+      - api.disablekey=true
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/JSON/core/view/version/"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+    networks:
+      - siber-network
+
+  api:
+    build:
+      context: ./backend
+      target: production
+    container_name: siber-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      UPLOAD_RATE_LIMIT_PER_HOUR: ${UPLOAD_RATE_LIMIT_PER_HOUR:-20}
+      RETEST_RATE_LIMIT_PER_HOUR: ${RETEST_RATE_LIMIT_PER_HOUR:-30}
+      SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
+      USE_CELERY_FOR_SCANS: ${USE_CELERY_FOR_SCANS:-true}
+      NUCLEI_TEMPLATES: /opt/nuclei-templates
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      ZAP_API_URL: http://zap:8080
+      ZAP_ENABLED: ${ZAP_ENABLED:-true}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
+      MOBILE_STORAGE_PATH: /var/siber/mobile
+      MOBILE_MAX_UPLOAD_BYTES: ${MOBILE_MAX_UPLOAD_BYTES:-104857600}
+    volumes:
+      - mobile_data:/var/siber/mobile
+    ports:
+      - "127.0.0.1:8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - siber-network
+
+  worker:
+    build:
+      context: ./backend
+      target: production
+    container_name: siber-worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --beat --loglevel=info -Q scans,monitoring --concurrency=2
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      SECRET_KEY: ${SECRET_KEY}
+      SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
+      USE_CELERY_FOR_SCANS: "true"
+      NUCLEI_TEMPLATES: /opt/nuclei-templates
+      ZAP_API_URL: http://zap:8080
+      ZAP_ENABLED: "true"
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
+      MOBILE_STORAGE_PATH: /var/siber/mobile
+      MOBILE_MAX_UPLOAD_BYTES: ${MOBILE_MAX_UPLOAD_BYTES:-104857600}
+    volumes:
+      - mobile_data:/var/siber/mobile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      zap:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - siber-network
+
+  mobile-worker:
+    build:
+      context: ./backend
+      target: production
+    container_name: siber-mobile-worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --loglevel=info -Q mobile --concurrency=1 --max-tasks-per-child=1 --without-gossip --without-mingle
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      SECRET_KEY: ${SECRET_KEY}
+      MOBILE_STORAGE_PATH: /var/siber/mobile
+      MOBILE_MAX_UPLOAD_BYTES: ${MOBILE_MAX_UPLOAD_BYTES:-104857600}
+      MOBILE_ANALYSIS_TIMEOUT_SECONDS: ${MOBILE_ANALYSIS_TIMEOUT_SECONDS:-600}
+    volumes:
+      - mobile_data:/var/siber/mobile
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    mem_limit: ${MOBILE_ANALYSIS_MEMORY_LIMIT:-768m}
+    cpus: ${MOBILE_ANALYSIS_CPUS:-1.0}
+    pids_limit: ${MOBILE_ANALYSIS_PIDS_LIMIT:-128}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mobile-analysis-network
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: siber-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      API_INTERNAL_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3011:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - siber-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mobile_data:
+
+networks:
+  siber-network:
+    driver: bridge
+  mobile-analysis-network:
+    driver: bridge
+    internal: true
