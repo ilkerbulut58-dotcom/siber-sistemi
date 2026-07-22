@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.benchmark.customer_validation import CustomerVisibility, build_customer_validation_artifact, compute_customer_visible_metrics
+from app.benchmark.customer_validation import (
+    CustomerVisibility,
+    build_customer_validation_artifact,
+    compute_customer_visible_metrics,
+)
 from app.scanners.base import RawFinding
 
 
