@@ -287,7 +287,24 @@ jobs:
         run: alembic upgrade head
       - name: Start realistic fixtures (closed network)
         working-directory: ${{ github.workspace }}
-        run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
+        run: |
+          docker compose -f docker-compose.realistic.yml --profile realistic up -d
+          for i in $(seq 1 60); do
+            juice=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' siber-sistemi-benchmark-juice-proxy-1 2>/dev/null || echo missing)
+            crapi=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' siber-sistemi-benchmark-crapi-proxy-1 2>/dev/null || echo missing)
+            echo "wait=$i juice_proxy=$juice crapi_proxy=$crapi"
+            if [ "$juice" = "healthy" ] && [ "$crapi" = "healthy" ]; then
+              echo "Realistic proxies healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Realistic fixtures failed health check"
+          docker compose -f docker-compose.realistic.yml --profile realistic ps
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-identity --tail 120 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-web --tail 80 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-proxy --tail 80 || true
+          exit 1
       - name: Run realistic subset benchmarks (report-only)
         working-directory: ${{ github.workspace }}
         timeout-minutes: 5
@@ -464,7 +481,24 @@ jobs:
         run: alembic upgrade head
       - name: Start realistic fixtures (closed network)
         working-directory: ${{ github.workspace }}
-        run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
+        run: |
+          docker compose -f docker-compose.realistic.yml --profile realistic up -d
+          for i in $(seq 1 60); do
+            juice=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' siber-sistemi-benchmark-juice-proxy-1 2>/dev/null || echo missing)
+            crapi=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' siber-sistemi-benchmark-crapi-proxy-1 2>/dev/null || echo missing)
+            echo "wait=$i juice_proxy=$juice crapi_proxy=$crapi"
+            if [ "$juice" = "healthy" ] && [ "$crapi" = "healthy" ]; then
+              echo "Realistic proxies healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Realistic fixtures failed health check"
+          docker compose -f docker-compose.realistic.yml --profile realistic ps
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-identity --tail 120 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-web --tail 80 || true
+          docker compose -f docker-compose.realistic.yml --profile realistic logs benchmark-crapi-proxy --tail 80 || true
+          exit 1
       - name: Run realistic subset (report-only)
         working-directory: ${{ github.workspace }}
         timeout-minutes: 5

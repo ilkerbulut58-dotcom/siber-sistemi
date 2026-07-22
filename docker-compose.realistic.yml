@@ -92,16 +92,28 @@ services:
       benchmark-crapi-mailhog:
         condition: service_healthy
     environment:
+      LOG_LEVEL: INFO
       DB_HOST: benchmark-crapi-postgres
       DB_PORT: "5432"
       DB_USER: admin
       DB_PASSWORD: crapisecretpassword
       DB_NAME: crapi
       SERVER_PORT: "8080"
+      ENABLE_SHELL_INJECTION: "false"
       JWT_SECRET: crapi
       MAILHOG_HOST: benchmark-crapi-mailhog
       MAILHOG_PORT: "1025"
       MAILHOG_DOMAIN: example.com
+      SMTP_HOST: benchmark-crapi-mailhog
+      SMTP_PORT: "1025"
+      SMTP_EMAIL: user@example.com
+      SMTP_PASS: mailhog
+      SMTP_FROM: no-reply@example.com
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      JWT_EXPIRATION: "604800000"
+      ENABLE_LOG4J: "false"
+      API_GATEWAY_URL: https://api.mypremiumdealership.com
       TLS_ENABLED: "false"
     healthcheck:
       test: ["CMD-SHELL", "/app/health.sh"]
