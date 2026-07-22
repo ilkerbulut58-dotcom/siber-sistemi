@@ -22,6 +22,7 @@ from app.benchmark.manifests import (
     load_suite_manifest,
 )
 from app.benchmark.baseline import REALISTIC_BASELINE_NAME, load_baseline, load_realistic_baseline
+from app.benchmark.security import assert_scan_profile_allowed, assert_suite_runnable
 from app.services.benchmark_matching_service import match_findings
 
 
