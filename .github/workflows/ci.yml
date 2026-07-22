@@ -66,7 +66,6 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: development
-          SKIP_DOMAIN_VERIFICATION: "true"
         run: pytest --cov=app --cov-report=term-missing
 
   frontend:
@@ -164,7 +163,6 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: development
-          SKIP_DOMAIN_VERIFICATION: "true"
         run: pytest -q
 
       - name: Start closed benchmark fixtures
@@ -267,7 +265,6 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: development
-          SKIP_DOMAIN_VERIFICATION: "true"
         run: pytest -q
       - name: Start benchmark fixtures
         working-directory: .
