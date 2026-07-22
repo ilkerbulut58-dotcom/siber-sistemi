@@ -58,8 +58,7 @@ jobs:
         run: ruff check app tests
 
       - name: Verify pinned benchmark images
-        working-directory: ..
-        run: python scripts/verify-pinned-images.py
+        run: python "${{ github.workspace }}/scripts/verify-pinned-images.py"
 
       - name: Run migrations
         env:
@@ -281,17 +280,16 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Verify pinned images
-        working-directory: .
-        run: python scripts/verify-pinned-images.py
+        run: python "${{ github.workspace }}/scripts/verify-pinned-images.py"
       - name: Run migrations
         env:
           DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
         run: alembic upgrade head
       - name: Start realistic fixtures (closed network)
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
       - name: Run realistic subset benchmarks (report-only)
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         timeout-minutes: 5
         env:
           DATABASE_URL: postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber
@@ -321,7 +319,7 @@ jobs:
             benchmarks/reports/*.html
       - name: Tear down realistic fixtures
         if: always()
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         run: docker compose -f docker-compose.realistic.yml --profile realistic down -v
 
   benchmark-main:
@@ -459,17 +457,16 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Verify pinned images
-        working-directory: .
-        run: python scripts/verify-pinned-images.py
+        run: python "${{ github.workspace }}/scripts/verify-pinned-images.py"
       - name: Run migrations
         env:
           DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
         run: alembic upgrade head
       - name: Start realistic fixtures (closed network)
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
       - name: Run realistic subset (report-only)
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         timeout-minutes: 5
         run: |
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
@@ -494,7 +491,7 @@ jobs:
             benchmarks/reports/*.html
       - name: Tear down realistic fixtures
         if: always()
-        working-directory: .
+        working-directory: ${{ github.workspace }}
         run: docker compose -f docker-compose.realistic.yml --profile realistic down -v
 
   benchmark-extended:
