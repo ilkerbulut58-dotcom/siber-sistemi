@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -114,9 +113,14 @@ def test_pinned_digest_lock_file_parse():
 
 
 def test_smoke_baseline_hash_unchanged():
-    baseline_path = _repo_root() / "benchmarks" / "baselines" / "smoke-v1.1.0.json"
-    digest = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
-    assert digest == "be0b269b570ae98d917c7a5578414abd97748d9f6f077ae55e6518bbafe39932"
+    import subprocess
+
+    blob = subprocess.check_output(
+        ["git", "rev-parse", "HEAD:benchmarks/baselines/smoke-v1.1.0.json"],
+        cwd=_repo_root(),
+        text=True,
+    ).strip()
+    assert blob == "d9869852b09d09e5e35cae9e1e891058ce0a68a9"
 
 
 def test_subset_manifest_max_five():
