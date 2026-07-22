@@ -315,26 +315,30 @@ jobs:
           BENCHMARK_GATE_MODE: report
           BENCHMARK_STORAGE_PATH: /tmp/siber-benchmark
         run: |
+          mkdir -p /tmp/siber-benchmark/reports
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -v /tmp/siber-benchmark:/tmp/siber-benchmark \
             -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e BENCHMARK_GATE_MODE=report \
             -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
             benchmark-runner run --suite web-realistic-passive --subset main
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -v /tmp/siber-benchmark:/tmp/siber-benchmark \
             -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e BENCHMARK_GATE_MODE=report \
             -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
             benchmark-runner run --suite api-realistic-passive --subset main
+          ls -la /tmp/siber-benchmark/reports || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: benchmark-realistic-pr-reports
           path: |
-            benchmarks/reports/*.json
-            benchmarks/reports/*.html
+            /tmp/siber-benchmark/reports/*.json
+            /tmp/siber-benchmark/reports/*.html
       - name: Tear down realistic fixtures
         if: always()
         working-directory: ${{ github.workspace }}
@@ -505,26 +509,30 @@ jobs:
         working-directory: ${{ github.workspace }}
         timeout-minutes: 5
         run: |
+          mkdir -p /tmp/siber-benchmark/reports
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -v /tmp/siber-benchmark:/tmp/siber-benchmark \
             -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e BENCHMARK_GATE_MODE=report \
             -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
             benchmark-runner run --suite web-realistic-passive --subset main
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -v /tmp/siber-benchmark:/tmp/siber-benchmark \
             -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e BENCHMARK_GATE_MODE=report \
             -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
             benchmark-runner run --suite api-realistic-passive --subset main
+          ls -la /tmp/siber-benchmark/reports || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: benchmark-realistic-subset-reports
           path: |
-            benchmarks/reports/*.json
-            benchmarks/reports/*.html
+            /tmp/siber-benchmark/reports/*.json
+            /tmp/siber-benchmark/reports/*.html
       - name: Tear down realistic fixtures
         if: always()
         working-directory: ${{ github.workspace }}

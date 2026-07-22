@@ -12,7 +12,12 @@ from app.core.config import get_settings
 
 
 def reports_dir() -> Path:
-    path = repo_benchmarks_root() / "reports"
+    import os
+
+    if os.environ.get("BENCHMARK_LAB_CONTAINER_MODE") == "true":
+        path = Path(get_settings().benchmark_storage_path) / "reports"
+    else:
+        path = repo_benchmarks_root() / "reports"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
