@@ -162,8 +162,10 @@ def test_realistic_baseline_file_metadata():
     assert baseline is not None
     assert baseline["baseline_name"] == REALISTIC_BASELINE_NAME
     assert baseline["baseline_type"] == "realistic_pinned_passive"
-    assert "Does not represent general product security accuracy" in baseline["description"]
-    assert "pinned Juice Shop and crAPI passive subset" in baseline["description"]
+    desc = baseline["description"]
+    assert "Does not represent general product security accuracy" in desc
+    assert "Juice Shop and crAPI passive" in desc
+    assert "regression protection" in desc
     assert baseline["fixture_version"] == "1.0.0"
     assert set(baseline["scope"]) == {"web-realistic-passive", "api-realistic-passive"}
 
