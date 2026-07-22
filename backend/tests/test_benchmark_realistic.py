@@ -146,3 +146,11 @@ def test_fixture_loader_accepts_automation_support():
     fixture = load_fixture(root / "fixtures/web-realistic-passive/ground-truth.yaml", fixtures_root=root)
     assert isinstance(fixture, BenchmarkFixture)
     assert fixture.expected_findings[0].automation_support == "supported"
+
+
+def test_container_mode_skips_docker_lifecycle(monkeypatch):
+    from app.benchmark import docker_control
+
+    monkeypatch.setenv("BENCHMARK_LAB_CONTAINER_MODE", "true")
+    docker_control.start_services(["benchmark-juice-proxy"], realistic=True)
+    docker_control.stop_services(["benchmark-juice-proxy"], realistic=True)

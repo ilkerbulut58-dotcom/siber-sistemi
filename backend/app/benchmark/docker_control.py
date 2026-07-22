@@ -51,12 +51,18 @@ def is_realistic_service(service_name: str) -> bool:
     return service_name.startswith("benchmark-juice") or service_name.startswith("benchmark-crapi")
 
 
+def _container_mode() -> bool:
+    return os.environ.get("BENCHMARK_LAB_CONTAINER_MODE") == "true"
+
+
 def start_services(
     service_names: list[str],
     *,
     timeout_seconds: int = 90,
     realistic: bool = False,
 ) -> None:
+    if _container_mode():
+        return
     unknown = set(service_names) - ALLOWED_DOCKER_SERVICES
     if unknown:
         raise ValueError(f"Refusing to start unknown services: {sorted(unknown)}")
@@ -85,6 +91,8 @@ def start_services(
 
 
 def stop_services(service_names: list[str] | None = None, *, realistic: bool = False) -> None:
+    if _container_mode():
+        return
     cmd = [
         "docker",
         "compose",
