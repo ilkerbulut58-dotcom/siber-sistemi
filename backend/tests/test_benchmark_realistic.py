@@ -83,10 +83,11 @@ def test_supported_metrics_exclude_manual_only_and_partial():
     assert any(record.classification == "true_positive" for record in records)
 
 
-def test_active_suite_blocked_in_11_1():
-    with pytest.raises(ValueError, match="blocked"):
+def test_active_suite_blocked_without_lab_env():
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="requires"):
         assert_suite_runnable("web-realistic-active")
-    with pytest.raises(ValueError, match="blocked"):
+    with pytest.raises(ValueError, match="requires"):
         assert_suite_runnable("api-realistic-active")
 
 
@@ -138,9 +139,10 @@ def test_realistic_manifest_loads():
     assert manifest.targets[0].health_url == "https://benchmark-crapi-proxy/health"
 
 
-def test_active_manifest_is_blocked():
+def test_active_manifest_is_enabled():
     manifest = load_suite_manifest("web-realistic-active")
-    assert manifest.blocked is True
+    assert manifest.blocked is False
+    assert manifest.targets[0].scan_profile == "benchmark-active-web"
 
 
 def test_fixture_loader_accepts_automation_support():

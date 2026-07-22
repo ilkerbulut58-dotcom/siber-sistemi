@@ -13,6 +13,8 @@ SMOKE_BASELINE_NAME = "smoke-v1.1.0"
 SMOKE_BASELINE_FILENAME = f"{SMOKE_BASELINE_NAME}.json"
 REALISTIC_BASELINE_NAME = "realistic-passive-v1.0.0"
 REALISTIC_BASELINE_FILENAME = f"{REALISTIC_BASELINE_NAME}.json"
+REALISTIC_BASELINE_V11_NAME = "realistic-passive-v1.1.0-zap-nuclei"
+REALISTIC_BASELINE_V11_FILENAME = f"{REALISTIC_BASELINE_V11_NAME}.json"
 
 
 def smoke_baseline_path() -> Path:
@@ -29,6 +31,19 @@ def realistic_baseline_path() -> Path:
 
 def load_smoke_baseline() -> dict[str, Any] | None:
     path = smoke_baseline_path()
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def realistic_baseline_v11_path() -> Path:
+    path = repo_benchmarks_root() / "baselines" / REALISTIC_BASELINE_V11_FILENAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def load_realistic_baseline_v11() -> dict[str, Any] | None:
+    path = realistic_baseline_v11_path()
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
@@ -63,7 +78,7 @@ def _suite_baseline_payload(root: dict[str, Any], suite: str) -> dict[str, Any] 
 def load_baseline(suite: str) -> dict[str, Any] | None:
     """Return suite metrics merged with baseline metadata."""
     if suite in REALISTIC_PASSIVE_SUITES:
-        realistic = load_realistic_baseline()
+        realistic = load_realistic_baseline_v11() or load_realistic_baseline()
         if realistic is None:
             return None
         return _suite_baseline_payload(realistic, suite)
@@ -98,6 +113,12 @@ def suite_metrics_payload(
 
 def write_smoke_baseline(payload: dict[str, Any]) -> Path:
     path = smoke_baseline_path()
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    return path
+
+
+def write_realistic_baseline_v11(payload: dict[str, Any]) -> Path:
+    path = realistic_baseline_v11_path()
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return path
 

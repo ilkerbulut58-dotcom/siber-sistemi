@@ -18,6 +18,7 @@ from app.models.finding import Finding
 from app.models.mobile_application import MobileApplication
 from app.models.organization import Organization
 from app.models.scan import ScanJob
+from app.scanners.execution_stats import scanner_stats_as_metrics
 from app.services.benchmark_matching_service import match_findings
 
 
@@ -53,6 +54,15 @@ class BenchmarkRunService:
             (await self.db.execute(select(Finding).where(Finding.scan_job_id == scan.id))).scalars()
         )
         records, metrics = match_findings(expected, actual)
+        scanner_metrics = scanner_stats_as_metrics()
+        breakdown = metrics.as_dict()
+        breakdown["scanner_metrics"] = scanner_metrics
+        breakdown["zap_finding_count"] = scanner_metrics.get("zap", {}).get("finding_count", 0)
+        breakdown["nuclei_finding_count"] = scanner_metrics.get("nuclei", {}).get("finding_count", 0)
+        breakdown["request_count"] = max(
+            scanner_metrics.get("zap", {}).get("request_count", 0),
+            scanner_metrics.get("nuclei", {}).get("request_count", 0),
+        )
         for record in records:
             self.db.add(BenchmarkFindingMatch(
                 benchmark_run_id=run.id,
@@ -76,7 +86,7 @@ class BenchmarkRunService:
             precision=metrics.precision,
             recall=metrics.recall,
             f1_score=metrics.f1_score,
-            breakdown=metrics.as_dict(),
+            breakdown=breakdown,
         ))
 
     async def complete_for_mobile(self, app: MobileApplication) -> None:

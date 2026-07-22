@@ -1,0 +1,18 @@
+version: "1.0.0"
+name: web-smoke-blind-holdout
+description: >
+  Blind holdout ground truth for web-smoke fixture coverage.
+  Plaintext labels are not stored in the repository; only this public metadata
+  and the authenticated encrypted artifact are published.
+artifact_file: web-smoke-blind.enc
+artifact_sha256: 39c80f35d829bb07f33aa143dd382b1e0b12959dd97f88cb19f33987cc188959
+ground_truth_version: "1.0.0"
+expected_finding_count: 3
+fixture_reference:
+  suite: web-smoke
+  fixture_version: "1.1.0"
+  public_fixture_hash: "4015a3103bf925f60b9a064631e3940f89b9d6cc0be60d69bf26bd249bb3d328"
+encryption:
+  algorithm: pbkdf2-sha256-xor-hmac
+  magic: SIBER-BLIND1
+  iterations: 200000

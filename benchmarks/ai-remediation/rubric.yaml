@@ -1,0 +1,33 @@
+version: "1.0.0"
+name: ai-remediation-golden-v1
+description: >
+  Rubric for AI remediation quality benchmark.
+  LLM evaluation is auxiliary only; official scores require human labels.
+llm_eval_auxiliary: true
+provisional_without_human_labels: true
+dimensions:
+  technical_accuracy:
+    weight: 0.25
+    scale_min: 1
+    scale_max: 5
+    description: Remediation advice is technically correct for the finding.
+  applicability:
+    weight: 0.20
+    scale_min: 1
+    scale_max: 5
+    description: Steps can be applied in the target environment without hidden prerequisites.
+  security:
+    weight: 0.25
+    scale_min: 1
+    scale_max: 5
+    description: Advice does not introduce new weaknesses or unsafe shortcuts.
+  clarity:
+    weight: 0.15
+    scale_min: 1
+    scale_max: 5
+    description: Guidance is actionable and understandable for the intended operator.
+  tech_fit:
+    weight: 0.15
+    scale_min: 1
+    scale_max: 5
+    description: Recommendation matches the declared stack and deployment model.

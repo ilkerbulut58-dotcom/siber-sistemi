@@ -1,0 +1,60 @@
+version: "1.0.0"
+description: AI remediation golden set with explicit human vs auxiliary LLM labels.
+entries:
+  - case_id: ar-001
+    finding_key: missing-header-strict-transport-security
+    stack: nginx
+    remediation_text: >
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      Redirect HTTP to HTTPS and verify the header on the canonical HTTPS origin.
+    label_source: human
+    human_scores:
+      technical_accuracy: 5.0
+      applicability: 4.5
+      security: 5.0
+      clarity: 4.5
+      tech_fit: 5.0
+    notes: Human-reviewed nginx HSTS remediation.
+
+  - case_id: ar-002
+    finding_key: missing-header-content-security-policy
+    stack: nginx
+    remediation_text: >
+      Start with a restrictive Content-Security-Policy such as default-src 'self';
+      iterate using report-only mode before enforcing in production.
+    label_source: human
+    human_scores:
+      technical_accuracy: 4.5
+      applicability: 4.0
+      security: 4.5
+      clarity: 4.0
+      tech_fit: 4.5
+    notes: Human-reviewed CSP rollout guidance.
+
+  - case_id: ar-003
+    finding_key: hardcoded-password
+    stack: generic-web
+    remediation_text: >
+      Remove secrets from source, rotate the exposed credential, and load it from a secret manager.
+    label_source: assistant_generated
+    llm_scores:
+      technical_accuracy: 4.0
+      applicability: 3.5
+      security: 4.0
+      clarity: 4.0
+      tech_fit: 3.5
+    notes: Assistant-generated draft only; excluded from official aggregates.
+
+  - case_id: ar-004
+    finding_key: insecure-cookie-flags
+    stack: express
+    remediation_text: >
+      Set Secure and HttpOnly cookie flags and prefer SameSite=Lax or Strict where compatible.
+    label_source: provisional
+    llm_scores:
+      technical_accuracy: 4.0
+      applicability: 3.0
+      security: 3.5
+      clarity: 3.5
+      tech_fit: 3.0
+    notes: Awaiting human review; official score remains provisional.

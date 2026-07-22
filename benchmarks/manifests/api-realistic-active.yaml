@@ -1,13 +1,11 @@
 suite: api-realistic-active
 version: "1.0.0"
 fixture_set: realistic-active
-description: Stub — active crAPI benchmark blocked until phase 11.3
-blocked: true
+description: Active crAPI benchmark via HTTPS reverse proxy (isolated lab only)
 targets:
   - name: api-realistic-crapi-active
     target_type: api
     scan_profile: benchmark-active-api
-    blocked: true
     docker_services:
       - benchmark-crapi-postgres
       - benchmark-crapi-mongo
@@ -21,3 +19,4 @@ targets:
     target_url: https://benchmark-crapi-proxy/health
     hostname: benchmark-crapi-proxy
     ground_truth: fixtures/api-realistic-passive/ground-truth.yaml
+    subset_manifest: fixtures/api-realistic-passive/subset-main.yaml

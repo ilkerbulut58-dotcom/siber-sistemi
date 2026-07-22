@@ -1,0 +1,7 @@
+# Pinned passive benchmark template IDs (one per line).
+# Only these templates may run during realistic passive lab scans.
+http-missing-security-headers
+missing-sri
+tls-version
+tech-detect
+xss-deprecated-header

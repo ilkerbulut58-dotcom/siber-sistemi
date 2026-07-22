@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from app.benchmark.manifests import repo_benchmarks_root
+from app.benchmark.nuclei_allowlist import load_nuclei_template_allowlist, nuclei_allowlist_hash
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,10 @@ async def collect_lab_scanner_versions() -> dict[str, Any]:
     if nuclei_lock:
         versions["nuclei_version"] = nuclei_lock.get("tag", NUCLEI_IMAGE_VERSION)
         versions["nuclei_templates_path"] = os.environ.get("NUCLEI_TEMPLATES", "/opt/nuclei-templates")
+    allowlist = load_nuclei_template_allowlist()
+    if allowlist:
+        versions["nuclei_template_allowlist_hash"] = nuclei_allowlist_hash()
+        versions["nuclei_template_allowlist_count"] = len(allowlist)
 
     if settings.zap_enabled:
         zap_version = await _zap_version(settings.zap_api_url)

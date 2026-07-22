@@ -258,6 +258,7 @@ services:
     environment:
       BENCHMARK_LAB_ISOLATED: "true"
       BENCHMARK_LAB_CONTAINER_MODE: "true"
+      BENCHMARK_ACTIVE_REALISTIC_ENABLED: "true"
       BENCHMARK_CA_CERT_PATH: /certs/ca.crt
       SKIP_DOMAIN_VERIFICATION: "true"
       ZAP_API_URL: http://benchmark-zap:8080

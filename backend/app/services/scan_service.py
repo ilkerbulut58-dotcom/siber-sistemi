@@ -8,9 +8,14 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.benchmark.security import assert_scan_profile_allowed
+from app.benchmark.security import (
+    assert_active_benchmark_create_allowed,
+    assert_scan_profile_allowed,
+    is_blocked_benchmark_profile,
+)
 from app.core.config import get_settings
 from app.core.exceptions import AppError
+from app.models.organization import Organization
 from app.models.scan import AuthorizationAcceptance, ScanJob, ScanProfile, ScanStatus
 from app.models.user import User
 from app.scanners.orchestrator import run_scan_for_profile
@@ -35,16 +40,32 @@ class ScanService:
 
     async def list_profiles(self) -> list[ScanProfile]:
         result = await self.db.execute(
-            select(ScanProfile).where(ScanProfile.is_active.is_(True)).order_by(ScanProfile.name)
+            select(ScanProfile)
+            .where(
+                ScanProfile.is_active.is_(True),
+                ScanProfile.name.not_in(["benchmark-active-web", "benchmark-active-api"]),
+            )
+            .order_by(ScanProfile.name)
         )
         return list(result.scalars())
 
     async def get_profile(self, name: str) -> ScanProfile:
+        if is_blocked_benchmark_profile(name):
+            raise AppError("NOT_FOUND", "Scan profile not found.", status_code=404)
         result = await self.db.execute(
             select(ScanProfile).where(ScanProfile.name == name, ScanProfile.is_active.is_(True))
         )
         profile = result.scalar_one_or_none()
         if profile is None:
+            raise AppError("NOT_FOUND", "Scan profile not found.", status_code=404)
+        return profile
+
+    async def _resolve_profile(self, name: str) -> ScanProfile:
+        result = await self.db.execute(select(ScanProfile).where(ScanProfile.name == name))
+        profile = result.scalar_one_or_none()
+        if profile is None:
+            raise AppError("NOT_FOUND", "Scan profile not found.", status_code=404)
+        if not profile.is_active and not is_blocked_benchmark_profile(name):
             raise AppError("NOT_FOUND", "Scan profile not found.", status_code=404)
         return profile
 
@@ -75,8 +96,22 @@ class ScanService:
                 status_code=400,
             )
 
-        profile = await self.get_profile(data.scan_profile)
-        assert_scan_profile_allowed(profile.name)
+        profile = await self._resolve_profile(data.scan_profile)
+        organization = (
+            await self.db.execute(select(Organization).where(Organization.id == organization_id))
+        ).scalar_one_or_none()
+        if organization is None:
+            raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+        if is_blocked_benchmark_profile(profile.name):
+            try:
+                assert_active_benchmark_create_allowed(
+                    profile.name,
+                    system_scope=organization.is_system_scope,
+                )
+            except ValueError as exc:
+                raise AppError("PROFILE_NOT_ALLOWED", str(exc), status_code=403) from exc
+        else:
+            assert_scan_profile_allowed(profile.name)
         target = str(data.target_url)
         if not settings.skip_domain_verification and domain.hostname not in target:
             raise AppError(

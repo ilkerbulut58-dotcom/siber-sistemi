@@ -10,6 +10,7 @@ import httpx
 
 from app.core.config import get_settings
 from app.scanners.base import RawFinding
+from app.scanners.execution_stats import set_pending_scanner_enrich
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ async def run_zap_passive_scan(
         return []
 
     try:
-        return await asyncio.wait_for(
+        findings = await asyncio.wait_for(
             _run_zap_passive_scan_impl(
                 base_url,
                 target_url,
@@ -48,12 +49,34 @@ async def run_zap_passive_scan(
             ),
             timeout=float(settings.zap_scan_timeout_seconds),
         )
+        version = await _zap_version(base_url)
+        set_pending_scanner_enrich(
+            "zap",
+            finding_count=len(findings),
+            scanner_version=version,
+            urls_scanned=1,
+            target_url=target_url,
+        )
+        return findings
     except TimeoutError:
         logger.warning("ZAP scan hard timeout (%ss) for %s", settings.zap_scan_timeout_seconds, target_url)
+        set_pending_scanner_enrich("zap", timeout_count=1, urls_scanned=1, target_url=target_url)
         return []
     except Exception as exc:
         logger.warning("ZAP passive scan failed for %s: %s", target_url, exc)
+        set_pending_scanner_enrich("zap", error_count=1, urls_scanned=1, target_url=target_url)
         return []
+
+
+async def _zap_version(base_url: str) -> str | None:
+    try:
+        async with httpx.AsyncClient(base_url=base_url, timeout=5.0) as client:
+            response = await client.get("/JSON/core/view/version/")
+            if response.status_code == 200:
+                return str(response.json().get("version") or "")
+    except Exception:
+        return None
+    return None
 
 
 async def _run_zap_passive_scan_impl(

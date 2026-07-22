@@ -1,0 +1,6 @@
+# Active benchmark allowlist for crAPI via benchmark-crapi-proxy (phase 11.3).
+entries:
+  - host: benchmark-crapi-proxy
+    port: 443
+    path_prefix: /
+    methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH]
