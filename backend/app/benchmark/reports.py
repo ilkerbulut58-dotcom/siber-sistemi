@@ -50,6 +50,11 @@ def _render_html(payload: dict[str, Any]) -> str:
     calibration_rows = "".join(
         f"<tr><td>{key}</td><td>{metrics.get(key, 0)}</td></tr>" for key in calibration_keys
     )
+    baseline = payload.get("baseline_delta") or {}
+    baseline_rows = "".join(
+        f"<tr><td>{key}</td><td>{value}</td></tr>"
+        for key, value in baseline.items()
+    )
     return f"""<!DOCTYPE html>
 <html lang="tr"><head><meta charset="utf-8"><title>Benchmark Report</title>
 <style>body{{font-family:Segoe UI,sans-serif;background:#0b1220;color:#e5e7eb;padding:2rem}}
@@ -60,6 +65,7 @@ table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #334155;padd
 <h2>Metrics</h2><table>{rows}</table>
 <h2>Missed findings</h2><ul>{missed_rows or '<li>None</li>'}</ul>
 <h2>Calibration breakdown</h2><table>{calibration_rows}</table>
+<h2>Baseline comparison</h2><table>{baseline_rows or '<tr><td>baseline_available</td><td>false</td></tr>'}</table>
 <p>Generated at {datetime.now(UTC).isoformat()}</p>
 </body></html>"""
 
@@ -90,6 +96,10 @@ def build_report_payload(
         "missed_findings": missed_findings,
         "false_positive_rules": false_positive_rules,
         "baseline_delta": baseline_delta,
+        "baseline_scope_note": (
+            "Metrics reflect controlled smoke fixture coverage only "
+            "(baseline_type=deterministic_smoke), not general product security accuracy."
+        ),
         "duration_seconds": duration_seconds,
         "scanner_errors": scanner_errors,
         "generated_at": datetime.now(UTC).isoformat(),

@@ -53,7 +53,7 @@ def _git_commit() -> str | None:
         return None
 
 
-def _build_fixture_apk(script_relative: str) -> tuple[Path, str]:
+def _build_fixture_apk(script_relative: str) -> tuple[Path, str, str]:
     root = repo_benchmarks_root()
     script = (root / script_relative).resolve()
     if root.resolve() not in script.parents:
@@ -63,7 +63,45 @@ def _build_fixture_apk(script_relative: str) -> tuple[Path, str]:
     if not apk_path.is_file():
         raise FileNotFoundError(apk_path)
     digest = hashlib.sha256(apk_path.read_bytes()).hexdigest()
-    return apk_path, digest
+    meta_path = apk_path.with_suffix(".json")
+    source_hash = ""
+    if meta_path.is_file():
+        import json
+
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        source_hash = str(meta.get("fixture_source_hash") or "")
+    if not source_hash:
+        sys.path.insert(0, str(script.parent))
+        try:
+            from build_fixture_apk import fixture_source_hash
+
+            source_hash = fixture_source_hash()
+        finally:
+            sys.path.pop(0)
+    return apk_path, digest, source_hash
+
+
+def _result_metrics(result: BenchmarkResult) -> dict:
+    breakdown = result.breakdown or {}
+    return {
+        "true_positive_count": result.true_positive_count,
+        "false_negative_count": result.false_negative_count,
+        "confirmed_false_positive_count": breakdown.get("confirmed_false_positive_count", 0),
+        "additional_valid_finding_count": breakdown.get("additional_valid_finding_count", 0),
+        "duplicate_count": result.duplicate_count,
+        "matcher_failure_count": breakdown.get("matcher_failure_count", 0),
+        "scanner_error_count": result.scanner_error_count,
+        "precision": result.precision,
+        "recall": result.recall,
+        "f1_score": result.f1_score,
+        "duration_seconds": None,
+    }
+
+
+def _delta_for_result(result: BenchmarkResult, suite: str, *, duration_seconds: float | None) -> dict:
+    metrics = _result_metrics(result)
+    metrics["duration_seconds"] = duration_seconds
+    return compute_delta(metrics, load_baseline(suite))
 
 
 async def _run_web_or_api_target(
@@ -138,24 +176,14 @@ async def _run_web_or_api_target(
             metrics = result.breakdown or {}
             missed = await _missed_findings(db, run.id)
             false_positives = await _false_positive_rules(db, run.id)
-            baseline = load_baseline(suite)
-            delta = compute_delta(
-                {
-                    "precision": result.precision,
-                    "recall": result.recall,
-                    "f1_score": result.f1_score,
-                    "false_negative_count": result.false_negative_count,
-                    "duration_seconds": run.duration_seconds,
-                },
-                baseline,
-            )
+            delta = _delta_for_result(result, suite, duration_seconds=run.duration_seconds)
             result.previous_delta = delta
             missed_critical = sum(
                 1 for item in missed if item.get("severity") == "critical" and item.get("detection_required")
             )
             gate = evaluate_gate(
                 metrics=metrics,
-                baseline=baseline,
+                baseline=load_baseline(suite),
                 delta=delta,
                 scanner_failed=False,
                 duration_seconds=run.duration_seconds,
@@ -187,15 +215,31 @@ async def _run_web_or_api_target(
             )
             json_path, html_path = write_reports(run_id=str(run.id), payload=payload)
             if write_baseline:
+                from app.benchmark.baseline import suite_metrics_payload, write_baseline
+
                 write_baseline(
                     suite,
                     {
-                        "run_id": str(run.id),
-                        "precision": result.precision,
-                        "recall": result.recall,
-                        "f1_score": result.f1_score,
-                        "false_negative_count": result.false_negative_count,
-                        "duration_seconds": run.duration_seconds,
+                        **suite_metrics_payload(
+                            run_id=str(run.id),
+                            metrics={
+                                "true_positive_count": result.true_positive_count,
+                                "false_negative_count": result.false_negative_count,
+                                "confirmed_false_positive_count": metrics.get("confirmed_false_positive_count", 0),
+                                "additional_valid_finding_count": metrics.get("additional_valid_finding_count", 0),
+                                "duplicate_count": result.duplicate_count,
+                                "matcher_failure_count": metrics.get("matcher_failure_count", 0),
+                                "scanner_error_count": result.scanner_error_count,
+                                "precision": result.precision,
+                                "recall": result.recall,
+                                "f1_score": result.f1_score,
+                            },
+                            duration_seconds=run.duration_seconds,
+                        ),
+                        "fixture_version": suite_manifest.version,
+                        "ground_truth_version": suite_manifest.version,
+                        "git_commit": run.git_commit,
+                        "scanner_versions": run.scanner_versions,
                     },
                 )
             await db.commit()
@@ -265,7 +309,7 @@ async def _false_positive_rules(db, run_id: UUID) -> list[dict]:
 
 async def _run_android_target(*, suite: str, suite_manifest, target_manifest, fixture_set: str, write_baseline: bool) -> int:
     settings = get_settings()
-    apk_path, sha256 = _build_fixture_apk(target_manifest.artifact_script or "")
+    apk_path, sha256, source_hash = _build_fixture_apk(target_manifest.artifact_script or "")
     benchmark_storage = Path(settings.benchmark_storage_path)
     benchmark_storage.mkdir(parents=True, exist_ok=True)
     os.environ["MOBILE_STORAGE_PATH"] = str(benchmark_storage)
@@ -283,7 +327,12 @@ async def _run_android_target(*, suite: str, suite_manifest, target_manifest, fi
             fixture_set=fixture_set,
             status=BenchmarkRunStatus.RUNNING,
             started_at=datetime.now(UTC),
-            scanner_versions={"app": settings.app_version, "fixture_apk_sha256": sha256},
+            scanner_versions={
+                "app": settings.app_version,
+                "fixture_version": suite_manifest.version,
+                "fixture_source_hash": source_hash,
+                "fixture_apk_sha256": sha256,
+            },
         )
         db.add(run)
         await db.flush()
@@ -308,24 +357,71 @@ async def _run_android_target(*, suite: str, suite_manifest, target_manifest, fi
         ).scalar_one_or_none()
         if result is None:
             return 1
+        metrics = result.breakdown or {}
+        delta = _delta_for_result(result, suite, duration_seconds=run.duration_seconds)
+        result.previous_delta = delta
         payload = build_report_payload(
             suite=suite,
             fixture_version=suite_manifest.version,
             ground_truth_version=suite_manifest.version,
             git_commit=run.git_commit,
             scanner_versions=run.scanner_versions,
-            metrics=result.breakdown or {},
+            metrics={
+                "expected_count": result.expected_count,
+                "true_positive_count": result.true_positive_count,
+                "false_negative_count": result.false_negative_count,
+                "false_positive_count": result.false_positive_count,
+                "duplicate_count": result.duplicate_count,
+                "scanner_error_count": result.scanner_error_count,
+                "precision": result.precision,
+                "recall": result.recall,
+                "f1_score": result.f1_score,
+                **metrics,
+            },
             missed_findings=await _missed_findings(db, run.id),
             false_positive_rules=await _false_positive_rules(db, run.id),
-            baseline_delta=compute_delta({"recall": result.recall, "precision": result.precision, "f1_score": result.f1_score, "false_negative_count": result.false_negative_count, "duration_seconds": run.duration_seconds}, load_baseline(suite)),
+            baseline_delta=delta,
             duration_seconds=run.duration_seconds,
             scanner_errors=[run.error_log] if run.error_log else [],
         )
         write_reports(run_id=str(run.id), payload=payload)
         if write_baseline:
-            write_baseline(suite, {"run_id": str(run.id), "recall": result.recall, "precision": result.precision, "f1_score": result.f1_score, "false_negative_count": result.false_negative_count, "duration_seconds": run.duration_seconds})
+            from app.benchmark.baseline import suite_metrics_payload, write_baseline
+
+            write_baseline(
+                suite,
+                {
+                    **suite_metrics_payload(
+                        run_id=str(run.id),
+                        metrics={
+                            "true_positive_count": result.true_positive_count,
+                            "false_negative_count": result.false_negative_count,
+                            "confirmed_false_positive_count": metrics.get("confirmed_false_positive_count", 0),
+                            "additional_valid_finding_count": metrics.get("additional_valid_finding_count", 0),
+                            "duplicate_count": result.duplicate_count,
+                            "matcher_failure_count": metrics.get("matcher_failure_count", 0),
+                            "scanner_error_count": result.scanner_error_count,
+                            "precision": result.precision,
+                            "recall": result.recall,
+                            "f1_score": result.f1_score,
+                        },
+                        duration_seconds=run.duration_seconds,
+                    ),
+                    "fixture_version": suite_manifest.version,
+                    "ground_truth_version": suite_manifest.version,
+                    "git_commit": run.git_commit,
+                    "scanner_versions": run.scanner_versions,
+                },
+            )
         await db.commit()
-        gate = evaluate_gate(metrics=result.breakdown or {}, baseline=load_baseline(suite), delta={}, scanner_failed=run.status == BenchmarkRunStatus.FAILED, duration_seconds=run.duration_seconds, missed_critical=0)
+        gate = evaluate_gate(
+            metrics=metrics,
+            baseline=load_baseline(suite),
+            delta=delta,
+            scanner_failed=run.status == BenchmarkRunStatus.FAILED,
+            duration_seconds=run.duration_seconds,
+            missed_critical=0,
+        )
         return gate.exit_code
 
 

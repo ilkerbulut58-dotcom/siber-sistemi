@@ -42,23 +42,53 @@ STRINGS_XML = """<?xml version="1.0" encoding="utf-8"?>
 </resources>
 """
 
+FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
-def build_apk(output: Path) -> str:
+FIXTURE_ENTRIES: tuple[tuple[str, bytes], ...] = (
+    ("AndroidManifest.xml", MANIFEST.encode("utf-8")),
+    ("classes.dex", b"dex\n035\x00benchmark"),
+    ("res/values/strings.xml", STRINGS_XML.encode("utf-8")),
+    ("res/xml/network_security_config.xml", NETWORK_CONFIG.encode("utf-8")),
+)
+
+
+def fixture_source_hash() -> str:
+    """Stable identity for fixture content — used for regression gates, not artifact SHA."""
+    payload = "\n---\n".join(
+        [MANIFEST.strip(), NETWORK_CONFIG.strip(), STRINGS_XML.strip()]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _write_zip_entry(zf: zipfile.ZipFile, name: str, data: bytes) -> None:
+    info = zipfile.ZipInfo(filename=name)
+    info.date_time = FIXED_ZIP_TIME
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3
+    zf.writestr(info, data)
+
+
+def build_apk(output: Path) -> tuple[str, str]:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("AndroidManifest.xml", MANIFEST)
-        zf.writestr("classes.dex", b"dex\n035\x00benchmark")
-        zf.writestr("res/xml/network_security_config.xml", NETWORK_CONFIG)
-        zf.writestr("res/values/strings.xml", STRINGS_XML)
+    with zipfile.ZipFile(buffer, "w") as zf:
+        for name, data in FIXTURE_ENTRIES:
+            _write_zip_entry(zf, name, data)
     data = buffer.getvalue()
     output.write_bytes(data)
     digest = hashlib.sha256(data).hexdigest()
-    meta = {"sha256": digest, "size": len(data), "package": "com.siber.benchmark.fixture"}
+    source_hash = fixture_source_hash()
+    meta = {
+        "sha256": digest,
+        "fixture_source_hash": source_hash,
+        "size": len(data),
+        "package": "com.siber.benchmark.fixture",
+        "deterministic": True,
+    }
     output.with_suffix(".json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    return digest
+    return digest, source_hash
 
 
 if __name__ == "__main__":
     out = Path(__file__).resolve().parent / "fixture.apk"
-    digest = build_apk(out)
-    print(f"Built {out} sha256={digest}")
+    apk_sha, source_hash = build_apk(out)
+    print(f"Built {out} sha256={apk_sha} fixture_source_hash={source_hash}")
