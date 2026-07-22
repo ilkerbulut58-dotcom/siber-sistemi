@@ -35,14 +35,16 @@ async def run_zap_active_scan(
         return []
 
     try:
+        scan_timeout = float(settings.benchmark_realistic_active_suite_timeout_seconds)
         findings = await asyncio.wait_for(
             _run_zap_active_scan_impl(
                 base_url,
                 target_url,
                 guard=guard,
                 max_children=max_children,
+                scan_timeout_seconds=scan_timeout,
             ),
-            timeout=float(settings.benchmark_active_timeout_seconds),
+            timeout=scan_timeout,
         )
         version = await _zap_version(base_url)
         guard_metrics = guard.metrics()
@@ -90,6 +92,7 @@ async def _run_zap_active_scan_impl(
     *,
     guard: ActiveBenchmarkGuard,
     max_children: int,
+    scan_timeout_seconds: float,
 ) -> list[RawFinding]:
     session_name = f"siber-active-{int(time.time())}"
     async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
@@ -98,13 +101,18 @@ async def _run_zap_active_scan_impl(
         guard.validate_request(url=target_url, method="GET")
         await _api_get(client, "/JSON/core/action/accessUrl/", url=target_url, followRedirects="false")
 
+        started_at = time.time()
         spider_id = await _start_spider(client, target_url, max_children=max_children)
         if spider_id is not None:
-            await _wait_spider(client, spider_id)
+            await _wait_spider(
+                client,
+                spider_id,
+                deadline=started_at + min(scan_timeout_seconds / 2, 120),
+            )
 
         active_id = await _start_active_scan(client, target_url)
         if active_id is not None:
-            await _wait_active_scan(client, active_id)
+            await _wait_active_scan(client, active_id, deadline=started_at + scan_timeout_seconds)
 
         await _wait_passive_queue(client)
         alerts = await _fetch_alerts(client, target_url)
@@ -145,9 +153,12 @@ async def _start_spider(
     return str(scan_id) if scan_id is not None else None
 
 
-async def _wait_spider(client: httpx.AsyncClient, scan_id: str) -> None:
-    settings = get_settings()
-    deadline = time.time() + min(settings.zap_spider_wait_seconds, settings.benchmark_active_timeout_seconds // 2)
+async def _wait_spider(
+    client: httpx.AsyncClient,
+    scan_id: str,
+    *,
+    deadline: float,
+) -> None:
     while time.time() < deadline:
         payload = await _api_get(client, "/JSON/spider/view/status/", scanId=scan_id)
         if int(str(payload.get("status", "100"))) >= 100:
@@ -168,9 +179,12 @@ async def _start_active_scan(client: httpx.AsyncClient, target_url: str) -> str 
     return str(scan_id) if scan_id is not None else None
 
 
-async def _wait_active_scan(client: httpx.AsyncClient, scan_id: str) -> None:
-    settings = get_settings()
-    deadline = time.time() + settings.benchmark_active_timeout_seconds
+async def _wait_active_scan(
+    client: httpx.AsyncClient,
+    scan_id: str,
+    *,
+    deadline: float,
+) -> None:
     while time.time() < deadline:
         payload = await _api_get(client, "/JSON/ascan/view/status/", scanId=scan_id)
         if int(str(payload.get("status", "100"))) >= 100:

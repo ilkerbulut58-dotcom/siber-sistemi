@@ -115,7 +115,7 @@ async def _run_scanners_parallel(
 def _profile_timeout_seconds(profile: str) -> float:
     settings = get_settings()
     if profile in {"benchmark-active-web", "benchmark-active-api"}:
-        return float(settings.benchmark_active_timeout_seconds)
+        return float(settings.benchmark_realistic_active_suite_timeout_seconds)
     if profile == "deep":
         return float(settings.scan_timeout_deep_seconds)
     if profile == "code":

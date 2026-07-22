@@ -9,7 +9,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.benchmark.baseline import REALISTIC_BASELINE_NAME, load_baseline, load_realistic_baseline
+from app.benchmark.baseline import (
+    REALISTIC_BASELINE_NAME,
+    REALISTIC_BASELINE_V11_NAME,
+    load_baseline,
+    load_realistic_baseline,
+    load_realistic_baseline_v11,
+)
 from app.benchmark.fixtures import (
     BenchmarkFixture,
     ExpectedFindingFixture,
@@ -173,18 +179,43 @@ def test_realistic_baseline_file_metadata():
     assert set(baseline["scope"]) == {"web-realistic-passive", "api-realistic-passive"}
 
 
+def test_load_realistic_baseline_v10_suite_metrics():
+    baseline = load_realistic_baseline()
+    assert baseline is not None
+    web = baseline["suites"]["web-realistic-passive"]
+    api = baseline["suites"]["api-realistic-passive"]
+    assert web["true_positive_count"] == 3
+    assert web["confirmed_false_positive_count"] == 1
+    assert api["confirmed_false_positive_count"] == 3
+    assert api["precision"] == 0.5
+
+
+def test_load_realistic_baseline_v11_metadata():
+    baseline = load_realistic_baseline_v11()
+    assert baseline is not None
+    assert baseline["baseline_name"] == REALISTIC_BASELINE_V11_NAME
+    assert baseline["baseline_type"] == "realistic_pinned_passive"
+    assert "Does not represent general product security accuracy" in baseline["description"]
+    assert baseline["scanner_versions"]["zap"] == "2.17.0"
+    assert baseline["scanner_versions"]["nuclei_version"] == "3.3.7"
+    assert baseline["scanner_versions"]["nuclei_template_allowlist_hash"]
+
+
 def test_load_realistic_baseline_suite_metrics():
     web = load_baseline("web-realistic-passive")
     api = load_baseline("api-realistic-passive")
     assert web is not None
     assert api is not None
+    assert web["baseline_name"] == REALISTIC_BASELINE_V11_NAME
     assert web["true_positive_count"] == 3
     assert web["false_negative_count"] == 2
-    assert web["confirmed_false_positive_count"] == 1
+    assert web["confirmed_false_positive_count"] == 3
     assert web["partial_recall"] == 0.0
-    assert web["owasp_coverage_gap_count"] == 0
-    assert api["confirmed_false_positive_count"] == 3
-    assert api["precision"] == 0.5
+    assert web["owasp_coverage_gap_count"] == 2
+    assert api["confirmed_false_positive_count"] == 2
+    assert api["precision"] == 0.6
+    assert web["scanner_metrics"]["zap"]["finding_count"] == 8
+    assert api["scanner_metrics"]["nuclei"]["finding_count"] == 10
 
 
 def test_images_lock_includes_zap_and_nuclei():

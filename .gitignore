@@ -49,6 +49,7 @@ benchmarks/baselines/*
 !benchmarks/baselines/smoke-v1.1.0.json
 !benchmarks/baselines/realistic-passive-v1.0.0.json
 !benchmarks/baselines/realistic-passive-v1.1.0-zap-nuclei.json
+!benchmarks/baselines/realistic-active-v1.0.0.json
 benchmarks/fixtures/android-smoke/fixture.apk
 benchmarks/fixtures/android-smoke/fixture.json
 siber-deploy.tgz

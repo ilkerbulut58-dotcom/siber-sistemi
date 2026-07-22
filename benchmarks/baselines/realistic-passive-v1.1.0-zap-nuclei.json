@@ -1,0 +1,145 @@
+{
+  "baseline_name": "realistic-passive-v1.1.0-zap-nuclei",
+  "baseline_type": "realistic_pinned_passive",
+  "description": "Pinned Juice Shop and crAPI full passive calibration with ZAP daemon and Nuclei template allowlist. Does not represent general product security accuracy. Regression baseline for scanner-integrated realistic passive benchmarks only.",
+  "fixture_version": "1.0.0",
+  "ground_truth_version": "1.1.0-zap-nuclei",
+  "subset": "full",
+  "scope": [
+    "web-realistic-passive",
+    "api-realistic-passive"
+  ],
+  "created_at": "2026-07-22T22:07:00+00:00",
+  "git_commit": "a4b3ddf477d6551d08e387fdd42718bef927ccd8",
+  "calibration_ci_run_ids": [
+    "29961282219",
+    "29961511485"
+  ],
+  "calibration_attempts": 2,
+  "fixture_startup_seconds": 38,
+  "image_digests": {
+    "juice-shop": "sha256:2765a26de7647609099a338d5b7f61085d95903c8703bb70f03fcc4b12f0818d",
+    "nginx-alpine": "sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591",
+    "crapi-web": "sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504",
+    "crapi-identity": "sha256:29099da8ad457e303c46dabb8b913b06cb583616f850d116359dfc69d07f1491",
+    "crapi-community": "sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687",
+    "crapi-workshop": "sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a",
+    "crapi-mailhog": "sha256:75119d12ee43e5405a92c538bfa2a9e0811fd0d99cc8185dd44a125ed4db34e6",
+    "postgres-14": "sha256:2a453914efff6156786247b2399e6f9f18d7fc37e1ca5574a23aba172cf37d3e",
+    "mongo-4.4": "sha256:52c42cbab240b3c5b1748582cc13ef46d521ddacae002bbbda645cebed270ec0",
+    "zaproxy-stable": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+    "nuclei": "sha256:embedded-in-benchmark-runner-image"
+  },
+  "scanner_versions": {
+    "app": "0.1.0",
+    "zap": "2.17.0",
+    "zap_image_digest": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+    "nuclei_version": "3.3.7",
+    "nuclei_template_allowlist_hash": "29a138de7641ec20546c4f13593d51d18bc91154bf38490e2f97fba520b106cd",
+    "images_lock_schema": 1
+  },
+  "finding_classification_summary": {
+    "confirmed_false_positives": {
+      "web-realistic-passive": 3,
+      "api-realistic-passive": 2,
+      "notes": "Header/info duplicates and scanner-specific phrasing not in GT keys; retained as confirmed FP without precision suppression."
+    },
+    "valid_additional_findings": {
+      "web-realistic-passive": 2,
+      "api-realistic-passive": 2,
+      "notes": "ZAP/Nuclei-detected issues validated against fixture evidence and recorded in ground truth."
+    },
+    "informational_out_of_scope": {
+      "web-realistic-passive": 3,
+      "api-realistic-passive": 1,
+      "notes": "Excluded from precision/recall numerator."
+    },
+    "ground_truth_gaps": {
+      "web-realistic-passive": 2,
+      "api-realistic-passive": 2,
+      "notes": "Required detections with partial or unsupported automation coverage."
+    },
+    "duplicate_count": 0,
+    "matcher_failure_count": 0
+  },
+  "suites": {
+    "web-realistic-passive": {
+      "run_id": "calibration-29961282219-web-full",
+      "true_positive_count": 3,
+      "false_negative_count": 2,
+      "confirmed_false_positive_count": 3,
+      "additional_valid_finding_count": 2,
+      "informational_count": 3,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 2,
+      "precision": 0.5,
+      "recall": 0.6,
+      "f1_score": 0.545,
+      "duration_seconds": 49.0,
+      "scanner_metrics": {
+        "passive_http": {
+          "finding_count": 4,
+          "execution_seconds": 0.065,
+          "timeout_count": 0,
+          "error_count": 0
+        },
+        "zap": {
+          "finding_count": 8,
+          "execution_seconds": 7.203,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "2.17.0"
+        },
+        "nuclei": {
+          "finding_count": 9,
+          "execution_seconds": 8.577,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "3.3.7"
+        }
+      }
+    },
+    "api-realistic-passive": {
+      "run_id": "calibration-29961511485-api-full",
+      "true_positive_count": 3,
+      "false_negative_count": 2,
+      "confirmed_false_positive_count": 2,
+      "additional_valid_finding_count": 2,
+      "informational_count": 1,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 2,
+      "precision": 0.6,
+      "recall": 0.6,
+      "f1_score": 0.6,
+      "duration_seconds": 12.0,
+      "scanner_metrics": {
+        "passive_http": {
+          "finding_count": 6,
+          "execution_seconds": 0.055,
+          "timeout_count": 0,
+          "error_count": 0
+        },
+        "zap": {
+          "finding_count": 3,
+          "execution_seconds": 6.612,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "2.17.0"
+        },
+        "nuclei": {
+          "finding_count": 10,
+          "execution_seconds": 8.296,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "3.3.7"
+        }
+      }
+    }
+  }
+}
