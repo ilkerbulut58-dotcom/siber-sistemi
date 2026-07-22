@@ -82,6 +82,8 @@ services:
     <<: *realistic_common
     image: crapi/crapi-identity@sha256:29099da8ad457e303c46dabb8b913b06cb583616f850d116359dfc69d07f1491
     profiles: ["realistic"]
+    volumes:
+      - ./benchmarks/docker/realistic/crapi-keys:/app/keys:ro
     depends_on:
       benchmark-crapi-postgres:
         condition: service_healthy
@@ -105,8 +107,8 @@ services:
       test: ["CMD-SHELL", "/app/health.sh"]
       interval: 5s
       timeout: 5s
-      retries: 24
-      start_period: 30s
+      retries: 30
+      start_period: 60s
 
   benchmark-crapi-community:
     <<: *realistic_common
