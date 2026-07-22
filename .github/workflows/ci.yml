@@ -316,6 +316,7 @@ jobs:
           BENCHMARK_STORAGE_PATH: /tmp/siber-benchmark
         run: |
           mkdir -p /tmp/siber-benchmark/reports
+          chmod -R 777 /tmp/siber-benchmark
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
             -v /tmp/siber-benchmark:/tmp/siber-benchmark \
@@ -510,6 +511,7 @@ jobs:
         timeout-minutes: 5
         run: |
           mkdir -p /tmp/siber-benchmark/reports
+          chmod -R 777 /tmp/siber-benchmark
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
           docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
             -v /tmp/siber-benchmark:/tmp/siber-benchmark \
