@@ -5,7 +5,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "013_detection_quality_benchmark_lab"
+revision: str = "013_benchmark_lab"
 down_revision: Union[str, None] = "012_target_site_profiles"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
