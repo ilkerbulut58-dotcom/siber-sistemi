@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "pinned_at": "2026-07-22",
+  "platform": "linux/amd64",
+  "images": {
+    "juice-shop": {
+      "image": "bkimminich/juice-shop",
+      "tag": "v19.0.0",
+      "digest": "sha256:2765a26de7647609099a338d5b7f61085d95903c8703bb70f03fcc4b12f0818d",
+      "platform_digest": "sha256:547bd3fef4a6d7e25e131da68f454e6dc4a59d281f8793df6853e6796c9bbf58",
+      "health_internal_url": "http://benchmark-juice-shop:3000/"
+    },
+    "nginx-alpine": {
+      "image": "nginx",
+      "tag": "1.27.4-alpine",
+      "digest": "sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591",
+      "platform_digest": "sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591"
+    },
+    "crapi-web": {
+      "image": "crapi/crapi-web",
+      "tag": "develop",
+      "digest": "sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504",
+      "platform_digest": "sha256:6450d5b31e4727c3209077ee1d8808c758e9b95d2af7fb4cca3eb377cfec28eb",
+      "health_internal_url": "http://benchmark-crapi-web/health"
+    },
+    "crapi-identity": {
+      "image": "crapi/crapi-identity",
+      "tag": "develop",
+      "digest": "sha256:29099da8ad457e303c46dabb8b913b06cb583616f850d116359dfc69d07f1491",
+      "platform_digest": "sha256:3658fae1f6e068abf88b1ce35bf98864e3a2a57f66e66d0e17ae95b6bcaba470"
+    },
+    "crapi-community": {
+      "image": "crapi/crapi-community",
+      "tag": "develop",
+      "digest": "sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687",
+      "platform_digest": "sha256:15f69b15ce621a0482818d19de886732b37b7fe5acf7ee63bbab603b50543687"
+    },
+    "crapi-workshop": {
+      "image": "crapi/crapi-workshop",
+      "tag": "develop",
+      "digest": "sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a",
+      "platform_digest": "sha256:cb5f57dfcbea5388d92ff3389af879eecf665a14200ee915ae4b4324e4ea7c5a"
+    },
+    "crapi-mailhog": {
+      "image": "crapi/mailhog",
+      "tag": "develop",
+      "digest": "sha256:75119d12ee43e5405a92c538bfa2a9e0811fd0d99cc8185dd44a125ed4db34e6",
+      "platform_digest": "sha256:75119d12ee43e5405a92c538bfa2a9e0811fd0d99cc8185dd44a125ed4db34e6"
+    },
+    "postgres-14": {
+      "image": "postgres",
+      "tag": "14.15",
+      "digest": "sha256:2a453914efff6156786247b2399e6f9f18d7fc37e1ca5574a23aba172cf37d3e",
+      "platform_digest": "sha256:2a453914efff6156786247b2399e6f9f18d7fc37e1ca5574a23aba172cf37d3e"
+    },
+    "mongo-4.4": {
+      "image": "mongo",
+      "tag": "4.4.29",
+      "digest": "sha256:52c42cbab240b3c5b1748582cc13ef46d521ddacae002bbbda645cebed270ec0",
+      "platform_digest": "sha256:6189a342f8da4568b4b111c378a890b1fe186b1bc133742bff8811fe63d2e01e"
+    }
+  }
+}

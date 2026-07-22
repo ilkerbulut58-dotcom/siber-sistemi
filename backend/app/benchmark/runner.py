@@ -15,10 +15,24 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.benchmark.baseline import compute_delta, load_baseline
-from app.benchmark.docker_control import start_services, stop_services, wait_for_health
+from app.benchmark.docker_control import (
+    REALISTIC_HEALTH_SECONDS,
+    REALISTIC_STARTUP_SECONDS,
+    start_services,
+    stop_services,
+    wait_for_health,
+)
+from app.benchmark.fixtures import filter_fixture_subset, load_subset
 from app.benchmark.gate import evaluate_gate
-from app.benchmark.manifests import load_ground_truth, load_suite_manifest, repo_benchmarks_root
+from app.benchmark.manifests import (
+    ALLOWED_SUITES,
+    REALISTIC_PASSIVE_SUITES,
+    load_ground_truth,
+    load_suite_manifest,
+    repo_benchmarks_root,
+)
 from app.benchmark.reports import build_report_payload, write_reports
+from app.benchmark.security import assert_suite_runnable, is_realistic_suite
 from app.core.config import get_settings
 from app.core.database import async_session_factory
 from app.models.benchmark import (
@@ -111,151 +125,185 @@ async def _run_web_or_api_target(
     target_manifest,
     fixture_set: str,
     write_baseline: bool,
+    subset: str | None = None,
 ) -> int:
     settings = get_settings()
+    realistic = suite in REALISTIC_PASSIVE_SUITES
     started_services = list(target_manifest.docker_services)
     exit_code = 0
+    suite_timeout = (
+        settings.benchmark_realistic_suite_timeout_seconds if realistic else settings.benchmark_max_duration_seconds
+    )
     try:
         if started_services:
-            start_services(started_services)
+            start_services(
+                started_services,
+                timeout_seconds=REALISTIC_STARTUP_SECONDS if realistic else 90,
+                realistic=realistic,
+            )
         if target_manifest.health_url:
-            wait_for_health(target_manifest.health_url)
+            wait_for_health(
+                target_manifest.health_url,
+                timeout_seconds=REALISTIC_HEALTH_SECONDS if realistic else 60,
+            )
         ground_truth = load_ground_truth(target_manifest.ground_truth)
-        async with async_session_factory() as db:
-            workspace = BenchmarkWorkspaceService(db)
-            organization, project, actor = await workspace.ensure_workspace()
-            hostname = target_manifest.hostname or "benchmark.local"
-            domain = await workspace.ensure_domain(organization, project, hostname)
-            benchmark_target = await BenchmarkFixtureSyncService(db).sync_target(target_manifest, ground_truth)
-            await db.commit()
-
-            run = BenchmarkRun(
-                benchmark_target_id=benchmark_target.id,
-                app_version=settings.app_version,
-                git_commit=_git_commit(),
-                scan_profile=target_manifest.scan_profile or "safe",
-                fixture_set=fixture_set,
-                status=BenchmarkRunStatus.RUNNING,
-                started_at=datetime.now(UTC),
-                scanner_versions={"app": settings.app_version},
+        if subset:
+            subset_path = target_manifest.subset_manifest or f"fixtures/{suite}/subset-{subset}.yaml"
+            subset_manifest = load_subset(
+                (repo_benchmarks_root() / subset_path).resolve(),
+                fixtures_root=repo_benchmarks_root(),
             )
-            db.add(run)
-            await db.flush()
+            ground_truth = filter_fixture_subset(ground_truth, subset_manifest)
 
-            scan = await ScanService(db).create(
-                organization.id,
-                ScanCreate(
-                    project_id=project.id,
-                    domain_id=domain.id,
-                    scan_profile=target_manifest.scan_profile or "safe",
-                    target_url=target_manifest.target_url,
-                    authorization_accepted=True,
-                ),
-                actor=actor,
-            )
-            run.scan_id = scan.id
-            await db.commit()
-
-        await run_scan_job(scan.id, async_session_factory)
-
-        async with async_session_factory() as db:
-            run = (await db.execute(select(BenchmarkRun).where(BenchmarkRun.id == run.id))).scalar_one()
-            scan = (await db.execute(select(ScanJob).where(ScanJob.id == run.scan_id))).scalar_one()
-            if scan.status != ScanStatus.COMPLETED:
-                run.status = BenchmarkRunStatus.FAILED
-                run.error_log = scan.error_log or f"Scan ended with status {scan.status}"
+        async def _execute() -> int:
+            async with async_session_factory() as db:
+                workspace = BenchmarkWorkspaceService(db)
+                organization, project, actor = await workspace.ensure_workspace()
+                hostname = target_manifest.hostname or "benchmark.local"
+                domain = await workspace.ensure_domain(organization, project, hostname)
+                benchmark_target = await BenchmarkFixtureSyncService(db).sync_target(target_manifest, ground_truth)
                 await db.commit()
-                return 1
 
-            result = (
-                await db.execute(select(BenchmarkResult).where(BenchmarkResult.benchmark_run_id == run.id))
-            ).scalar_one_or_none()
-            if result is None:
-                return 1
-
-            metrics = result.breakdown or {}
-            missed = await _missed_findings(db, run.id)
-            false_positives = await _false_positive_rules(db, run.id)
-            delta = _delta_for_result(result, suite, duration_seconds=run.duration_seconds)
-            result.previous_delta = delta
-            missed_critical = sum(
-                1 for item in missed if item.get("severity") == "critical" and item.get("detection_required")
-            )
-            gate = evaluate_gate(
-                metrics=metrics,
-                baseline=load_baseline(suite),
-                delta=delta,
-                scanner_failed=False,
-                duration_seconds=run.duration_seconds,
-                missed_critical=missed_critical,
-            )
-            payload = build_report_payload(
-                suite=suite,
-                fixture_version=suite_manifest.version,
-                ground_truth_version=suite_manifest.version,
-                git_commit=run.git_commit,
-                scanner_versions=run.scanner_versions,
-                metrics={
-                    "expected_count": result.expected_count,
-                    "true_positive_count": result.true_positive_count,
-                    "false_negative_count": result.false_negative_count,
-                    "false_positive_count": result.false_positive_count,
-                    "duplicate_count": result.duplicate_count,
-                    "scanner_error_count": result.scanner_error_count,
-                    "precision": result.precision,
-                    "recall": result.recall,
-                    "f1_score": result.f1_score,
-                    **metrics,
-                },
-                missed_findings=missed,
-                false_positive_rules=false_positives,
-                baseline_delta=delta,
-                duration_seconds=run.duration_seconds,
-                scanner_errors=[run.error_log] if run.error_log else [],
-            )
-            json_path, html_path = write_reports(run_id=str(run.id), payload=payload)
-            if write_baseline:
-                from app.benchmark.baseline import suite_metrics_payload, write_baseline
-
-                write_baseline(
-                    suite,
-                    {
-                        **suite_metrics_payload(
-                            run_id=str(run.id),
-                            metrics={
-                                "true_positive_count": result.true_positive_count,
-                                "false_negative_count": result.false_negative_count,
-                                "confirmed_false_positive_count": metrics.get("confirmed_false_positive_count", 0),
-                                "additional_valid_finding_count": metrics.get("additional_valid_finding_count", 0),
-                                "duplicate_count": result.duplicate_count,
-                                "matcher_failure_count": metrics.get("matcher_failure_count", 0),
-                                "scanner_error_count": result.scanner_error_count,
-                                "precision": result.precision,
-                                "recall": result.recall,
-                                "f1_score": result.f1_score,
-                            },
-                            duration_seconds=run.duration_seconds,
-                        ),
-                        "fixture_version": suite_manifest.version,
-                        "ground_truth_version": suite_manifest.version,
-                        "git_commit": run.git_commit,
-                        "scanner_versions": run.scanner_versions,
-                    },
+                run = BenchmarkRun(
+                    benchmark_target_id=benchmark_target.id,
+                    app_version=settings.app_version,
+                    git_commit=_git_commit(),
+                    scan_profile=target_manifest.scan_profile or "safe",
+                    fixture_set=fixture_set if not subset else f"{fixture_set}-{subset}",
+                    status=BenchmarkRunStatus.RUNNING,
+                    started_at=datetime.now(UTC),
+                    scanner_versions={"app": settings.app_version},
                 )
-            await db.commit()
-            print(f"Benchmark report: {json_path}")
-            print(f"Benchmark report: {html_path}")
-            print(
-                f"TP={result.true_positive_count} FN={result.false_negative_count} "
-                f"confirmed_FP={metrics.get('confirmed_false_positive_count', result.false_positive_count)} "
-                f"additional={metrics.get('additional_valid_finding_count', 0)} "
-                f"dup={result.duplicate_count} matcher_fail={metrics.get('matcher_failure_count', 0)} "
-                f"P={result.precision:.3f} R={result.recall:.3f} F1={result.f1_score:.3f}"
-            )
-            exit_code = gate.exit_code
+                db.add(run)
+                await db.flush()
+
+                scan = await ScanService(db).create(
+                    organization.id,
+                    ScanCreate(
+                        project_id=project.id,
+                        domain_id=domain.id,
+                        scan_profile=target_manifest.scan_profile or "safe",
+                        target_url=target_manifest.target_url,
+                        authorization_accepted=True,
+                    ),
+                    actor=actor,
+                )
+                run.scan_id = scan.id
+                await db.commit()
+                run_id = run.id
+                scan_id = scan.id
+
+            await run_scan_job(scan_id, async_session_factory)
+
+            async with async_session_factory() as db:
+                run = (await db.execute(select(BenchmarkRun).where(BenchmarkRun.id == run_id))).scalar_one()
+                scan = (await db.execute(select(ScanJob).where(ScanJob.id == scan_id))).scalar_one()
+                if scan.status != ScanStatus.COMPLETED:
+                    run.status = BenchmarkRunStatus.FAILED
+                    run.error_log = scan.error_log or f"Scan ended with status {scan.status}"
+                    await db.commit()
+                    return 1
+
+                result = (
+                    await db.execute(select(BenchmarkResult).where(BenchmarkResult.benchmark_run_id == run.id))
+                ).scalar_one_or_none()
+                if result is None:
+                    return 1
+
+                metrics = result.breakdown or {}
+                missed = await _missed_findings(db, run.id)
+                false_positives = await _false_positive_rules(db, run.id)
+                delta = _delta_for_result(result, suite, duration_seconds=run.duration_seconds)
+                result.previous_delta = delta
+                missed_critical = sum(
+                    1 for item in missed if item.get("severity") == "critical" and item.get("detection_required")
+                )
+                gate = evaluate_gate(
+                    metrics=metrics,
+                    baseline=load_baseline(suite),
+                    delta=delta,
+                    scanner_failed=False,
+                    duration_seconds=run.duration_seconds,
+                    missed_critical=missed_critical,
+                )
+                payload = build_report_payload(
+                    suite=suite,
+                    fixture_version=suite_manifest.version,
+                    ground_truth_version=suite_manifest.version,
+                    git_commit=run.git_commit,
+                    scanner_versions=run.scanner_versions,
+                    metrics={
+                        "expected_count": result.expected_count,
+                        "true_positive_count": result.true_positive_count,
+                        "false_negative_count": result.false_negative_count,
+                        "false_positive_count": result.false_positive_count,
+                        "duplicate_count": result.duplicate_count,
+                        "scanner_error_count": result.scanner_error_count,
+                        "precision": result.precision,
+                        "recall": result.recall,
+                        "f1_score": result.f1_score,
+                        **metrics,
+                    },
+                    missed_findings=missed,
+                    false_positive_rules=false_positives,
+                    baseline_delta=delta,
+                    duration_seconds=run.duration_seconds,
+                    scanner_errors=[run.error_log] if run.error_log else [],
+                    subset=subset,
+                    realistic=realistic,
+                )
+                json_path, html_path = write_reports(run_id=str(run.id), payload=payload)
+                if write_baseline:
+                    from app.benchmark.baseline import suite_metrics_payload
+                    from app.benchmark.baseline import write_baseline as persist_baseline
+
+                    persist_baseline(
+                        suite,
+                        {
+                            **suite_metrics_payload(
+                                run_id=str(run.id),
+                                metrics={
+                                    "true_positive_count": result.true_positive_count,
+                                    "false_negative_count": result.false_negative_count,
+                                    "confirmed_false_positive_count": metrics.get("confirmed_false_positive_count", 0),
+                                    "additional_valid_finding_count": metrics.get("additional_valid_finding_count", 0),
+                                    "duplicate_count": result.duplicate_count,
+                                    "matcher_failure_count": metrics.get("matcher_failure_count", 0),
+                                    "scanner_error_count": result.scanner_error_count,
+                                    "precision": result.precision,
+                                    "recall": result.recall,
+                                    "f1_score": result.f1_score,
+                                },
+                                duration_seconds=run.duration_seconds,
+                            ),
+                            "fixture_version": suite_manifest.version,
+                            "ground_truth_version": suite_manifest.version,
+                            "git_commit": run.git_commit,
+                            "scanner_versions": run.scanner_versions,
+                        },
+                    )
+                await db.commit()
+                print(f"Benchmark report: {json_path}")
+                print(f"Benchmark report: {html_path}")
+                print(
+                    f"TP={result.true_positive_count} FN={result.false_negative_count} "
+                    f"confirmed_FP={metrics.get('confirmed_false_positive_count', result.false_positive_count)} "
+                    f"additional={metrics.get('additional_valid_finding_count', 0)} "
+                    f"partial_R={metrics.get('partial_recall', 0):.3f} "
+                    f"gaps={metrics.get('owasp_coverage_gap_count', 0)} "
+                    f"dup={result.duplicate_count} matcher_fail={metrics.get('matcher_failure_count', 0)} "
+                    f"P={result.precision:.3f} R={result.recall:.3f} F1={result.f1_score:.3f}"
+                )
+                return gate.exit_code
+
+        try:
+            exit_code = await asyncio.wait_for(_execute(), timeout=suite_timeout)
+        except TimeoutError:
+            print(f"Suite {suite} timed out after {suite_timeout}s (scanner_error)", file=sys.stderr)
+            exit_code = 1
     finally:
         if started_services:
-            stop_services(started_services)
+            stop_services(started_services, realistic=realistic)
     return exit_code
 
 
@@ -425,32 +473,55 @@ async def _run_android_target(*, suite: str, suite_manifest, target_manifest, fi
         return gate.exit_code
 
 
-async def run_suite(suite: str, *, write_baseline: bool = False) -> int:
+async def run_suite(suite: str, *, write_baseline: bool = False, subset: str | None = None) -> int:
+    assert_suite_runnable(suite)
     os.environ.setdefault("SKIP_DOMAIN_VERIFICATION", "true")
+    if is_realistic_suite(suite):
+        os.environ.setdefault("BENCHMARK_LAB_ISOLATED", "true")
+        ca_default = repo_benchmarks_root() / "docker" / "realistic" / "certs" / "ca.crt"
+        if ca_default.is_file():
+            os.environ.setdefault("BENCHMARK_CA_CERT_PATH", str(ca_default))
     get_settings.cache_clear()
     manifest = load_suite_manifest(suite)
-    exit_code = 0
-    for target in manifest.targets:
-        if target.target_type in {"web", "api"}:
-            code = await _run_web_or_api_target(
-                suite=suite,
-                suite_manifest=manifest,
-                target_manifest=target,
-                fixture_set=manifest.fixture_set,
-                write_baseline=write_baseline,
-            )
-        elif target.target_type == "android":
-            code = await _run_android_target(
-                suite=suite,
-                suite_manifest=manifest,
-                target_manifest=target,
-                fixture_set=manifest.fixture_set,
-                write_baseline=write_baseline,
-            )
-        else:
-            raise ValueError(f"Unsupported target type {target.target_type}")
-        exit_code = max(exit_code, code)
-    return exit_code
+    if manifest.blocked:
+        raise ValueError(f"Suite {suite!r} is blocked in this release")
+    settings = get_settings()
+    job_timeout = settings.benchmark_realistic_job_timeout_seconds if suite in REALISTIC_PASSIVE_SUITES else None
+
+    async def _run_all() -> int:
+        exit_code = 0
+        for target in manifest.targets:
+            if target.blocked:
+                raise ValueError(f"Target {target.name!r} is blocked in this release")
+            if target.target_type in {"web", "api"}:
+                code = await _run_web_or_api_target(
+                    suite=suite,
+                    suite_manifest=manifest,
+                    target_manifest=target,
+                    fixture_set=manifest.fixture_set,
+                    write_baseline=write_baseline,
+                    subset=subset,
+                )
+            elif target.target_type == "android":
+                code = await _run_android_target(
+                    suite=suite,
+                    suite_manifest=manifest,
+                    target_manifest=target,
+                    fixture_set=manifest.fixture_set,
+                    write_baseline=write_baseline,
+                )
+            else:
+                raise ValueError(f"Unsupported target type {target.target_type}")
+            exit_code = max(exit_code, code)
+        return exit_code
+
+    if job_timeout:
+        try:
+            return await asyncio.wait_for(_run_all(), timeout=job_timeout)
+        except TimeoutError:
+            print(f"Benchmark job timed out after {job_timeout}s (scanner_error)", file=sys.stderr)
+            return 1
+    return await _run_all()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -458,13 +529,18 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     run_parser = sub.add_parser("run", help="Run an allowlisted benchmark suite")
     run_parser.add_argument("--suite", required=True, help="Allowlisted suite name")
+    run_parser.add_argument("--subset", default=None, help="Optional subset manifest suffix (e.g. main)")
     run_parser.add_argument("--write-baseline", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "run":
-        if args.suite not in {"web-smoke", "api-smoke", "android-smoke"}:
+        if args.suite not in ALLOWED_SUITES:
             print("Suite is not allowlisted", file=sys.stderr)
             return 2
-        return asyncio.run(run_suite(args.suite, write_baseline=args.write_baseline))
+        try:
+            return asyncio.run(run_suite(args.suite, write_baseline=args.write_baseline, subset=args.subset))
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     return 2
 
 

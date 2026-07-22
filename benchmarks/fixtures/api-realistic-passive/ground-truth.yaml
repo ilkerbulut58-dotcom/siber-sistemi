@@ -1,0 +1,61 @@
+target: api-realistic-crapi
+target_type: api
+target_reference: https://benchmark-crapi-proxy/health
+environment: benchmark
+expected_findings:
+  - expected_key: missing-header-content-security-policy
+    title: CSP eksik
+    category: missing-header-content-security-policy
+    severity: medium
+    automation_support: supported
+    detection_required: true
+  - expected_key: missing-header-strict-transport-security
+    title: HSTS eksik
+    category: missing-header-strict-transport-security
+    severity: medium
+    automation_support: supported
+    detection_required: true
+  - expected_key: server-disclosure
+    title: Sunucu ifşası
+    category: server-disclosure
+    severity: info
+    automation_support: supported
+    detection_required: true
+  - expected_key: permissive-cors
+    title: İzin verici CORS yapılandırması
+    category: permissive-cors
+    severity: medium
+    automation_support: supported
+    detection_required: true
+    accepted_alternative_keys:
+      - cors-misconfiguration
+  - expected_key: exposed-api-docs
+    title: API dokümantasyonu açık
+    category: exposed-api-docs
+    severity: medium
+    automation_support: supported
+    detection_required: true
+  - expected_key: verbose-error-response
+    title: Ayrıntılı hata yanıtı
+    category: verbose-error-response
+    severity: low
+    automation_support: partially_supported
+    detection_required: true
+  - expected_key: bola-idor-signal
+    title: BOLA/IDOR sinyali
+    category: bola-idor
+    severity: high
+    automation_support: manual_only
+    detection_required: false
+    framework_refs:
+      - framework: OWASP_API_TOP_10
+        control: API1:2023
+  - expected_key: rate-limit-missing
+    title: Rate limit eksik
+    category: rate-limit-missing
+    severity: medium
+    automation_support: unsupported
+    detection_required: false
+    framework_refs:
+      - framework: OWASP_API_TOP_10
+        control: API4:2023

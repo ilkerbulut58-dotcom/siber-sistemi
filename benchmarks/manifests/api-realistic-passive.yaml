@@ -1,0 +1,22 @@
+suite: api-realistic-passive
+version: "1.0.0"
+fixture_set: realistic-passive
+description: Pinned crAPI passive benchmark via HTTPS reverse proxy
+targets:
+  - name: api-realistic-crapi
+    target_type: api
+    scan_profile: safe
+    docker_services:
+      - benchmark-crapi-postgres
+      - benchmark-crapi-mongo
+      - benchmark-crapi-mailhog
+      - benchmark-crapi-identity
+      - benchmark-crapi-community
+      - benchmark-crapi-workshop
+      - benchmark-crapi-web
+      - benchmark-crapi-proxy
+    health_url: https://benchmark-crapi-proxy/health
+    target_url: https://benchmark-crapi-proxy/health
+    hostname: benchmark-crapi-proxy
+    ground_truth: fixtures/api-realistic-passive/ground-truth.yaml
+    subset_manifest: fixtures/api-realistic-passive/subset-main.yaml

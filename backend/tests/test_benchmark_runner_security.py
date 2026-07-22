@@ -12,8 +12,10 @@ def test_unknown_suite_rejected():
         load_suite_manifest("evil-suite")
 
 
-def test_allowlist_is_fixed():
-    assert {"web-smoke", "api-smoke", "android-smoke"} == ALLOWED_SUITES
+def test_allowlist_includes_realistic_passive():
+    assert {"web-smoke", "api-smoke", "android-smoke"}.issubset(ALLOWED_SUITES)
+    assert "web-realistic-passive" in ALLOWED_SUITES
+    assert "api-realistic-passive" in ALLOWED_SUITES
 
 
 def test_web_smoke_manifest_loads():

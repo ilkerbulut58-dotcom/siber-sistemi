@@ -1,0 +1,27 @@
+# Optional local-debug overlay — exposes host ports for manual inspection.
+# Not used in CI (closed network, no published ports).
+
+services:
+  benchmark-juice-proxy:
+    profiles: ["local-debug"]
+    ports:
+      - "18443:443"
+
+  benchmark-crapi-proxy:
+    profiles: ["local-debug"]
+    ports:
+      - "18444:443"
+
+  benchmark-juice-shop:
+    profiles: ["local-debug"]
+    ports:
+      - "18082:3000"
+
+  benchmark-crapi-web:
+    profiles: ["local-debug"]
+    ports:
+      - "18083:80"
+
+networks:
+  realistic_internal:
+    internal: false

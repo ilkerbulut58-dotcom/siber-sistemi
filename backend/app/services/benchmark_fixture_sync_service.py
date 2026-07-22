@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.benchmark.fixtures import BenchmarkFixture
 from app.benchmark.manifests import SuiteTargetManifest
-from app.models.benchmark import BenchmarkTarget, ExpectedFinding
+from app.models.benchmark import AutomationSupport, BenchmarkTarget, ExpectedFinding
 
 
 class BenchmarkFixtureSyncService:
@@ -47,10 +47,9 @@ class BenchmarkFixtureSyncService:
                 )
             ).scalars()
         }
-        seen: set[str] = set()
         for item in ground_truth.expected_findings:
-            seen.add(item.expected_key)
             row = existing.get(item.expected_key)
+            framework_refs = [ref.model_dump() for ref in item.framework_refs] or None
             if row is None:
                 row = ExpectedFinding(
                     benchmark_target_id=target.id,
@@ -62,6 +61,8 @@ class BenchmarkFixtureSyncService:
                     description=item.description,
                     detection_required=item.detection_required,
                     accepted_alternative_keys=item.accepted_alternative_keys,
+                    automation_support=item.automation_support or AutomationSupport.SUPPORTED,
+                    framework_refs=framework_refs,
                 )
                 self.db.add(row)
             else:
@@ -72,4 +73,6 @@ class BenchmarkFixtureSyncService:
                 row.description = item.description
                 row.detection_required = item.detection_required
                 row.accepted_alternative_keys = item.accepted_alternative_keys
+                row.automation_support = item.automation_support or AutomationSupport.SUPPORTED
+                row.framework_refs = framework_refs
         return target

@@ -62,6 +62,7 @@ turbridge-conf.txt
 # Secrets
 *.pem
 *.key
+!benchmarks/docker/realistic/certs/*.key
 credentials.json
 
 # Alembic

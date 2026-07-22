@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from app.models.benchmark import BenchmarkClassification
+from app.models.benchmark import AutomationSupport, BenchmarkClassification
 from app.models.finding import Finding
 
 
@@ -33,6 +33,11 @@ class BenchmarkMetrics:
     ground_truth_gap_count: int = 0
     matcher_failure_count: int = 0
     unsupported_count: int = 0
+    partial_true_positive_count: int = 0
+    partial_false_negative_count: int = 0
+    partial_recall: float = 0.0
+    conditional_coverage_count: int = 0
+    owasp_coverage_gap_count: int = 0
 
     def as_dict(self) -> dict[str, float | int]:
         denominator = self.true_positive_count + self.confirmed_false_positive_count
@@ -51,6 +56,11 @@ class BenchmarkMetrics:
             "false_negative_rate": self.false_negative_count / self.expected_count if self.expected_count else 0.0,
             "duplicate_rate": self.duplicate_count / legacy_denominator if legacy_denominator else 0.0,
         }
+
+
+def _automation_support(expected) -> str:
+    value = getattr(expected, "automation_support", AutomationSupport.SUPPORTED) or AutomationSupport.SUPPORTED
+    return str(value)
 
 
 def _finding_keys(finding: Finding) -> set[str]:
@@ -126,7 +136,7 @@ def match_findings(
     *,
     scanner_error_count: int = 0,
 ) -> tuple[list[MatchRecord], BenchmarkMetrics]:
-    """Match required expected findings once; classify extras with calibrated buckets."""
+    """Match expected findings; main P/R/F1 uses automation_support=supported only."""
     expected = list(expected_findings)
     actual = list(actual_findings)
     used_actual: set[object] = set()
@@ -134,8 +144,22 @@ def match_findings(
     records: list[MatchRecord] = []
     tp = fn = legacy_fp = duplicates = 0
     confirmed_fp = additional_valid = gt_gap = matcher_failure = unsupported = 0
+    partial_tp = partial_fn = conditional_coverage = owasp_gap = 0
 
+    measurable = [
+        item
+        for item in expected
+        if _automation_support(item) in {AutomationSupport.SUPPORTED, AutomationSupport.PARTIALLY_SUPPORTED}
+    ]
     for item in expected:
+        if _automation_support(item) in {AutomationSupport.MANUAL_ONLY, AutomationSupport.UNSUPPORTED}:
+            owasp_gap += 1
+            records.append(
+                MatchRecord(item.id, None, BenchmarkClassification.GROUND_TRUTH_MISSING, "coverage_gap")
+            )
+
+    for item in measurable:
+        support = _automation_support(item)
         candidates = [
             (finding, reason)
             for finding in actual
@@ -150,19 +174,32 @@ def match_findings(
             finding, reason = primary
             used_actual.add(finding.id)
             matched_findings.append(finding)
-            if item.detection_required:
-                tp += 1
-                records.append(
-                    MatchRecord(item.id, finding.id, BenchmarkClassification.TRUE_POSITIVE, reason)
-                )
+            if support == AutomationSupport.SUPPORTED:
+                if item.detection_required:
+                    tp += 1
+                    records.append(
+                        MatchRecord(item.id, finding.id, BenchmarkClassification.TRUE_POSITIVE, reason)
+                    )
+                else:
+                    additional_valid += 1
+                    records.append(
+                        MatchRecord(
+                            item.id,
+                            finding.id,
+                            BenchmarkClassification.VALID_ADDITIONAL_FINDING,
+                            reason,
+                        )
+                    )
             else:
-                additional_valid += 1
+                if item.detection_required:
+                    partial_tp += 1
+                    conditional_coverage += 1
                 records.append(
                     MatchRecord(
                         item.id,
                         finding.id,
-                        BenchmarkClassification.VALID_ADDITIONAL_FINDING,
-                        reason,
+                        BenchmarkClassification.TRUE_POSITIVE,
+                        f"partial:{reason}",
                     )
                 )
             for duplicate, duplicate_reason in candidates:
@@ -173,15 +210,22 @@ def match_findings(
                         MatchRecord(item.id, duplicate.id, BenchmarkClassification.DUPLICATE, duplicate_reason)
                     )
         elif item.detection_required:
-            fn += 1
-            records.append(
-                MatchRecord(item.id, None, BenchmarkClassification.FALSE_NEGATIVE, "no_match")
-            )
+            if support == AutomationSupport.SUPPORTED:
+                fn += 1
+                records.append(
+                    MatchRecord(item.id, None, BenchmarkClassification.FALSE_NEGATIVE, "no_match")
+                )
+            else:
+                partial_fn += 1
+                records.append(
+                    MatchRecord(item.id, None, BenchmarkClassification.FALSE_NEGATIVE, "partial_no_match")
+                )
 
     fn_expected = [
         item
-        for item in expected
-        if item.detection_required
+        for item in measurable
+        if _automation_support(item) == AutomationSupport.SUPPORTED
+        and item.detection_required
         and not any(
             record.expected_id == item.id
             and record.classification == BenchmarkClassification.TRUE_POSITIVE
@@ -220,10 +264,20 @@ def match_findings(
             )
         )
 
-    required = sum(1 for item in expected if item.detection_required)
+    required = sum(
+        1
+        for item in expected
+        if _automation_support(item) == AutomationSupport.SUPPORTED and item.detection_required
+    )
+    partial_required = sum(
+        1
+        for item in expected
+        if _automation_support(item) == AutomationSupport.PARTIALLY_SUPPORTED and item.detection_required
+    )
     precision = tp / (tp + confirmed_fp) if tp + confirmed_fp else 0.0
     recall = tp / required if required else 1.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    partial_recall = partial_tp / partial_required if partial_required else 0.0
     return records, BenchmarkMetrics(
         expected_count=required,
         true_positive_count=tp,
@@ -239,4 +293,9 @@ def match_findings(
         ground_truth_gap_count=gt_gap,
         matcher_failure_count=matcher_failure,
         unsupported_count=unsupported,
+        partial_true_positive_count=partial_tp,
+        partial_false_negative_count=partial_fn,
+        partial_recall=partial_recall,
+        conditional_coverage_count=conditional_coverage,
+        owasp_coverage_gap_count=owasp_gap,
     )

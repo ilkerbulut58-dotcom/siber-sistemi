@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 
+from app.benchmark.security import assert_scan_profile_allowed
 from app.core.config import get_settings
 from app.scanners.base import RawFinding
 from app.scanners.exposed_paths import scan_exposed_paths
@@ -79,6 +80,7 @@ def _profile_timeout_seconds(profile: str) -> float:
 
 
 async def run_scan_for_profile(target_url: str, profile: str) -> list[RawFinding]:
+    assert_scan_profile_allowed(profile)
     timeout = _profile_timeout_seconds(profile)
 
     if profile == "safe":

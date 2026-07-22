@@ -1,0 +1,23 @@
+suite: api-realistic-active
+version: "1.0.0"
+fixture_set: realistic-active
+description: Stub — active crAPI benchmark blocked until phase 11.3
+blocked: true
+targets:
+  - name: api-realistic-crapi-active
+    target_type: api
+    scan_profile: benchmark-active-api
+    blocked: true
+    docker_services:
+      - benchmark-crapi-postgres
+      - benchmark-crapi-mongo
+      - benchmark-crapi-mailhog
+      - benchmark-crapi-identity
+      - benchmark-crapi-community
+      - benchmark-crapi-workshop
+      - benchmark-crapi-web
+      - benchmark-crapi-proxy
+    health_url: https://benchmark-crapi-proxy/health
+    target_url: https://benchmark-crapi-proxy/health
+    hostname: benchmark-crapi-proxy
+    ground_truth: fixtures/api-realistic-passive/ground-truth.yaml

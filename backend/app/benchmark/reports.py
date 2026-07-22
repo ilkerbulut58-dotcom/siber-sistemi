@@ -83,10 +83,21 @@ def build_report_payload(
     baseline_delta: dict[str, Any] | None,
     duration_seconds: float | None,
     scanner_errors: list[str],
+    subset: str | None = None,
+    realistic: bool = False,
 ) -> dict[str, Any]:
     settings = get_settings()
+    scope_note = (
+        "Metrics reflect pinned realistic passive fixture coverage only "
+        "(baseline_type=realistic_pinned_passive), not general product security accuracy."
+        if realistic
+        else "Metrics reflect controlled smoke fixture coverage only "
+        "(baseline_type=deterministic_smoke), not general product security accuracy."
+    )
     return {
         "suite": suite,
+        "subset": subset,
+        "baseline_type": "realistic_pinned_passive" if realistic else "deterministic_smoke",
         "app_version": settings.app_version,
         "git_commit": git_commit,
         "fixture_version": fixture_version,
@@ -96,10 +107,8 @@ def build_report_payload(
         "missed_findings": missed_findings,
         "false_positive_rules": false_positive_rules,
         "baseline_delta": baseline_delta,
-        "baseline_scope_note": (
-            "Metrics reflect controlled smoke fixture coverage only "
-            "(baseline_type=deterministic_smoke), not general product security accuracy."
-        ),
+        "baseline_scope_note": scope_note,
+        "coverage_gaps": metrics.get("coverage_gaps", []),
         "duration_seconds": duration_seconds,
         "scanner_errors": scanner_errors,
         "generated_at": datetime.now(UTC).isoformat(),

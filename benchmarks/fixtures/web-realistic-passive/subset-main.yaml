@@ -1,0 +1,6 @@
+expected_keys:
+  - missing-header-content-security-policy
+  - missing-header-strict-transport-security
+  - missing-header-x-content-type-options
+  - x-powered-by-disclosure
+  - server-disclosure
