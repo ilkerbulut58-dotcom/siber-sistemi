@@ -23,6 +23,7 @@ from app.benchmark.manifests import (
     load_suite_manifest,
 )
 from app.benchmark.security import assert_scan_profile_allowed, assert_suite_runnable
+from app.core.config import get_settings
 from app.services.benchmark_matching_service import match_findings
 
 
@@ -182,3 +183,39 @@ def test_load_realistic_baseline_suite_metrics():
     assert web["owasp_coverage_gap_count"] == 0
     assert api["confirmed_false_positive_count"] == 3
     assert api["precision"] == 0.5
+
+
+def test_images_lock_includes_zap_and_nuclei():
+    lock_path = _repo_root() / "benchmarks" / "docker" / "images.lock.json"
+    payload = json.loads(lock_path.read_text(encoding="utf-8"))
+    images = payload["images"]
+    assert "zaproxy-stable" in images
+    assert images["zaproxy-stable"]["digest"].startswith("sha256:")
+    assert "nuclei" in images
+    assert images["nuclei"]["tag"] == "3.3.7"
+
+
+def test_realistic_compose_pins_zap_daemon():
+    compose = (_repo_root() / "docker-compose.realistic.yml").read_text(encoding="utf-8")
+    lock = json.loads(
+        (_repo_root() / "benchmarks" / "docker" / "images.lock.json").read_text(encoding="utf-8")
+    )
+    zap_digest = lock["images"]["zaproxy-stable"]["digest"]
+    assert "benchmark-zap:" in compose
+    assert zap_digest in compose
+    assert "ZAP_API_URL: http://benchmark-zap:8080" in compose
+    assert "ZAP_ENABLED: \"true\"" in compose
+
+
+@pytest.mark.asyncio
+async def test_collect_lab_scanner_versions_without_zap(monkeypatch):
+    from app.benchmark.scanner_versions import collect_lab_scanner_versions
+
+    monkeypatch.setenv("ZAP_ENABLED", "false")
+    get_settings.cache_clear()
+    versions = await collect_lab_scanner_versions()
+    get_settings.cache_clear()
+    assert versions["app"]
+    assert versions["zap"] == "disabled"
+    assert versions["zap_image_digest"].startswith("sha256:")
+    assert versions["nuclei_version"] == "3.3.7"

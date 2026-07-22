@@ -221,6 +221,30 @@ services:
       - ./benchmarks/docker/realistic/certs/server.crt:/etc/nginx/certs/server.crt:ro
       - ./benchmarks/docker/realistic/certs/server.key:/etc/nginx/certs/server.key:ro
 
+  benchmark-zap:
+    <<: *realistic_common
+    image: ghcr.io/zaproxy/zaproxy@sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a
+    profiles: ["realistic"]
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - "0.0.0.0"
+      - -port
+      - "8080"
+      - -config
+      - api.disablekey=true
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/JSON/core/view/version/"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 90s
+
   benchmark-runner:
     profiles: ["realistic-runner"]
     build:
@@ -236,6 +260,8 @@ services:
       BENCHMARK_LAB_CONTAINER_MODE: "true"
       BENCHMARK_CA_CERT_PATH: /certs/ca.crt
       SKIP_DOMAIN_VERIFICATION: "true"
+      ZAP_API_URL: http://benchmark-zap:8080
+      ZAP_ENABLED: "true"
     volumes:
       - ./benchmarks:/app/benchmarks
       - ./benchmarks/docker/realistic/certs/ca.crt:/certs/ca.crt:ro
@@ -245,6 +271,8 @@ services:
       benchmark-juice-proxy:
         condition: service_healthy
       benchmark-crapi-proxy:
+        condition: service_healthy
+      benchmark-zap:
         condition: service_healthy
 
 networks:

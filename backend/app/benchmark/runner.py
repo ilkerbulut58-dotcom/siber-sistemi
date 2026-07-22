@@ -32,6 +32,7 @@ from app.benchmark.manifests import (
     repo_benchmarks_root,
 )
 from app.benchmark.reports import build_report_payload, write_reports
+from app.benchmark.scanner_versions import collect_lab_scanner_versions
 from app.benchmark.security import assert_suite_runnable, is_realistic_suite
 from app.core.config import get_settings
 from app.core.database import async_session_factory
@@ -164,6 +165,7 @@ async def _run_web_or_api_target(
                 benchmark_target = await BenchmarkFixtureSyncService(db).sync_target(target_manifest, ground_truth)
                 await db.commit()
 
+                scanner_versions = await collect_lab_scanner_versions()
                 run = BenchmarkRun(
                     benchmark_target_id=benchmark_target.id,
                     app_version=settings.app_version,
@@ -172,7 +174,7 @@ async def _run_web_or_api_target(
                     fixture_set=fixture_set if not subset else f"{fixture_set}-{subset}",
                     status=BenchmarkRunStatus.RUNNING,
                     started_at=datetime.now(UTC),
-                    scanner_versions={"app": settings.app_version},
+                    scanner_versions=scanner_versions,
                 )
                 db.add(run)
                 await db.flush()
