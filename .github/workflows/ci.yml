@@ -291,19 +291,27 @@ jobs:
         working-directory: .
         run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
       - name: Run realistic subset benchmarks (report-only)
-        working-directory: backend
+        working-directory: .
         timeout-minutes: 5
         env:
-          DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
-          REDIS_URL: redis://localhost:6379/0
-          SKIP_DOMAIN_VERIFICATION: "true"
+          DATABASE_URL: postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber
+          REDIS_URL: redis://host.docker.internal:6379/0
           BENCHMARK_GATE_MODE: report
-          BENCHMARK_LAB_ISOLATED: "true"
-          BENCHMARK_CA_CERT_PATH: ${{ github.workspace }}/benchmarks/docker/realistic/certs/ca.crt
           BENCHMARK_STORAGE_PATH: /tmp/siber-benchmark
         run: |
-          python -m app.benchmark run --suite web-realistic-passive --subset main
-          python -m app.benchmark run --suite api-realistic-passive --subset main
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e BENCHMARK_GATE_MODE=report \
+            -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
+            benchmark-runner run --suite web-realistic-passive --subset main
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e BENCHMARK_GATE_MODE=report \
+            -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
+            benchmark-runner run --suite api-realistic-passive --subset main
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -461,19 +469,22 @@ jobs:
         working-directory: .
         run: docker compose -f docker-compose.realistic.yml --profile realistic up -d --wait --wait-timeout 120
       - name: Run realistic subset (report-only)
-        working-directory: backend
+        working-directory: .
         timeout-minutes: 5
-        env:
-          DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
-          REDIS_URL: redis://localhost:6379/0
-          SKIP_DOMAIN_VERIFICATION: "true"
-          BENCHMARK_GATE_MODE: report
-          BENCHMARK_LAB_ISOLATED: "true"
-          BENCHMARK_CA_CERT_PATH: ${{ github.workspace }}/benchmarks/docker/realistic/certs/ca.crt
-          BENCHMARK_STORAGE_PATH: /tmp/siber-benchmark
         run: |
-          python -m app.benchmark run --suite web-realistic-passive --subset main
-          python -m app.benchmark run --suite api-realistic-passive --subset main
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner build benchmark-runner
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e BENCHMARK_GATE_MODE=report \
+            -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
+            benchmark-runner run --suite web-realistic-passive --subset main
+          docker compose -f docker-compose.realistic.yml --profile realistic --profile realistic-runner run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://siber:siber@host.docker.internal:5432/siber \
+            -e REDIS_URL=redis://host.docker.internal:6379/0 \
+            -e BENCHMARK_GATE_MODE=report \
+            -e BENCHMARK_STORAGE_PATH=/tmp/siber-benchmark \
+            benchmark-runner run --suite api-realistic-passive --subset main
       - uses: actions/upload-artifact@v4
         if: always()
         with:

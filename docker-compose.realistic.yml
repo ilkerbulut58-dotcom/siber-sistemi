@@ -155,21 +155,27 @@ services:
     profiles: ["realistic-runner"]
     build:
       context: ./backend
+      target: development
     networks:
       - realistic_internal
       - realistic_egress
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       BENCHMARK_LAB_ISOLATED: "true"
+      BENCHMARK_LAB_CONTAINER_MODE: "true"
       BENCHMARK_CA_CERT_PATH: /certs/ca.crt
       SKIP_DOMAIN_VERIFICATION: "true"
     volumes:
-      - ./benchmarks:/app/benchmarks:ro
+      - ./benchmarks:/app/benchmarks
       - ./benchmarks/docker/realistic/certs/ca.crt:/certs/ca.crt:ro
-    working_dir: /app/backend
+    working_dir: /app
     entrypoint: ["python", "-m", "app.benchmark"]
     depends_on:
-      - benchmark-juice-proxy
-      - benchmark-crapi-proxy
+      benchmark-juice-proxy:
+        condition: service_healthy
+      benchmark-crapi-proxy:
+        condition: service_healthy
 
 networks:
   realistic_internal:
