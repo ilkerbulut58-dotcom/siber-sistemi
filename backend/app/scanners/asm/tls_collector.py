@@ -19,20 +19,21 @@ def collect_tls_info(hostname: str, port: int = 443) -> dict[str, object]:
     }
 
     try:
-        with socket.create_connection((hostname, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                cert = ssock.getpeercert()
-                info["valid"] = True
-                info["subject"] = dict(x[0] for x in cert.get("subject", ()))
-                info["issuer"] = dict(x[0] for x in cert.get("issuer", ()))
-                info["version"] = cert.get("version")
-                info["san"] = cert.get("subjectAltName", [])
-                not_after = cert.get("notAfter")
-                if not_after:
-                    expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
-                    info["not_after"] = expiry.isoformat()
-                    info["days_until_expiry"] = (expiry - datetime.now(UTC)).days
-                info["protocol"] = ssock.version()
+        with socket.create_connection((hostname, port), timeout=10) as sock, context.wrap_socket(
+            sock, server_hostname=hostname
+        ) as ssock:
+            cert = ssock.getpeercert()
+            info["valid"] = True
+            info["subject"] = dict(x[0] for x in cert.get("subject", ()))
+            info["issuer"] = dict(x[0] for x in cert.get("issuer", ()))
+            info["version"] = cert.get("version")
+            info["san"] = cert.get("subjectAltName", [])
+            not_after = cert.get("notAfter")
+            if not_after:
+                expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
+                info["not_after"] = expiry.isoformat()
+                info["days_until_expiry"] = (expiry - datetime.now(UTC)).days
+            info["protocol"] = ssock.version()
     except ssl.SSLError as exc:
         info["error"] = f"SSL error: {exc}"
     except OSError as exc:

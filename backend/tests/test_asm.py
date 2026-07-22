@@ -51,7 +51,7 @@ def test_detect_technologies_from_headers() -> None:
 async def test_discover_attack_surface_mocked() -> None:
     from app.scanners.asm.discovery import discover_attack_surface
 
-    mock_assets = [
+    [
         DiscoveredAsset(
             asset_type="domain",
             identifier="example.com",

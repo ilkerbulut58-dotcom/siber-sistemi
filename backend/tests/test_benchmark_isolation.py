@@ -8,8 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.models.organization import Organization, OrganizationMember
-from app.models.user import User
+from app.models.organization import Organization
 from app.services.benchmark_workspace_service import BENCHMARK_ORG_SLUG, BenchmarkWorkspaceService
 
 

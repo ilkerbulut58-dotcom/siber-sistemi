@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 
 import httpx
 
-from app.analysis.correlation_rules import normalize_url
 from app.analysis.types import AnalyzedFinding, CorrelatedFinding
 
 logger = logging.getLogger(__name__)
@@ -151,9 +150,10 @@ async def _verify_tls(url: str, key: str) -> tuple[str, str, str | None]:
         return "low", "unverified", None
     try:
         context = ssl.create_default_context()
-        with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=parsed.hostname):
-                pass
+        with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock, context.wrap_socket(
+            sock, server_hostname=parsed.hostname
+        ):
+            pass
         if key == "cert-invalid":
             return "low", "inconclusive", "Sertifika artık geçerli görünüyor."
         return "medium", "verified", "TLS sorunu pasif doğrulamayla teyit edildi."

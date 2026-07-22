@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from app.ai.providers.base import AIProvider
 from app.ai.providers.openai_provider import OpenAIProvider
-from app.core.config import Settings, get_settings
+from app.core.config import get_settings
 
 
 @lru_cache

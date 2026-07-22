@@ -3,10 +3,8 @@
 from io import BytesIO
 
 import pypdf
-import pytest
 
 from app.services.pdf_utils import html_to_pdf
-
 
 TURKISH_SAMPLE_HTML = """<!DOCTYPE html>
 <html lang="tr">

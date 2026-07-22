@@ -7,14 +7,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analysis.correlation_rules import normalize_url
+from app.analysis.pipeline import analyze_scan_findings
+from app.analysis.types import AnalyzedFinding
 from app.core.exceptions import AppError
 from app.models.finding import Finding, FindingStatus
 from app.models.finding_history import FindingHistory
 from app.models.scan import ScanJob
 from app.models.user import User
-from app.analysis.correlation_rules import normalize_url
-from app.analysis.pipeline import analyze_scan_findings
-from app.analysis.types import AnalyzedFinding
 from app.scanners.base import RawFinding
 from app.schemas.finding import FindingUpdate
 from app.schemas.scan import ScanCreate

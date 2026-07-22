@@ -76,8 +76,8 @@ async def test_scan_produces_findings(mock_scan: AsyncMock, client: AsyncClient)
         )
     ).json()["data"]
 
-    from app.services.scan_service import run_scan_job
     from app.core.database import async_session_factory
+    from app.services.scan_service import run_scan_job
 
     await run_scan_job(scan["id"], async_session_factory)
 

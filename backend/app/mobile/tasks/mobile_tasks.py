@@ -6,8 +6,8 @@ import asyncio
 import logging
 from uuid import UUID
 
-from app.core.database import async_session_factory
 from app.core.config import get_settings
+from app.core.database import async_session_factory
 from app.mobile.services.mobile_service import MobileService
 from app.tasks.celery_app import celery_app
 

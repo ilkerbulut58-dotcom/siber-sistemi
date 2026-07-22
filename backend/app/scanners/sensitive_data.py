@@ -134,9 +134,10 @@ async def scan_sensitive_data(target_url: str) -> list[RawFinding]:
                 continue
 
             content_type = response.headers.get("content-type", "").lower()
-            if not any(t in content_type for t in ("text/", "json", "javascript", "xml")):
-                if not url.endswith(".js"):
-                    continue
+            if not any(t in content_type for t in ("text/", "json", "javascript", "xml")) and not url.endswith(
+                ".js"
+            ):
+                continue
 
             body = response.text[:MAX_BODY]
             seen_rules: set[str] = set()

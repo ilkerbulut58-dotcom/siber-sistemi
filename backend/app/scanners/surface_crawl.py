@@ -72,9 +72,12 @@ async def run_surface_crawl_passive(target_url: str) -> list[RawFinding]:
                     continue
                 next_url = urljoin(clean, href)
                 next_parsed = urlparse(next_url)
-                if next_parsed.netloc == parsed.netloc and next_url not in visited:
-                    if len(queue) + len(visited) < MAX_PAGES:
-                        queue.append(next_url)
+                if (
+                    next_parsed.netloc == parsed.netloc
+                    and next_url not in visited
+                    and len(queue) + len(visited) < MAX_PAGES
+                ):
+                    queue.append(next_url)
 
     logger.info("Surface crawl checked %s pages for %s", len(visited), origin)
     return findings

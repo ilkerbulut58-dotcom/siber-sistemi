@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
-from slugify import slugify
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

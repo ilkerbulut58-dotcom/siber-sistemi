@@ -26,7 +26,7 @@ from app.models.mobile_application import MobileAnalysisStatus, MobileApplicatio
 from app.models.user import User
 from app.schemas.mobile import MobileReportSummary
 from app.services.audit_service import log_audit_event
-from app.services.finding_service import FindingService, build_mobile_fingerprint
+from app.services.finding_service import FindingService
 from app.services.project_service import ProjectService
 
 logger = logging.getLogger(__name__)

@@ -1,8 +1,7 @@
 """Report generation tests."""
 
-from uuid import UUID
-
 from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient

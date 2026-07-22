@@ -1,5 +1,5 @@
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest

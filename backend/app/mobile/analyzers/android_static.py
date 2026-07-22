@@ -65,7 +65,6 @@ def _extract_utf16le_strings(data: bytes, min_len: int = 4) -> list[str]:
     i = 0
     while i < len(data) - 1:
         if data[i] == 0 and 32 <= data[i + 1] <= 126:
-            start = i
             chars: list[str] = []
             j = i
             while j < len(data) - 1:

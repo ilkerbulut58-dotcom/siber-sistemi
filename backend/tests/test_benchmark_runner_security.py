@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from app.benchmark.manifests import ALLOWED_SUITES, load_suite_manifest
@@ -15,7 +13,7 @@ def test_unknown_suite_rejected():
 
 
 def test_allowlist_is_fixed():
-    assert ALLOWED_SUITES == {"web-smoke", "api-smoke", "android-smoke"}
+    assert {"web-smoke", "api-smoke", "android-smoke"} == ALLOWED_SUITES
 
 
 def test_web_smoke_manifest_loads():

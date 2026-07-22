@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from app.analysis.correlation_rules import SEVERITY_RANK
 from app.analysis.types import AnalyzedFinding

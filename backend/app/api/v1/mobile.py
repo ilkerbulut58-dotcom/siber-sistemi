@@ -2,13 +2,24 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.dependencies import get_client_ip, get_current_user, require_org_role
 from app.core.exceptions import AppError
-from app.core.config import get_settings
 from app.core.logging import request_id_ctx
 from app.mobile.services.mobile_dispatch import dispatch_mobile_analysis
 from app.mobile.services.mobile_service import MobileService

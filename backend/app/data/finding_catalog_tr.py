@@ -42,7 +42,7 @@ FINDING_CATALOG_TR: dict[str, FindingCatalogEntry] = {
         "remediation_summary_tr": "Nginx/Apache yanıtına HSTS header ekleyin.",
         "remediation_steps_tr": [
             "Plesk'e giriş yapın.",
-            f"Domains → sitenizi seçin → Apache & nginx Settings.",
+            "Domains → sitenizi seçin → Apache & nginx Settings.",
             _nginx_extra_directives_hint(),
             "Değişikliği kaydedin ve nginx'i yeniden yükleyin (Plesk genelde otomatik yapar).",
             "SIBER'de bu bulgu için 'Yeniden tara' ile doğrulayın.",

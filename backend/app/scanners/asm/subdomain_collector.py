@@ -43,9 +43,11 @@ async def discover_subdomains(root_domain: str, *, max_results: int = 30) -> lis
                     name = str(entry.get("name_value", "")).lower()
                     for part in name.split("\n"):
                         part = part.strip().lstrip("*.")
-                        if part.endswith(f".{root_domain}") or part == root_domain:
-                            if part.count(".") <= root_domain.count(".") + 1:
-                                found.add(part)
+                        if (
+                            (part.endswith(f".{root_domain}") or part == root_domain)
+                            and part.count(".") <= root_domain.count(".") + 1
+                        ):
+                            found.add(part)
         except Exception as exc:
             logger.debug("crt.sh lookup failed for %s: %s", root_domain, exc)
 

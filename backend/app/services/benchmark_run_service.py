@@ -15,9 +15,9 @@ from app.models.benchmark import (
     ExpectedFinding,
 )
 from app.models.finding import Finding
+from app.models.mobile_application import MobileApplication
 from app.models.organization import Organization
 from app.models.scan import ScanJob
-from app.models.mobile_application import MobileApplication
 from app.services.benchmark_matching_service import match_findings
 
 

@@ -6,7 +6,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 ConfidenceLabel = Literal["unverified", "verified", "likely_false_positive"]
 
 

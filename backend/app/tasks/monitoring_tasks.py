@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from uuid import UUID
 
 from app.core.database import async_session_factory
 from app.services.monitoring_service import MonitoringService

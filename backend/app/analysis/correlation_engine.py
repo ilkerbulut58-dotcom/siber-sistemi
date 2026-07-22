@@ -48,12 +48,7 @@ def _merge_group(correlation_key: str, url: str, items: list[RawFinding]) -> Cor
             evidence.setdefault("tool_evidence", {})[item.source_tool] = item.evidence
 
     agreement = len(tools)
-    if agreement >= 3:
-        confidence = "medium"
-    elif agreement == 2:
-        confidence = "medium"
-    else:
-        confidence = "low"
+    confidence = "medium" if agreement >= 3 or agreement == 2 else "low"
 
     return CorrelatedFinding(
         correlation_key=correlation_key,

@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import get_settings
 from app.core.database import async_session_factory
 from app.core.exceptions import AppError
-from app.models.mobile_application import MobileApplication
 from app.mobile.services.mobile_service import MobileService
+from app.models.mobile_application import MobileApplication
 
 logger = logging.getLogger(__name__)
 

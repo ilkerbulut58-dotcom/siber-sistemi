@@ -184,26 +184,27 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
     findings: list[RawFinding] = []
     try:
         context = ssl.create_default_context()
-        with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=parsed.hostname) as ssock:
-                cert = ssock.getpeercert()
-                not_after = cert.get("notAfter")
-                if not_after:
-                    expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
-                    days_left = (expiry - datetime.now(UTC)).days
-                    if days_left < 30:
-                        findings.append(
-                            RawFinding(
-                                source_tool="tls_check",
-                                source_rule_id="cert-expiring-soon",
-                                title="TLS certificate expiring soon",
-                                description=f"Certificate expires in {days_left} days ({not_after}).",
-                                severity="high" if days_left < 7 else "medium",
-                                affected_url=target_url,
-                                remediation="Renew the TLS certificate before expiry.",
-                                evidence={"expires_at": not_after, "days_left": days_left},
-                            )
+        with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock, context.wrap_socket(
+            sock, server_hostname=parsed.hostname
+        ) as ssock:
+            cert = ssock.getpeercert()
+            not_after = cert.get("notAfter")
+            if not_after:
+                expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
+                days_left = (expiry - datetime.now(UTC)).days
+                if days_left < 30:
+                    findings.append(
+                        RawFinding(
+                            source_tool="tls_check",
+                            source_rule_id="cert-expiring-soon",
+                            title="TLS certificate expiring soon",
+                            description=f"Certificate expires in {days_left} days ({not_after}).",
+                            severity="high" if days_left < 7 else "medium",
+                            affected_url=target_url,
+                            remediation="Renew the TLS certificate before expiry.",
+                            evidence={"expires_at": not_after, "days_left": days_left},
                         )
+                    )
     except ssl.SSLCertVerificationError as exc:
         findings.append(
             RawFinding(

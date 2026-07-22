@@ -14,7 +14,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.benchmark.baseline import compute_delta, load_baseline, write_baseline
+from app.benchmark.baseline import compute_delta, load_baseline
 from app.benchmark.docker_control import start_services, stop_services, wait_for_health
 from app.benchmark.gate import evaluate_gate
 from app.benchmark.manifests import load_ground_truth, load_suite_manifest, repo_benchmarks_root

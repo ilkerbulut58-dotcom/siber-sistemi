@@ -8,10 +8,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.exceptions import AppError
 from app.core.security import TOKEN_TYPE_ACCESS, decode_token
-from app.core.config import get_settings
 from app.models.mixins import OrganizationRole, role_at_least
 from app.models.organization import Organization, OrganizationMember
 from app.models.user import User

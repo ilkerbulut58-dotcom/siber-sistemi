@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 from pydantic import Field, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     """Central configuration loaded from environment variables."""
 

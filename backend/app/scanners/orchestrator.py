@@ -11,8 +11,8 @@ from app.scanners.base import RawFinding
 from app.scanners.exposed_paths import scan_exposed_paths
 from app.scanners.nuclei import run_nuclei_scan
 from app.scanners.passive_http import run_passive_http_scan
-from app.scanners.sensitive_data import scan_sensitive_data
 from app.scanners.secret_patterns import scan_response_secrets
+from app.scanners.sensitive_data import scan_sensitive_data
 from app.scanners.surface_crawl import run_surface_crawl_passive
 from app.scanners.zap_passive import run_zap_passive_scan
 

@@ -13,13 +13,13 @@ from app.core.database import get_db
 from app.core.dependencies import get_client_ip, require_platform_admin
 from app.core.logging import request_id_ctx
 from app.models.user import User
-from app.schemas.common import APIResponse, ResponseMeta
 from app.schemas.benchmark import BenchmarkRunResponse, QualitySummaryResponse
+from app.schemas.common import APIResponse, ResponseMeta
 from app.schemas.organization import OrganizationCreate, OrganizationResponse
 from app.schemas.support_grant import SupportGrantCreate, SupportGrantResponse
+from app.services.benchmark_quality_service import BenchmarkQualityService
 from app.services.organization_service import OrganizationService
 from app.services.support_grant_service import SupportGrantService
-from app.services.benchmark_quality_service import BenchmarkQualityService
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 
@@ -172,6 +172,7 @@ async def quality_runs(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[list[BenchmarkRunResponse]]:
     from sqlalchemy import select
+
     from app.models.benchmark import BenchmarkRun
 
     result = await db.execute(

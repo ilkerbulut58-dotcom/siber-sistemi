@@ -1,6 +1,5 @@
 """Finding localization tests."""
 
-import pytest
 
 from app.data.finding_catalog_tr import SEVERITY_LABEL_TR
 from app.scanners.base import RawFinding
