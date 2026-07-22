@@ -21,7 +21,7 @@ from app.benchmark.manifests import (
     REALISTIC_PASSIVE_SUITES,
     load_suite_manifest,
 )
-from app.benchmark.security import assert_scan_profile_allowed, assert_suite_runnable
+from app.benchmark.baseline import REALISTIC_BASELINE_NAME, load_baseline, load_realistic_baseline
 from app.services.benchmark_matching_service import match_findings
 
 
@@ -154,3 +154,28 @@ def test_container_mode_skips_docker_lifecycle(monkeypatch):
     monkeypatch.setenv("BENCHMARK_LAB_CONTAINER_MODE", "true")
     docker_control.start_services(["benchmark-juice-proxy"], realistic=True)
     docker_control.stop_services(["benchmark-juice-proxy"], realistic=True)
+
+
+def test_realistic_baseline_file_metadata():
+    baseline = load_realistic_baseline()
+    assert baseline is not None
+    assert baseline["baseline_name"] == REALISTIC_BASELINE_NAME
+    assert baseline["baseline_type"] == "realistic_pinned_passive"
+    assert "Does not represent general product security accuracy" in baseline["description"]
+    assert "pinned Juice Shop and crAPI passive subset" in baseline["description"]
+    assert baseline["fixture_version"] == "1.0.0"
+    assert set(baseline["scope"]) == {"web-realistic-passive", "api-realistic-passive"}
+
+
+def test_load_realistic_baseline_suite_metrics():
+    web = load_baseline("web-realistic-passive")
+    api = load_baseline("api-realistic-passive")
+    assert web is not None
+    assert api is not None
+    assert web["true_positive_count"] == 3
+    assert web["false_negative_count"] == 2
+    assert web["confirmed_false_positive_count"] == 1
+    assert web["partial_recall"] == 0.0
+    assert web["owasp_coverage_gap_count"] == 0
+    assert api["confirmed_false_positive_count"] == 3
+    assert api["precision"] == 0.5
