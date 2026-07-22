@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 
@@ -11,6 +11,11 @@ from app.scanners.base import RawFinding
 from app.scanners.passive_http import _httpx_verify
 
 logger = logging.getLogger(__name__)
+
+def _site_origin(url: str) -> str:
+    parsed = urlparse(url)
+    return urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+
 
 OPENAPI_PATHS = (
     "/openapi.json",
@@ -62,8 +67,9 @@ async def scan_cors_policy(target_url: str, client: httpx.AsyncClient) -> list[R
 async def scan_openapi_exposure(base_url: str, client: httpx.AsyncClient) -> list[RawFinding]:
     findings: list[RawFinding] = []
     discovered: list[str] = []
+    origin = _site_origin(base_url)
     for path in OPENAPI_PATHS:
-        url = urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+        url = urljoin(origin.rstrip("/") + "/", path.lstrip("/"))
         try:
             response = await client.get(url)
             if response.status_code != 200:
@@ -95,10 +101,12 @@ async def scan_openapi_exposure(base_url: str, client: httpx.AsyncClient) -> lis
 
 async def run_api_surface_scan(target_url: str) -> list[RawFinding]:
     findings: list[RawFinding] = []
+    origin = _site_origin(target_url)
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, verify=_httpx_verify()) as client:
-            findings.extend(await scan_cors_policy(target_url, client))
-            findings.extend(await scan_openapi_exposure(target_url, client))
+            for probe_url in dict.fromkeys([origin, target_url]):
+                findings.extend(await scan_cors_policy(probe_url, client))
+            findings.extend(await scan_openapi_exposure(origin, client))
     except httpx.HTTPError as exc:
         logger.warning("API surface scan failed for %s: %s", target_url, exc)
     return findings

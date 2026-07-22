@@ -79,6 +79,8 @@ def evaluate_release_gates(
     passive_api: dict[str, Any] | None = None,
     active_web: dict[str, Any] | None = None,
     active_api: dict[str, Any] | None = None,
+    customer_visible_web: dict[str, Any] | None = None,
+    customer_visible_api: dict[str, Any] | None = None,
     customer_variance_pct: float | None = None,
     external_request_count: int = 0,
     blind_validation_passed: bool | None = None,
@@ -167,6 +169,46 @@ def evaluate_release_gates(
                 root_cause="API surface discovery or auth/state coverage gaps.",
             )
         )
+    if customer_visible_web:
+        gates.append(
+            _gate(
+                "customer_visible_web_precision",
+                "Customer-visible web precision",
+                threshold=0.70,
+                actual=customer_visible_web.get("precision", 0),
+                comparator="gte",
+                root_cause="Unvalidated ZAP/Nuclei noise still marked customer-visible.",
+            )
+        )
+        gates.append(
+            _gate(
+                "customer_visible_web_recall",
+                "Customer-visible web recall",
+                threshold=0.70,
+                actual=customer_visible_web.get("recall", 0),
+                comparator="gte",
+            )
+        )
+    if customer_visible_api:
+        gates.append(
+            _gate(
+                "customer_visible_api_precision",
+                "Customer-visible API precision",
+                threshold=0.70,
+                actual=customer_visible_api.get("precision", 0),
+                comparator="gte",
+            )
+        )
+        gates.append(
+            _gate(
+                "customer_visible_api_recall",
+                "Customer-visible API recall",
+                threshold=0.60,
+                actual=customer_visible_api.get("recall", 0),
+                comparator="gte",
+                root_cause="API header/CORS/OpenAPI probes missing customer-visible evidence.",
+            )
+        )
     if customer_variance_pct is not None:
         gates.append(
             _gate(
@@ -220,9 +262,36 @@ def evaluate_release_gates(
 
     blockers = [f"{gate.gate_id}: {gate.root_cause}" for gate in gates if not gate.passed and gate.root_cause]
     all_passed = all(gate.passed for gate in gates)
+    raw_gate_ids = {
+        "passive_web_precision",
+        "passive_web_recall",
+        "passive_api_precision",
+        "passive_api_recall",
+        "active_web_precision",
+        "active_web_recall",
+        "active_api_precision",
+        "active_api_recall",
+    }
+    customer_gate_ids = {gate.gate_id for gate in gates if gate.gate_id.startswith("customer_visible_")}
+    operational_gate_ids = {
+        "customer_visible_variance",
+        "external_request_count",
+        "blind_validation",
+        "risk_human_labels_only",
+        "ai_human_labels_only",
+    }
+    raw_passed = all(gate.passed for gate in gates if gate.gate_id in raw_gate_ids)
+    customer_passed = all(gate.passed for gate in gates if gate.gate_id in customer_gate_ids) if customer_gate_ids else None
+    operational_passed = all(
+        gate.passed for gate in gates if gate.gate_id in operational_gate_ids and gate.gate_id in {g.gate_id for g in gates}
+    )
+
     if all_passed:
         ready_for = "closed_pilot"
         status = "ready"
+    elif customer_passed and operational_passed and not raw_passed:
+        ready_for = "closed_pilot_candidate"
+        status = "not_ready"
     elif any(gate.passed for gate in gates):
         ready_for = "internal_alpha"
         status = "not_ready"

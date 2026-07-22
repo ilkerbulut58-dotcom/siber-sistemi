@@ -182,3 +182,31 @@ def build_customer_validation_artifact(raw_findings: list[RawFinding]) -> Valida
         suppressions=suppressions,
         findings=views,
     )
+
+
+def compute_customer_visible_metrics(
+    *,
+    true_positive_count: int,
+    false_negative_count: int,
+    raw_findings: list[RawFinding],
+) -> dict[str, float | int]:
+    """Precision/recall using customer-publication visibility (confirmed + high-confidence only)."""
+    artifact = build_customer_validation_artifact(raw_findings)
+    visible = artifact.customer_visible_count
+    customer_confirmed_fp = max(0, visible - true_positive_count)
+    precision_denom = true_positive_count + customer_confirmed_fp
+    recall_denom = true_positive_count + false_negative_count
+    precision = true_positive_count / precision_denom if precision_denom else 0.0
+    recall = true_positive_count / recall_denom if recall_denom else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    return {
+        "true_positive_count": true_positive_count,
+        "false_negative_count": false_negative_count,
+        "customer_visible_count": visible,
+        "customer_confirmed_false_positive_count": customer_confirmed_fp,
+        "customer_needs_review_count": artifact.by_visibility.get("needs_review", 0),
+        "customer_informational_count": artifact.by_visibility.get("informational", 0),
+        "precision": round(precision, 3),
+        "recall": round(recall, 3),
+        "f1_score": round(f1, 3),
+    }

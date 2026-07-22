@@ -43,6 +43,7 @@ expected_findings:
     detection_required: true
     accepted_alternative_keys:
       - zap-10096
+      - x-powered-by-disclosure
   - expected_key: permissive-cors
     title: İzin verici CORS yapılandırması
     category: permissive-cors

@@ -223,15 +223,24 @@ async def _run_web_or_api_target(
                 missed = await _missed_findings(db, run.id)
                 false_positives = await _false_positive_rules(db, run.id)
                 raw_findings = await _raw_findings_from_scan(db, scan.id)
-                from app.benchmark.customer_validation import build_customer_validation_artifact
+                from app.benchmark.customer_validation import (
+                    build_customer_validation_artifact,
+                    compute_customer_visible_metrics,
+                )
 
                 validation_artifact = build_customer_validation_artifact(raw_findings)
+                customer_visible_metrics = compute_customer_visible_metrics(
+                    true_positive_count=result.true_positive_count,
+                    false_negative_count=result.false_negative_count,
+                    raw_findings=raw_findings,
+                )
                 customer_validation = {
                     "raw_finding_count": validation_artifact.raw_finding_count,
                     "customer_visible_count": validation_artifact.customer_visible_count,
                     "by_visibility": validation_artifact.by_visibility,
                     "suppression_count": len(validation_artifact.suppressions),
                     "suppressions": validation_artifact.suppressions[:20],
+                    "metrics": customer_visible_metrics,
                 }
                 api_coverage = None
                 if active and "api" in suite:

@@ -827,7 +827,9 @@ jobs:
       - name: Run Faz 11.5 unit tests
         run: pytest -q tests/test_alert_dedup.py tests/test_customer_validation.py tests/test_release_gates.py tests/test_url_canonicalization.py tests/test_metrics_audit.py
       - name: Metric audit report
-        run: python -m app.benchmark metrics-audit > ../benchmarks/reports/metrics-audit.json
+        run: |
+          mkdir -p ../benchmarks/reports
+          python -m app.benchmark metrics-audit > ../benchmarks/reports/metrics-audit.json
       - name: MVP release gates (report-only, does not mutate baselines)
         run: python -m app.benchmark release-gates
       - uses: actions/upload-artifact@v4
