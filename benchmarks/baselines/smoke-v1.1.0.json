@@ -1,0 +1,63 @@
+{
+  "baseline_name": "smoke-v1.1.0",
+  "baseline_type": "deterministic_smoke",
+  "description": "Controlled smoke fixture coverage only. Does not represent general real-world product security accuracy.",
+  "fixture_version": "1.1.0",
+  "ground_truth_version": "1.1.0",
+  "scope": [
+    "web-smoke",
+    "api-smoke",
+    "android-smoke"
+  ],
+  "created_at": "2026-07-22T12:30:00+00:00",
+  "git_commit": "8fe0974aad2f5685783b09712c5801909ddd5cdb",
+  "scanner_versions": {
+    "app": "0.1.0",
+    "fixture_version": "1.1.0",
+    "fixture_source_hash": "4015a3103bf925f60b9a064631e3940f89b9d6cc0be60d69bf26bd249bb3d328"
+  },
+  "suites": {
+    "web-smoke": {
+      "run_id": "calibration-run-29919248709-web",
+      "true_positive_count": 7,
+      "false_negative_count": 0,
+      "confirmed_false_positive_count": 0,
+      "additional_valid_finding_count": 3,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "duration_seconds": 0.375
+    },
+    "api-smoke": {
+      "run_id": "calibration-run-29919248709-api",
+      "true_positive_count": 5,
+      "false_negative_count": 0,
+      "confirmed_false_positive_count": 0,
+      "additional_valid_finding_count": 3,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "duration_seconds": 0.43
+    },
+    "android-smoke": {
+      "run_id": "calibration-run-29919248709-android",
+      "true_positive_count": 5,
+      "false_negative_count": 0,
+      "confirmed_false_positive_count": 0,
+      "additional_valid_finding_count": 3,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "duration_seconds": 0.088
+    }
+  }
+}

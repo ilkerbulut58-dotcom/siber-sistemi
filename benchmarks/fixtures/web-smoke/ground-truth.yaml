@@ -1,0 +1,83 @@
+target: web-security-test-1
+target_type: web
+target_reference: http://127.0.0.1:18080/
+environment: benchmark
+expected_findings:
+  - expected_key: missing-header-content-security-policy
+    title: Content Security Policy eksik
+    category: missing-header-content-security-policy
+    severity: medium
+    affected_location: /
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-csp
+      - content-security-policy-missing
+  - expected_key: missing-header-strict-transport-security
+    title: HSTS eksik
+    category: missing-header-strict-transport-security
+    severity: medium
+    affected_location: /
+    detection_required: true
+    accepted_alternative_keys:
+      - missing-hsts
+  - expected_key: missing-header-x-content-type-options
+    title: X-Content-Type-Options eksik
+    category: missing-header-x-content-type-options
+    severity: low
+    affected_location: /
+    detection_required: true
+  - expected_key: x-powered-by-disclosure
+    title: X-Powered-By ifşası
+    category: x-powered-by-disclosure
+    severity: info
+    affected_location: /
+    detection_required: true
+  - expected_key: insecure-cookie-flags
+    title: Cookie güvenlik bayrakları eksik
+    category: insecure-cookie-flags
+    severity: medium
+    affected_location: /
+    detection_required: true
+  - expected_key: hardcoded-password
+    title: Hardcoded password sinyali
+    category: hardcoded-password
+    severity: high
+    affected_location: /
+    detection_required: true
+    accepted_alternative_keys:
+      - sensitive-hardcoded-password
+      - generic.possible-hardcoded-password-in-public-response
+  - expected_key: no-https
+    title: Site HTTPS kullanmıyor
+    category: no-https
+    severity: high
+    affected_location: /
+    detection_required: true
+  - expected_key: missing-header-x-frame-options
+    title: X-Frame-Options eksik
+    category: missing-header-x-frame-options
+    severity: medium
+    affected_location: /
+    detection_required: false
+    description: Informational coverage — smoke suite gate focuses on CSP/HSTS/XCTO.
+  - expected_key: missing-header-referrer-policy
+    title: Referrer-Policy eksik
+    category: missing-header-referrer-policy
+    severity: low
+    affected_location: /
+    detection_required: false
+    description: Informational coverage — tracked but not gate-critical for smoke.
+  - expected_key: server-disclosure
+    title: Sunucu yazılım bilgisi görünüyor
+    category: server-disclosure
+    severity: info
+    affected_location: /
+    detection_required: false
+    description: Nginx Server header disclosure — intentional fixture signal, informational.
+  - expected_key: security-txt-present
+    title: Security.txt mevcut
+    category: security-txt-present
+    severity: info
+    affected_location: /.well-known/security.txt
+    detection_required: false
+    description: Informational coverage — not all scanners emit a dedicated finding.

@@ -1,0 +1,14 @@
+suite: api-smoke
+version: "1.1.0"
+fixture_set: smoke
+description: Deterministic closed-network API security fixture
+targets:
+  - name: api-security-test-1
+    target_type: api
+    scan_profile: safe
+    docker_services:
+      - benchmark-api
+    health_url: http://127.0.0.1:18081/api/health
+    target_url: http://127.0.0.1:18081/api/health
+    hostname: benchmark-api.local
+    ground_truth: fixtures/api-smoke/ground-truth.yaml

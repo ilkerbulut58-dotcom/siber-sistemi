@@ -45,11 +45,16 @@ frontend/next-env.d.ts
 scan_outputs/
 reports/
 benchmarks/reports/
-benchmarks/baselines/*.json
+benchmarks/baselines/*
+!benchmarks/baselines/smoke-v1.1.0.json
 benchmarks/fixtures/android-smoke/fixture.apk
 benchmarks/fixtures/android-smoke/fixture.json
 siber-deploy.tgz
 deploy-output.log
+backend/benchmark-local.db
+backend/pytest-pdf.out
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
 siber_sifre.txt
 siber-nginx.txt
 turbridge-conf.txt

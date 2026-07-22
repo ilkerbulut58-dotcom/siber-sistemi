@@ -1,0 +1,63 @@
+target: android-security-test-1
+target_type: android
+target_reference: fixtures/android-smoke/build_fixture_apk.py
+environment: benchmark
+expected_findings:
+  - expected_key: mobile-debuggable
+    title: Debuggable uygulama
+    category: mobile-debuggable
+    severity: high
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-allow-backup
+    title: Android yedekleme etkin
+    category: mobile-allow-backup
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-cleartext-traffic
+    title: Cleartext traffic etkin
+    category: mobile-cleartext-traffic
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-exported-component
+    title: Exported component
+    category: mobile-exported-component
+    severity: high
+    affected_location: .ExportedActivity
+    detection_required: true
+  - expected_key: mobile-permission-read_sms
+    title: Tehlikeli izin READ_SMS
+    category: mobile-permission-read_sms
+    severity: medium
+    affected_location: AndroidManifest.xml
+    detection_required: true
+  - expected_key: mobile-cleartext-network-config
+    title: Cleartext traffic permitted in network security config
+    category: mobile-cleartext-network-config
+    severity: medium
+    affected_location: res/xml/network_security_config.xml
+    detection_required: false
+    description: Additional network config signal — manifest cleartext is gate-critical.
+  - expected_key: mobile-user-trust-anchors
+    title: User-installed CA trust anchors configured
+    category: mobile-user-trust-anchors
+    severity: medium
+    affected_location: res/xml/network_security_config.xml
+    detection_required: false
+    description: Intentional fixture signal for MITM trust model coverage.
+  - expected_key: mobile-permission-camera
+    title: Dangerous permission requested CAMERA
+    category: mobile-permission-camera
+    severity: low
+    affected_location: android.permission.CAMERA
+    detection_required: false
+    description: Intentional fixture permission — tracked for coverage, not gate-critical.
+  - expected_key: mobile-secret-fake_api_key
+    title: Fake API key sinyali
+    category: mobile-secret-fake_api_key
+    severity: high
+    affected_location: res/values/strings.xml
+    detection_required: false
+    description: Secret pattern coverage may vary; tracked but not gate-critical initially.
