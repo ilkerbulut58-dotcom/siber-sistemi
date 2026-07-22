@@ -1,5 +1,5 @@
 suite: android-smoke
-version: "1.0.0"
+version: "1.1.0"
 fixture_set: smoke
 description: Deterministic local APK static analysis fixture
 targets:

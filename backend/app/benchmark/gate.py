@@ -43,7 +43,9 @@ def evaluate_gate(
                 f"Recall dropped by {recall_drop:.3f} vs baseline (limit {settings.benchmark_recall_drop_limit})"
             )
 
-    fp_rate = metrics.get("false_positive_rate", 0)
+    fp_rate = metrics.get("confirmed_false_positive_rate")
+    if fp_rate is None:
+        fp_rate = metrics.get("false_positive_rate", 0)
     if fp_rate > settings.benchmark_max_false_positive_rate:
         failures.append(
             f"False positive rate {fp_rate:.3f} exceeds limit {settings.benchmark_max_false_positive_rate}"

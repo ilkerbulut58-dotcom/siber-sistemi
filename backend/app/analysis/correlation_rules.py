@@ -31,6 +31,20 @@ NUCLEI_FRAGMENT_MAP: list[tuple[str, str]] = [
 
 SEVERITY_RANK = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}
 
+# sensitive_data scanner rule IDs -> canonical keys
+SENSITIVE_DATA_RULE_MAP: dict[str, str] = {
+    "sensitive-hardcoded-password": "hardcoded-password",
+    "sensitive-db-connection-string": "db-connection-string",
+    "sensitive-turkish-iban": "turkish-iban",
+    "sensitive-generic-iban": "generic-iban",
+    "sensitive-credit-card-number": "credit-card-number",
+    "sensitive-bank-account-hint": "bank-account-hint",
+    "sensitive-api-secret-assignment": "api-secret-assignment",
+}
+
+# Findings that represent the same secret across URLs should deduplicate by secret identity.
+SECRET_CORRELATION_KEYS = frozenset(SENSITIVE_DATA_RULE_MAP.values())
+
 
 def normalize_url(url: str | None) -> str:
     if not url:
@@ -71,5 +85,24 @@ def resolve_correlation_key(source_tool: str, source_rule_id: str, title: str) -
     if source_tool == "tls_check" and rule:
         return rule
 
+    if source_tool == "sensitive_data" and rule:
+        if rule in SENSITIVE_DATA_RULE_MAP:
+            return SENSITIVE_DATA_RULE_MAP[rule]
+        if rule.startswith("sensitive-"):
+            return rule.removeprefix("sensitive-")
+
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
     return f"generic.{slug or rule or 'unknown'}"
+
+
+def secret_identity_token(correlation_key: str, evidence: dict | None) -> str | None:
+    """Stable token for deduplicating the same secret observed on multiple URLs."""
+    if correlation_key not in SECRET_CORRELATION_KEYS:
+        return None
+    if not evidence:
+        return None
+    pattern = str(evidence.get("pattern") or correlation_key)
+    masked = str(evidence.get("masked_sample") or "").strip()
+    if not masked:
+        return None
+    return f"{pattern}:{masked}"

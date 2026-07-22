@@ -33,6 +33,12 @@ class BenchmarkClassification(enum.StrEnum):
     FALSE_POSITIVE = "false_positive"
     DUPLICATE = "duplicate"
     SCANNER_ERROR = "scanner_error"
+    CONFIRMED_FALSE_POSITIVE = "confirmed_false_positive"
+    VALID_ADDITIONAL_FINDING = "valid_additional_finding"
+    GROUND_TRUTH_MISSING = "ground_truth_missing"
+    OUT_OF_SCOPE_INFORMATIONAL = "out_of_scope_informational"
+    MATCHER_FAILURE = "matcher_failure"
+    UNSUPPORTED = "unsupported"
 
 
 class BenchmarkTarget(Base, TimestampMixin):

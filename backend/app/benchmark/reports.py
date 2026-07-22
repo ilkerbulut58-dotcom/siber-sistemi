@@ -39,6 +39,17 @@ def _render_html(payload: dict[str, Any]) -> str:
     missed_rows = "".join(
         f"<li>{item.get('expected_key')} — {item.get('title')}</li>" for item in missed
     )
+    calibration_keys = (
+        "confirmed_false_positive_count",
+        "additional_valid_finding_count",
+        "ground_truth_gap_count",
+        "duplicate_count",
+        "matcher_failure_count",
+        "unsupported_count",
+    )
+    calibration_rows = "".join(
+        f"<tr><td>{key}</td><td>{metrics.get(key, 0)}</td></tr>" for key in calibration_keys
+    )
     return f"""<!DOCTYPE html>
 <html lang="tr"><head><meta charset="utf-8"><title>Benchmark Report</title>
 <style>body{{font-family:Segoe UI,sans-serif;background:#0b1220;color:#e5e7eb;padding:2rem}}
@@ -48,6 +59,7 @@ table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #334155;padd
 <p>Suite: {payload.get('suite')} · Commit: {payload.get('git_commit')} · Version: {payload.get('app_version')}</p>
 <h2>Metrics</h2><table>{rows}</table>
 <h2>Missed findings</h2><ul>{missed_rows or '<li>None</li>'}</ul>
+<h2>Calibration breakdown</h2><table>{calibration_rows}</table>
 <p>Generated at {datetime.now(UTC).isoformat()}</p>
 </body></html>"""
 

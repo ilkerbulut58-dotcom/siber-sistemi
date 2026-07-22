@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analysis.correlation_rules import normalize_url
+from app.analysis.correlation_rules import SECRET_CORRELATION_KEYS, normalize_url, secret_identity_token
 from app.analysis.pipeline import analyze_scan_findings
 from app.analysis.types import AnalyzedFinding
 from app.core.exceptions import AppError
@@ -23,8 +23,18 @@ from app.services.ai_analysis_service import enrich_finding
 from app.services.audit_service import log_audit_event
 
 
-def build_fingerprint(project_id: UUID, correlation_key: str, affected_url: str) -> str:
-    payload = f"{project_id}:{correlation_key}:{normalize_url(affected_url)}"
+def build_fingerprint(
+    project_id: UUID,
+    correlation_key: str,
+    affected_url: str,
+    *,
+    evidence: dict | None = None,
+) -> str:
+    secret_token = secret_identity_token(correlation_key, evidence)
+    if secret_token:
+        payload = f"{project_id}:{correlation_key}:{secret_token}"
+    else:
+        payload = f"{project_id}:{correlation_key}:{normalize_url(affected_url)}"
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -93,7 +103,12 @@ class FindingService:
         saved: list[Finding] = []
 
         for item in analyzed_findings:
-            fingerprint = build_fingerprint(project_id, item.correlation_key, item.affected_url)
+            fingerprint = build_fingerprint(
+                project_id,
+                item.correlation_key,
+                item.affected_url,
+                evidence=item.evidence,
+            )
             result = await self.db.execute(
                 select(Finding).where(
                     Finding.project_id == project_id,

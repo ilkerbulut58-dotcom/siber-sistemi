@@ -33,6 +33,27 @@ expected_findings:
     severity: medium
     affected_location: AndroidManifest.xml
     detection_required: true
+  - expected_key: mobile-cleartext-network-config
+    title: Cleartext traffic permitted in network security config
+    category: mobile-cleartext-network-config
+    severity: medium
+    affected_location: res/xml/network_security_config.xml
+    detection_required: false
+    description: Additional network config signal — manifest cleartext is gate-critical.
+  - expected_key: mobile-user-trust-anchors
+    title: User-installed CA trust anchors configured
+    category: mobile-user-trust-anchors
+    severity: medium
+    affected_location: res/xml/network_security_config.xml
+    detection_required: false
+    description: Intentional fixture signal for MITM trust model coverage.
+  - expected_key: mobile-permission-camera
+    title: Dangerous permission requested CAMERA
+    category: mobile-permission-camera
+    severity: low
+    affected_location: android.permission.CAMERA
+    detection_required: false
+    description: Intentional fixture permission — tracked for coverage, not gate-critical.
   - expected_key: mobile-secret-fake_api_key
     title: Fake API key sinyali
     category: mobile-secret-fake_api_key

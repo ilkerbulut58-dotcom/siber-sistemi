@@ -34,6 +34,7 @@ def test_counts_false_negative_false_positive_and_duplicate():
     assert metrics.true_positive_count == 1
     assert metrics.false_negative_count == 1
     assert metrics.duplicate_count == 1
+    assert metrics.confirmed_false_positive_count == 1
     assert metrics.false_positive_count == 1
 
 

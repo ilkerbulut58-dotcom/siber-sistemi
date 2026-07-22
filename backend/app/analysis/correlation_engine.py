@@ -4,22 +4,35 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from app.analysis.correlation_rules import SEVERITY_RANK, normalize_url, resolve_correlation_key
+from app.analysis.correlation_rules import (
+    SECRET_CORRELATION_KEYS,
+    SEVERITY_RANK,
+    normalize_url,
+    resolve_correlation_key,
+    secret_identity_token,
+)
 from app.analysis.types import CorrelatedFinding
 from app.scanners.base import RawFinding
+
+
+def _grouping_key(raw: RawFinding) -> tuple[str, str]:
+    correlation_key = resolve_correlation_key(raw.source_tool, raw.source_rule_id, raw.title)
+    secret_token = secret_identity_token(correlation_key, raw.evidence)
+    if secret_token:
+        return correlation_key, secret_token
+    return correlation_key, normalize_url(raw.affected_url)
 
 
 def correlate_findings(raw_findings: list[RawFinding]) -> list[CorrelatedFinding]:
     groups: dict[tuple[str, str], list[RawFinding]] = defaultdict(list)
 
     for raw in raw_findings:
-        key = resolve_correlation_key(raw.source_tool, raw.source_rule_id, raw.title)
-        url = normalize_url(raw.affected_url)
-        groups[(key, url)].append(raw)
+        groups[_grouping_key(raw)].append(raw)
 
     correlated: list[CorrelatedFinding] = []
-    for (correlation_key, url), items in groups.items():
-        correlated.append(_merge_group(correlation_key, url, items))
+    for (correlation_key, group_token), items in groups.items():
+        primary_url = normalize_url(items[0].affected_url)
+        correlated.append(_merge_group(correlation_key, primary_url, items))
 
     correlated.sort(key=lambda f: (-SEVERITY_RANK.get(f.severity, 0), f.correlation_key))
     return correlated
@@ -46,6 +59,11 @@ def _merge_group(correlation_key: str, url: str, items: list[RawFinding]) -> Cor
     for item in items:
         if item.evidence:
             evidence.setdefault("tool_evidence", {})[item.source_tool] = item.evidence
+
+    if correlation_key in SECRET_CORRELATION_KEYS:
+        locations = sorted({normalize_url(item.affected_url) for item in items if item.affected_url})
+        if len(locations) > 1:
+            evidence["affected_locations"] = locations
 
     agreement = len(tools)
     confidence = "medium" if agreement >= 3 or agreement == 2 else "low"

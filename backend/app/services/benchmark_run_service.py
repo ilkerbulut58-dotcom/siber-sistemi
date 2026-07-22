@@ -112,6 +112,8 @@ class BenchmarkRunService:
             ))
         run.status = BenchmarkRunStatus.COMPLETED
         run.completed_at = datetime.now(UTC)
+        if run.started_at:
+            run.duration_seconds = (run.completed_at - run.started_at).total_seconds()
         self.db.add(BenchmarkResult(
             benchmark_run_id=run.id, expected_count=metrics.expected_count,
             true_positive_count=metrics.true_positive_count,

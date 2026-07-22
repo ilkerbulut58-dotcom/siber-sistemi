@@ -37,6 +37,9 @@ from app.services.scan_service import ScanService, run_scan_job
 
 
 def _git_commit() -> str | None:
+    env_sha = os.environ.get("GITHUB_SHA", "").strip()
+    if env_sha:
+        return env_sha
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -200,7 +203,10 @@ async def _run_web_or_api_target(
             print(f"Benchmark report: {html_path}")
             print(
                 f"TP={result.true_positive_count} FN={result.false_negative_count} "
-                f"FP={result.false_positive_count} P={result.precision:.3f} R={result.recall:.3f} F1={result.f1_score:.3f}"
+                f"confirmed_FP={metrics.get('confirmed_false_positive_count', result.false_positive_count)} "
+                f"additional={metrics.get('additional_valid_finding_count', 0)} "
+                f"dup={result.duplicate_count} matcher_fail={metrics.get('matcher_failure_count', 0)} "
+                f"P={result.precision:.3f} R={result.recall:.3f} F1={result.f1_score:.3f}"
             )
             exit_code = gate.exit_code
     finally:
@@ -235,12 +241,25 @@ async def _false_positive_rules(db, run_id: UUID) -> list[dict]:
         .join(BenchmarkFindingMatch, BenchmarkFindingMatch.finding_id == Finding.id)
         .where(
             BenchmarkFindingMatch.benchmark_run_id == run_id,
-            BenchmarkFindingMatch.classification == "false_positive",
+            BenchmarkFindingMatch.classification.in_(
+                {
+                    "false_positive",
+                    "confirmed_false_positive",
+                    "matcher_failure",
+                    "ground_truth_missing",
+                    "unsupported",
+                }
+            ),
         )
     )
     return [
-        {"source_rule_id": finding.source_rule_id, "title": finding.title, "correlation_key": finding.correlation_key}
-        for finding, _ in rows.all()
+        {
+            "source_rule_id": finding.source_rule_id,
+            "title": finding.title,
+            "correlation_key": finding.correlation_key,
+            "classification": match.classification,
+        }
+        for finding, match in rows.all()
     ]
 
 
