@@ -8,7 +8,6 @@ from app.benchmark.active_guard import (
     ActiveBenchmarkGuard,
     ActiveBenchmarkGuardError,
     guard_for_profile,
-    load_api_active_allowlist,
     load_web_active_allowlist,
 )
 from app.benchmark.security import (
