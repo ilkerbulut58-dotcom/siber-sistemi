@@ -69,8 +69,13 @@ def validate_raw_finding(raw: RawFinding) -> ValidationDecision:
     confidence = (raw.confidence or "medium").lower()
     severity = (raw.severity or "info").lower()
 
-    if rule.startswith("missing-header-") and _has_header_evidence(raw):
-        validators_passed.append("header_evidence")
+    if rule.startswith("missing-header-") and (
+        _has_header_evidence(raw)
+        or (raw.source_tool == "passive_http" and confidence in {"high", "medium"})
+    ):
+        validators_passed.append(
+            "header_evidence" if _has_header_evidence(raw) else "scanner_response_inspection"
+        )
         return ValidationDecision(
             CustomerVisibility.CONFIRMED,
             "Missing security header confirmed by response inspection.",

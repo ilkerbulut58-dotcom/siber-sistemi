@@ -8,6 +8,7 @@ COMPOSE_FILE="${ROOT}/docker-compose.realistic.yml"
 STORAGE="${BENCHMARK_STORAGE_PATH:-/tmp/siber-benchmark-api-repeat}"
 
 mkdir -p "${STORAGE}/reports"
+chmod -R 777 "$(dirname "$STORAGE")" 2>/dev/null || true
 
 docker compose -f "$COMPOSE_FILE" --profile realistic --profile realistic-runner build benchmark-runner
 

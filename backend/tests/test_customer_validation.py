@@ -26,6 +26,21 @@ def test_header_finding_is_confirmed():
     assert artifact.findings[0].visibility == CustomerVisibility.CONFIRMED
 
 
+def test_passive_http_header_finding_confirmed_without_persisted_evidence():
+    raw = RawFinding(
+        source_tool="passive_http",
+        source_rule_id="missing-header-strict-transport-security",
+        title="Missing HSTS",
+        description="missing",
+        severity="medium",
+        affected_url="https://benchmark-juice-proxy/",
+        confidence="high",
+    )
+    artifact = build_customer_validation_artifact([raw])
+    assert artifact.customer_visible_count == 1
+    assert artifact.findings[0].visibility == CustomerVisibility.CONFIRMED
+
+
 def test_customer_visible_metrics_excludes_needs_review_from_fp():
     confirmed = RawFinding(
         source_tool="passive_http",
