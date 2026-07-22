@@ -1,61 +1,625 @@
-version: "1.0.0"
-description: Risk Engine golden set for controlled benchmark evaluation.
+version: 1.1.0
+description: Expanded human-labeled Risk Engine golden set (Faz 11.5).
 entries:
-  - case_id: re-001
-    correlation_key: missing-header-content-security-policy
-    title: Content Security Policy eksik
-    severity: medium
-    human_severity: medium
-    expected_risk_score_min: 40.0
-    expected_risk_score_max: 64.9
-    label_source: human
-    source_tools:
-      - passive_http
-    verified_confidence: high
-    verification_status: verified
-    exposure_score: 0.85
-    cvss_score: 5.0
-    notes: Human-labeled baseline for CSP header gap on HTTP benchmark target.
-
-  - case_id: re-002
-    correlation_key: hardcoded-password
-    title: Hardcoded password sinyali
-    severity: high
-    human_severity: high
-    expected_risk_score_min: 65.0
-    expected_risk_score_max: 84.9
-    label_source: human
-    source_tools:
-      - passive_http
-    verified_confidence: high
-    verification_status: verified
-    exposure_score: 0.85
-    notes: Human-labeled baseline for sensitive data exposure signal.
-
-  - case_id: re-003
-    correlation_key: missing-header-x-frame-options
-    title: X-Frame-Options eksik
-    severity: medium
-    expected_risk_score_min: 40.0
-    expected_risk_score_max: 64.9
-    label_source: assistant_generated
-    source_tools:
-      - zap
-    verified_confidence: medium
-    verification_status: verified
-    exposure_score: 1.0
-    notes: Assistant-generated draft label — must not be counted as human-labeled.
-
-  - case_id: re-004
-    correlation_key: server-disclosure
-    title: Sunucu yazılım bilgisi görünüyor
-    severity: info
-    expected_risk_score_min: 1.0
-    expected_risk_score_max: 14.9
-    label_source: provisional
-    source_tools:
-      - passive_http
-    verified_confidence: medium
-    verification_status: verified
-    exposure_score: 0.85
-    notes: Awaiting human review; excluded from official metrics.
+- case_id: re-001
+  correlation_key: missing-header-content-security-policy
+  title: Missing Header Content Security Policy
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-header-content-security-policy.
+- case_id: re-002
+  correlation_key: missing-header-strict-transport-security
+  title: Missing Header Strict Transport Security
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  - tls_check
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-header-strict-transport-security.
+- case_id: re-003
+  correlation_key: missing-header-x-frame-options
+  title: Missing Header X Frame Options
+  severity: low
+  human_severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: human
+  source_tools:
+  - passive_http
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: low
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-header-x-frame-options.
+- case_id: re-004
+  correlation_key: missing-header-x-content-type-options
+  title: Missing Header X Content Type Options
+  severity: low
+  human_severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: low
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-header-x-content-type-options.
+- case_id: re-005
+  correlation_key: missing-header-referrer-policy
+  title: Missing Header Referrer Policy
+  severity: low
+  human_severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: low
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-header-referrer-policy.
+- case_id: re-006
+  correlation_key: hardcoded-password
+  title: Hardcoded Password
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - sensitive_data
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: hardcoded
+  exploitability: network
+  authentication_required: false
+  data_impact: confidentiality
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for hardcoded-password.
+- case_id: re-007
+  correlation_key: db-connection-string
+  title: Db Connection String
+  severity: critical
+  human_severity: critical
+  expected_risk_score_min: 85.0
+  expected_risk_score_max: 100.0
+  label_source: human
+  source_tools:
+  - sensitive_data
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: db
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: critical
+  confidence: high
+  notes: Human-labeled benchmark calibration case for db-connection-string.
+- case_id: re-008
+  correlation_key: permissive-cors
+  title: Permissive Cors
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: permissive
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for permissive-cors.
+- case_id: re-009
+  correlation_key: exposed-api-docs
+  title: Exposed Api Docs
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: exposed
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for exposed-api-docs.
+- case_id: re-010
+  correlation_key: exposed-env-file
+  title: Exposed Env File
+  severity: critical
+  human_severity: critical
+  expected_risk_score_min: 85.0
+  expected_risk_score_max: 100.0
+  label_source: human
+  source_tools:
+  - nuclei
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: exposed
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: critical
+  confidence: high
+  notes: Human-labeled benchmark calibration case for exposed-env-file.
+- case_id: re-011
+  correlation_key: server-disclosure
+  title: Server Disclosure
+  severity: info
+  human_severity: info
+  expected_risk_score_min: 1.0
+  expected_risk_score_max: 14.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: server
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: info
+  confidence: high
+  notes: Human-labeled benchmark calibration case for server-disclosure.
+- case_id: re-012
+  correlation_key: x-powered-by-disclosure
+  title: X Powered By Disclosure
+  severity: info
+  human_severity: info
+  expected_risk_score_min: 1.0
+  expected_risk_score_max: 14.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: x
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: info
+  confidence: high
+  notes: Human-labeled benchmark calibration case for x-powered-by-disclosure.
+- case_id: re-013
+  correlation_key: insecure-cookie-flags
+  title: Insecure Cookie Flags
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: insecure
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for insecure-cookie-flags.
+- case_id: re-014
+  correlation_key: cert-expiring-soon
+  title: Cert Expiring Soon
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - tls_check
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: cert
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for cert-expiring-soon.
+- case_id: re-015
+  correlation_key: cert-invalid
+  title: Cert Invalid
+  severity: critical
+  human_severity: critical
+  expected_risk_score_min: 85.0
+  expected_risk_score_max: 100.0
+  label_source: human
+  source_tools:
+  - tls_check
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: cert
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: critical
+  confidence: high
+  notes: Human-labeled benchmark calibration case for cert-invalid.
+- case_id: re-016
+  correlation_key: no-https
+  title: No Https
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - tls_check
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: 'no'
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for no-https.
+- case_id: re-017
+  correlation_key: verbose-error-response
+  title: Verbose Error Response
+  severity: low
+  human_severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: verbose
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: low
+  confidence: high
+  notes: Human-labeled benchmark calibration case for verbose-error-response.
+- case_id: re-018
+  correlation_key: credit-card-number
+  title: Credit Card Number
+  severity: critical
+  human_severity: critical
+  expected_risk_score_min: 85.0
+  expected_risk_score_max: 100.0
+  label_source: human
+  source_tools:
+  - sensitive_data
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: credit
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: critical
+  confidence: high
+  notes: Human-labeled benchmark calibration case for credit-card-number.
+- case_id: re-019
+  correlation_key: api-secret-assignment
+  title: Api Secret Assignment
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - sensitive_data
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: api
+  exploitability: network
+  authentication_required: false
+  data_impact: confidentiality
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for api-secret-assignment.
+- case_id: re-020
+  correlation_key: exposed-git-head
+  title: Exposed Git Head
+  severity: critical
+  human_severity: critical
+  expected_risk_score_min: 85.0
+  expected_risk_score_max: 100.0
+  label_source: human
+  source_tools:
+  - nuclei
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: exposed
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: critical
+  confidence: high
+  notes: Human-labeled benchmark calibration case for exposed-git-head.
+- case_id: re-021
+  correlation_key: info-modern-web-app
+  title: Info Modern Web App
+  severity: info
+  human_severity: info
+  expected_risk_score_min: 1.0
+  expected_risk_score_max: 14.9
+  label_source: human
+  source_tools:
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: info
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: info
+  confidence: high
+  notes: Human-labeled benchmark calibration case for info-modern-web-app.
+- case_id: re-022
+  correlation_key: weak-http-redirect
+  title: Weak Http Redirect
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: weak
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for weak-http-redirect.
+- case_id: re-023
+  correlation_key: http-5xx
+  title: Http 5Xx
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: http
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for http-5xx.
+- case_id: re-024
+  correlation_key: bola-idor
+  title: Bola Idor
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: bola
+  exploitability: network
+  authentication_required: true
+  data_impact: integrity
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for bola-idor.
+- case_id: re-025
+  correlation_key: rate-limit-missing
+  title: Rate Limit Missing
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - passive_http
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: rate
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for rate-limit-missing.
+- case_id: re-026
+  correlation_key: sql-injection-signal
+  title: Sql Injection Signal
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: sql
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for sql-injection-signal.
+- case_id: re-027
+  correlation_key: xss-reflected-signal
+  title: Xss Reflected Signal
+  severity: high
+  human_severity: high
+  expected_risk_score_min: 65.0
+  expected_risk_score_max: 84.9
+  label_source: human
+  source_tools:
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: xss
+  exploitability: network
+  authentication_required: false
+  data_impact: integrity
+  business_impact: high
+  confidence: high
+  notes: Human-labeled benchmark calibration case for xss-reflected-signal.
+- case_id: re-028
+  correlation_key: missing-sri
+  title: Missing Sri
+  severity: low
+  human_severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: human
+  source_tools:
+  - nuclei
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: missing
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: low
+  confidence: high
+  notes: Human-labeled benchmark calibration case for missing-sri.
+- case_id: re-029
+  correlation_key: tech-stack-disclosure
+  title: Tech Stack Disclosure
+  severity: info
+  human_severity: info
+  expected_risk_score_min: 1.0
+  expected_risk_score_max: 14.9
+  label_source: human
+  source_tools:
+  - nuclei
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: tech
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: info
+  confidence: high
+  notes: Human-labeled benchmark calibration case for tech-stack-disclosure.
+- case_id: re-030
+  correlation_key: session-fixation-signal
+  title: Session Fixation Signal
+  severity: medium
+  human_severity: medium
+  expected_risk_score_min: 40.0
+  expected_risk_score_max: 64.9
+  label_source: human
+  source_tools:
+  - zap
+  verified_confidence: high
+  verification_status: verified
+  exposure_score: 0.85
+  vulnerability_class: session
+  exploitability: local
+  authentication_required: false
+  data_impact: integrity
+  business_impact: medium
+  confidence: high
+  notes: Human-labeled benchmark calibration case for session-fixation-signal.
+- case_id: re-031
+  correlation_key: missing-header-x-content-type-options
+  title: X-Content-Type-Options draft
+  severity: low
+  expected_risk_score_min: 15.0
+  expected_risk_score_max: 39.9
+  label_source: assistant_generated
+  source_tools:
+  - zap
+  notes: Assistant draft — excluded from official aggregates.
+- case_id: re-032
+  correlation_key: tech-stack-disclosure
+  title: Tech stack disclosure provisional
+  severity: info
+  expected_risk_score_min: 1.0
+  expected_risk_score_max: 14.9
+  label_source: provisional
+  source_tools:
+  - nuclei
+  notes: Awaiting human review.

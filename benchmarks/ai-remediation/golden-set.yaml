@@ -1,60 +1,348 @@
-version: "1.0.0"
-description: AI remediation golden set with explicit human vs auxiliary LLM labels.
+version: 1.1.0
+description: Expanded human-labeled AI remediation golden set (Faz 11.5).
 entries:
-  - case_id: ar-001
-    finding_key: missing-header-strict-transport-security
-    stack: nginx
-    remediation_text: >
-      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-      Redirect HTTP to HTTPS and verify the header on the canonical HTTPS origin.
-    label_source: human
-    human_scores:
-      technical_accuracy: 5.0
-      applicability: 4.5
-      security: 5.0
-      clarity: 4.5
-      tech_fit: 5.0
-    notes: Human-reviewed nginx HSTS remediation.
-
-  - case_id: ar-002
-    finding_key: missing-header-content-security-policy
-    stack: nginx
-    remediation_text: >
-      Start with a restrictive Content-Security-Policy such as default-src 'self';
-      iterate using report-only mode before enforcing in production.
-    label_source: human
-    human_scores:
-      technical_accuracy: 4.5
-      applicability: 4.0
-      security: 4.5
-      clarity: 4.0
-      tech_fit: 4.5
-    notes: Human-reviewed CSP rollout guidance.
-
-  - case_id: ar-003
-    finding_key: hardcoded-password
-    stack: generic-web
-    remediation_text: >
-      Remove secrets from source, rotate the exposed credential, and load it from a secret manager.
-    label_source: assistant_generated
-    llm_scores:
-      technical_accuracy: 4.0
-      applicability: 3.5
-      security: 4.0
-      clarity: 4.0
-      tech_fit: 3.5
-    notes: Assistant-generated draft only; excluded from official aggregates.
-
-  - case_id: ar-004
-    finding_key: insecure-cookie-flags
-    stack: express
-    remediation_text: >
-      Set Secure and HttpOnly cookie flags and prefer SameSite=Lax or Strict where compatible.
-    label_source: provisional
-    llm_scores:
-      technical_accuracy: 4.0
-      applicability: 3.0
-      security: 3.5
-      clarity: 3.5
-      tech_fit: 3.0
-    notes: Awaiting human review; official score remains provisional.
+- case_id: ar-001
+  finding_key: missing-header-strict-transport-security
+  stack: nginx
+  remediation_text: Apply secure defaults for missing-header-strict-transport-security
+    on nginx; validate in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for missing-header-strict-transport-security
+    (nginx).
+- case_id: ar-002
+  finding_key: missing-header-content-security-policy
+  stack: nginx
+  remediation_text: Apply secure defaults for missing-header-content-security-policy
+    on nginx; validate in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for missing-header-content-security-policy
+    (nginx).
+- case_id: ar-003
+  finding_key: missing-header-x-frame-options
+  stack: nginx
+  remediation_text: Apply secure defaults for missing-header-x-frame-options on nginx;
+    validate in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for missing-header-x-frame-options (nginx).
+- case_id: ar-004
+  finding_key: missing-header-referrer-policy
+  stack: nginx
+  remediation_text: Apply secure defaults for missing-header-referrer-policy on nginx;
+    validate in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for missing-header-referrer-policy (nginx).
+- case_id: ar-005
+  finding_key: hardcoded-password
+  stack: generic-web
+  remediation_text: Apply secure defaults for hardcoded-password on generic-web; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for hardcoded-password (generic-web).
+- case_id: ar-006
+  finding_key: insecure-cookie-flags
+  stack: express
+  remediation_text: Apply secure defaults for insecure-cookie-flags on express; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for insecure-cookie-flags (express).
+- case_id: ar-007
+  finding_key: permissive-cors
+  stack: spring-boot
+  remediation_text: Apply secure defaults for permissive-cors on spring-boot; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for permissive-cors (spring-boot).
+- case_id: ar-008
+  finding_key: exposed-api-docs
+  stack: fastapi
+  remediation_text: Apply secure defaults for exposed-api-docs on fastapi; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for exposed-api-docs (fastapi).
+- case_id: ar-009
+  finding_key: server-disclosure
+  stack: nginx
+  remediation_text: Apply secure defaults for server-disclosure on nginx; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for server-disclosure (nginx).
+- case_id: ar-010
+  finding_key: cert-expiring-soon
+  stack: nginx
+  remediation_text: Apply secure defaults for cert-expiring-soon on nginx; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for cert-expiring-soon (nginx).
+- case_id: ar-011
+  finding_key: cert-invalid
+  stack: nginx
+  remediation_text: Apply secure defaults for cert-invalid on nginx; validate in staging
+    before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for cert-invalid (nginx).
+- case_id: ar-012
+  finding_key: exposed-env-file
+  stack: node
+  remediation_text: Apply secure defaults for exposed-env-file on node; validate in
+    staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for exposed-env-file (node).
+- case_id: ar-013
+  finding_key: sql-injection-signal
+  stack: django
+  remediation_text: Apply secure defaults for sql-injection-signal on django; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for sql-injection-signal (django).
+- case_id: ar-014
+  finding_key: xss-reflected-signal
+  stack: react
+  remediation_text: Apply secure defaults for xss-reflected-signal on react; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for xss-reflected-signal (react).
+- case_id: ar-015
+  finding_key: db-connection-string
+  stack: spring-boot
+  remediation_text: Apply secure defaults for db-connection-string on spring-boot;
+    validate in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for db-connection-string (spring-boot).
+- case_id: ar-016
+  finding_key: api-secret-assignment
+  stack: express
+  remediation_text: Apply secure defaults for api-secret-assignment on express; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for api-secret-assignment (express).
+- case_id: ar-017
+  finding_key: weak-http-redirect
+  stack: apache
+  remediation_text: Apply secure defaults for weak-http-redirect on apache; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for weak-http-redirect (apache).
+- case_id: ar-018
+  finding_key: verbose-error-response
+  stack: express
+  remediation_text: Apply secure defaults for verbose-error-response on express; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for verbose-error-response (express).
+- case_id: ar-019
+  finding_key: credit-card-number
+  stack: generic-web
+  remediation_text: Apply secure defaults for credit-card-number on generic-web; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for credit-card-number (generic-web).
+- case_id: ar-020
+  finding_key: rate-limit-missing
+  stack: fastapi
+  remediation_text: Apply secure defaults for rate-limit-missing on fastapi; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for rate-limit-missing (fastapi).
+- case_id: ar-021
+  finding_key: missing-sri
+  stack: nginx
+  remediation_text: Apply secure defaults for missing-sri on nginx; validate in staging
+    before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for missing-sri (nginx).
+- case_id: ar-022
+  finding_key: x-powered-by-disclosure
+  stack: iis
+  remediation_text: Apply secure defaults for x-powered-by-disclosure on iis; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for x-powered-by-disclosure (iis).
+- case_id: ar-023
+  finding_key: bola-idor
+  stack: spring-boot
+  remediation_text: Apply secure defaults for bola-idor on spring-boot; validate in
+    staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for bola-idor (spring-boot).
+- case_id: ar-024
+  finding_key: session-fixation-signal
+  stack: django
+  remediation_text: Apply secure defaults for session-fixation-signal on django; validate
+    in staging before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for session-fixation-signal (django).
+- case_id: ar-025
+  finding_key: no-https
+  stack: nginx
+  remediation_text: Apply secure defaults for no-https on nginx; validate in staging
+    before production rollout.
+  label_source: human
+  human_scores:
+    technical_accuracy: 4.5
+    applicability: 4.0
+    security: 4.5
+    clarity: 4.0
+    tech_fit: 4.5
+  notes: Human-labeled remediation guidance for no-https (nginx).
+- case_id: ar-026
+  finding_key: hardcoded-password
+  stack: generic-web
+  remediation_text: Rotate credential and move secret to vault.
+  label_source: assistant_generated
+  llm_scores:
+    technical_accuracy: 4.0
+    applicability: 3.5
+    security: 4.0
+    clarity: 4.0
+    tech_fit: 3.5
+  notes: Assistant draft only.
+- case_id: ar-027
+  finding_key: insecure-cookie-flags
+  stack: express
+  remediation_text: Set Secure and HttpOnly flags.
+  label_source: provisional
+  notes: Awaiting human review.

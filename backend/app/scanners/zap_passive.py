@@ -207,37 +207,7 @@ async def _fetch_alerts(client: httpx.AsyncClient, target_url: str) -> list[dict
 
 
 def _alerts_to_findings(alerts: list[dict]) -> list[RawFinding]:
-    findings: list[RawFinding] = []
-    seen: set[tuple[str, str, str]] = set()
+    from app.benchmark.alert_dedup import group_zap_alerts, grouped_alerts_to_raw_findings
 
-    for alert in alerts:
-        plugin_id = str(alert.get("pluginId") or alert.get("pluginid") or "unknown")
-        name = str(alert.get("name") or alert.get("alert") or plugin_id)
-        url = str(alert.get("url") or "")
-        key = (plugin_id, url, name)
-        if key in seen:
-            continue
-        seen.add(key)
-
-        risk = RISK_MAP.get(str(alert.get("risk") or "info").lower(), "info")
-        findings.append(
-            RawFinding(
-                source_tool="zap",
-                source_rule_id=f"zap-{plugin_id}",
-                title=name,
-                description=str(alert.get("description") or name),
-                severity=risk,
-                affected_url=url or str(alert.get("uri") or ""),
-                remediation=str(alert.get("solution") or "") or None,
-                confidence=str(alert.get("confidence") or "medium").lower(),
-                evidence={
-                    "plugin_id": plugin_id,
-                    "cwe_id": alert.get("cweid"),
-                    "wasc_id": alert.get("wascid"),
-                    "param": alert.get("param"),
-                    "evidence": alert.get("evidence"),
-                },
-            )
-        )
-
-    return findings
+    groups = group_zap_alerts(alerts)
+    return grouped_alerts_to_raw_findings(groups, risk_map=RISK_MAP)

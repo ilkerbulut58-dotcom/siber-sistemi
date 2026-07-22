@@ -91,6 +91,8 @@ def build_report_payload(
     subset: str | None = None,
     realistic: bool = False,
     active: bool = False,
+    customer_validation: dict[str, Any] | None = None,
+    api_coverage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if active:
@@ -128,5 +130,7 @@ def build_report_payload(
         "coverage_gaps": metrics.get("coverage_gaps", []),
         "duration_seconds": duration_seconds,
         "scanner_errors": scanner_errors,
+        "customer_validation": customer_validation,
+        "api_coverage": api_coverage,
         "generated_at": datetime.now(UTC).isoformat(),
     }

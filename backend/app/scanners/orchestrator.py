@@ -165,17 +165,26 @@ async def run_scan_for_profile(target_url: str, profile: str) -> list[RawFinding
         guard = guard_for_profile(profile)
         guard.validate_target_url(target_url)
         scanners = [
-            (
-                "zap",
-                run_zap_active_scan,
-                {"target_url": target_url, "guard": guard, "max_children": 5},
-            ),
-            (
-                "nuclei",
-                run_nuclei_scan,
-                {"target_url": target_url, "tags": "misconfig,exposure,tech", "guard": guard},
-            ),
+            ("passive_http", run_passive_http_scan, {"target_url": target_url}),
         ]
+        if profile == "benchmark-active-api":
+            from app.scanners.api_surface_scanner import run_api_surface_scan
+
+            scanners.append(("api_surface", run_api_surface_scan, {"target_url": target_url}))
+        scanners.extend(
+            [
+                (
+                    "zap",
+                    run_zap_active_scan,
+                    {"target_url": target_url, "guard": guard, "max_children": 5},
+                ),
+                (
+                    "nuclei",
+                    run_nuclei_scan,
+                    {"target_url": target_url, "tags": "misconfig,exposure,tech", "guard": guard},
+                ),
+            ]
+        )
     else:
         scanners = [
             ("passive_http", run_passive_http_scan, {"target_url": target_url}),

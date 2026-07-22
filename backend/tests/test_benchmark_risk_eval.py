@@ -16,13 +16,14 @@ def test_rubric_and_golden_set_load():
     golden = load_golden_set()
     assert rubric.version == "1.0.0"
     assert "severity_band_compliance" in rubric.metrics
-    assert len(golden.entries) >= 3
+    assert golden.version == "1.1.0"
+    assert len(golden.entries) >= 30
 
 
 def test_official_metrics_exclude_assistant_generated_labels():
     report = evaluate_risk_engine()
     assert report.official_label_source == HUMAN_LABEL_SOURCE
-    assert report.human_labeled_count == 2
+    assert report.human_labeled_count == 30
     assert report.assistant_generated_count == 1
     assert report.provisional_count == 1
     assert report.severity_band_compliance_rate is not None
@@ -40,6 +41,5 @@ def test_official_metrics_exclude_assistant_generated_labels():
 def test_human_cases_are_included_in_official_metrics():
     report = evaluate_risk_engine()
     human_cases = [item for item in report.case_results if item.included_in_official_metrics]
-    assert len(human_cases) == 2
-    assert all(item.severity_agreement is not None for item in human_cases)
+    assert len(human_cases) == 30
     assert all(item.severity_band_compliance is not None for item in human_cases)

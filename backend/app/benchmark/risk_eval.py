@@ -192,7 +192,7 @@ def _finding_from_case(case: RiskGoldenCase) -> AnalyzedFinding:
 def evaluate_case(case: RiskGoldenCase, rubric: RiskRubric) -> RiskCaseResult:
     finding = _finding_from_case(case)
     predicted_score = calculate_risk_score(finding)
-    predicted_severity = case.severity
+    predicted_severity_band = severity_band_for_score(rubric, predicted_score)
     official = case.label_source in OFFICIAL_LABEL_SOURCES
 
     severity_agreement: bool | None = None
@@ -201,22 +201,21 @@ def evaluate_case(case: RiskGoldenCase, rubric: RiskRubric) -> RiskCaseResult:
 
     if official:
         reference_severity = case.human_severity or case.severity
-        severity_agreement = predicted_severity == reference_severity
+        severity_agreement = predicted_severity_band == reference_severity
         severity_band_compliance = (
             case.expected_risk_score_min <= predicted_score <= case.expected_risk_score_max
         )
-        predicted_band = severity_band_for_score(rubric, predicted_score)
         reference_band = severity_band_for_score(
             rubric,
             (case.expected_risk_score_min + case.expected_risk_score_max) / 2,
         )
-        false_severity = predicted_band != reference_band
+        false_severity = predicted_severity_band != reference_band
 
     return RiskCaseResult(
         case_id=case.case_id,
         label_source=case.label_source,
         included_in_official_metrics=official,
-        predicted_severity=predicted_severity,
+        predicted_severity=predicted_severity_band or case.severity,
         predicted_risk_score=predicted_score,
         human_severity=case.human_severity or (case.severity if official else None),
         severity_agreement=severity_agreement,

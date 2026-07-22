@@ -46,6 +46,7 @@ from app.models.benchmark import (
 )
 from app.models.finding import Finding
 from app.models.scan import ScanJob, ScanStatus
+from app.scanners.base import RawFinding
 from app.schemas.scan import ScanCreate
 from app.services.benchmark_fixture_sync_service import BenchmarkFixtureSyncService
 from app.services.benchmark_workspace_service import BenchmarkWorkspaceService
@@ -221,6 +222,28 @@ async def _run_web_or_api_target(
                 metrics = result.breakdown or {}
                 missed = await _missed_findings(db, run.id)
                 false_positives = await _false_positive_rules(db, run.id)
+                raw_findings = await _raw_findings_from_scan(db, scan.id)
+                from app.benchmark.customer_validation import build_customer_validation_artifact
+
+                validation_artifact = build_customer_validation_artifact(raw_findings)
+                customer_validation = {
+                    "raw_finding_count": validation_artifact.raw_finding_count,
+                    "customer_visible_count": validation_artifact.customer_visible_count,
+                    "by_visibility": validation_artifact.by_visibility,
+                    "suppression_count": len(validation_artifact.suppressions),
+                    "suppressions": validation_artifact.suppressions[:20],
+                }
+                api_coverage = None
+                if active and "api" in suite:
+                    from app.scanners.api_surface_scanner import api_coverage_metrics
+
+                    api_coverage = api_coverage_metrics(raw_findings)
+                    missed_keys = [item.get("expected_key") for item in missed if item.get("expected_key")]
+                    from app.benchmark.api_coverage_analysis import analyze_api_false_negatives
+
+                    api_coverage["false_negative_analysis"] = analyze_api_false_negatives(
+                        [key for key in missed_keys if key]
+                    )
                 delta = _delta_for_result(result, suite, duration_seconds=run.duration_seconds)
                 result.previous_delta = delta
                 missed_critical = sum(
@@ -260,6 +283,8 @@ async def _run_web_or_api_target(
                     subset=subset,
                     realistic=realistic,
                     active=active,
+                    customer_validation=customer_validation,
+                    api_coverage=api_coverage,
                 )
                 json_path, html_path = write_reports(run_id=str(run.id), payload=payload)
                 if write_baseline:
@@ -347,6 +372,26 @@ async def _missed_findings(db, run_id: UUID) -> list[dict]:
         }
         for expected, _match in rows.all()
     ]
+
+
+async def _raw_findings_from_scan(db, scan_id: UUID) -> list[RawFinding]:
+    rows = await db.execute(select(Finding).where(Finding.scan_job_id == scan_id))
+    raw: list[RawFinding] = []
+    for finding in rows.scalars().all():
+        raw.append(
+            RawFinding(
+                source_tool=finding.source_tool,
+                source_rule_id=finding.source_rule_id or finding.correlation_key or "unknown",
+                title=finding.title,
+                description=finding.description or finding.title,
+                severity=finding.severity,
+                affected_url=finding.affected_url or "",
+                remediation=finding.remediation,
+                confidence=finding.confidence or "medium",
+                evidence=dict(finding.evidence or {}),
+            )
+        )
+    return raw
 
 
 async def _false_positive_rules(db, run_id: UUID) -> list[dict]:
@@ -565,6 +610,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("blind", help="Run blind benchmark evaluation (requires BLIND_GROUND_TRUTH_SECRET)")
     sub.add_parser("risk-eval", help="Run Risk Engine golden-set evaluation")
     sub.add_parser("ai-remediation-eval", help="Run AI remediation golden-set evaluation")
+    sub.add_parser("metrics-audit", help="Print metric definitions and Risk Engine confusion table")
+    sub.add_parser("release-gates", help="Evaluate MVP release gates (report-only)")
     args = parser.parse_args(argv)
     if args.command == "run":
         if args.suite not in ALLOWED_SUITES:
@@ -587,6 +634,44 @@ def main(argv: list[str] | None = None) -> int:
         from app.benchmark.ai_remediation_eval import run_ai_remediation_eval_cli
 
         return run_ai_remediation_eval_cli()
+    if args.command == "metrics-audit":
+        import json
+
+        from app.benchmark.metrics_audit import risk_engine_confusion_table
+        from app.benchmark.metrics_definitions import (
+            METRIC_DEFINITIONS,
+            precision_recall_inclusion_table,
+        )
+
+        payload = {
+            "metric_definitions": METRIC_DEFINITIONS,
+            "precision_recall_inclusion": precision_recall_inclusion_table(),
+            "risk_engine_confusion": risk_engine_confusion_table(),
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+    if args.command == "release-gates":
+        import json
+
+        from app.benchmark.baseline import (
+            load_realistic_active_baseline,
+            load_realistic_baseline_v11,
+        )
+        from app.benchmark.release_gates import evaluate_release_gates, write_release_gate_report
+
+        passive = load_realistic_baseline_v11()
+        active = load_realistic_active_baseline()
+        report = evaluate_release_gates(
+            passive_web=(passive or {}).get("suites", {}).get("web-realistic-passive"),
+            passive_api=(passive or {}).get("suites", {}).get("api-realistic-passive"),
+            active_web=(active or {}).get("suites", {}).get("web-realistic-active"),
+            active_api=(active or {}).get("suites", {}).get("api-realistic-active"),
+            blind_validation_passed=None,
+        )
+        path = write_release_gate_report(report)
+        print(json.dumps(report.as_dict(), indent=2))
+        print(f"Report written to {path}")
+        return 0
     return 2
 
 

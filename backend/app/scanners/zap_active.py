@@ -159,10 +159,21 @@ async def _wait_spider(
     *,
     deadline: float,
 ) -> None:
+    last_progress = -1
+    stalled_rounds = 0
     while time.time() < deadline:
         payload = await _api_get(client, "/JSON/spider/view/status/", scanId=scan_id)
-        if int(str(payload.get("status", "100"))) >= 100:
+        progress = int(str(payload.get("status", "100")))
+        if progress >= 100:
             return
+        if progress == last_progress:
+            stalled_rounds += 1
+            if stalled_rounds >= 5:
+                logger.warning("ZAP active spider stalled at %s%% for scan %s", progress, scan_id)
+                return
+        else:
+            stalled_rounds = 0
+            last_progress = progress
         await asyncio.sleep(2)
     logger.warning("ZAP active spider timed out for scan %s", scan_id)
 
@@ -185,23 +196,35 @@ async def _wait_active_scan(
     *,
     deadline: float,
 ) -> None:
+    last_progress = -1
+    stalled_rounds = 0
     while time.time() < deadline:
         payload = await _api_get(client, "/JSON/ascan/view/status/", scanId=scan_id)
-        if int(str(payload.get("status", "100"))) >= 100:
+        progress = int(str(payload.get("status", "100")))
+        if progress >= 100:
             return
+        if progress == last_progress:
+            stalled_rounds += 1
+            if stalled_rounds >= 5:
+                logger.warning(
+                    "ZAP active scan stalled at %s%% for scan %s — using partial results",
+                    progress,
+                    scan_id,
+                )
+                await _api_get(client, "/JSON/ascan/action/stop/", scanId=scan_id)
+                return
+        else:
+            stalled_rounds = 0
+            last_progress = progress
         await asyncio.sleep(3)
     logger.warning("ZAP active scan timed out for scan %s", scan_id)
     await _api_get(client, "/JSON/ascan/action/stop/", scanId=scan_id)
 
 
 async def _wait_passive_queue(client: httpx.AsyncClient) -> None:
-    settings = get_settings()
-    deadline = time.time() + min(settings.zap_passive_wait_seconds, 30)
-    while time.time() < deadline:
-        payload = await _api_get(client, "/JSON/pscan/view/recordsToScan/")
-        if int(str(payload.get("recordsToScan", "0"))) == 0:
-            return
-        await asyncio.sleep(2)
+    from app.scanners.zap_passive import _wait_passive_scan
+
+    await _wait_passive_scan(client)
 
 
 async def _fetch_alerts(client: httpx.AsyncClient, target_url: str) -> list[dict]:

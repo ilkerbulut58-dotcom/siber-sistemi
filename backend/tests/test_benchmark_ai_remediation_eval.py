@@ -24,17 +24,17 @@ def test_rubric_dimensions_present():
         "clarity",
         "tech_fit",
     }
-    assert len(golden.entries) >= 3
+    assert len(golden.entries) >= 25
 
 
 def test_official_scores_use_human_labels_only():
     report = evaluate_ai_remediation()
-    assert report.human_labeled_count == 2
+    assert report.human_labeled_count == 25
     assert report.provisional_count >= 1
     assert report.overall_score is not None
 
     human_cases = [item for item in report.case_results if item.label_source == HUMAN_LABEL_SOURCE]
-    assert len(human_cases) == 2
+    assert len(human_cases) == 25
     assert all(not item.provisional for item in human_cases)
     assert all(item.official_scores for item in human_cases)
 

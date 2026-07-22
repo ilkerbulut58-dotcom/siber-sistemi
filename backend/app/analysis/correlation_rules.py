@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
+
+from app.utils.url_canonicalization import (
+    normalize_url,  # noqa: F401 — re-exported for analysis modules
+)
 
 # ZAP passive plugin IDs -> canonical keys (aligned with passive_http rule IDs)
 ZAP_RULE_MAP: dict[str, str] = {
@@ -13,6 +16,7 @@ ZAP_RULE_MAP: dict[str, str] = {
     "10038": "missing-header-content-security-policy",
     "10063": "missing-header-referrer-policy",
     "10096": "server-disclosure",
+    "10098": "permissive-cors",
     "10109": "info-modern-web-app",
 }
 
@@ -24,6 +28,9 @@ NUCLEI_FRAGMENT_MAP: list[tuple[str, str]] = [
     ("content-security-policy", "missing-header-content-security-policy"),
     ("referrer-policy", "missing-header-referrer-policy"),
     ("x-powered-by", "x-powered-by-disclosure"),
+    ("cors", "permissive-cors"),
+    ("openapi", "exposed-api-docs"),
+    ("swagger", "exposed-api-docs"),
     ("tls", "cert-invalid"),
     ("ssl", "cert-invalid"),
     ("exposure", "exposed-env-file"),
@@ -44,19 +51,6 @@ SENSITIVE_DATA_RULE_MAP: dict[str, str] = {
 
 # Findings that represent the same secret across URLs should deduplicate by secret identity.
 SECRET_CORRELATION_KEYS = frozenset(SENSITIVE_DATA_RULE_MAP.values())
-
-
-def normalize_url(url: str | None) -> str:
-    if not url:
-        return ""
-    parsed = urlparse(url.strip())
-    host = (parsed.hostname or "").lower()
-    path = parsed.path.rstrip("/") or "/"
-    scheme = parsed.scheme or "https"
-    port = parsed.port
-    if port and ((scheme == "https" and port != 443) or (scheme == "http" and port != 80)):
-        return f"{scheme}://{host}:{port}{path}"
-    return f"{scheme}://{host}{path}"
 
 
 def resolve_correlation_key(source_tool: str, source_rule_id: str, title: str) -> str:
