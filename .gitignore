@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker
+*.log
+
+# Scan outputs (Phase 5+)
+scan_outputs/
+reports/
+benchmarks/reports/
+benchmarks/baselines/*.json
+benchmarks/fixtures/android-smoke/fixture.apk
+benchmarks/fixtures/android-smoke/fixture.json
+siber-deploy.tgz
+deploy-output.log
+siber_sifre.txt
+siber-nginx.txt
+turbridge-conf.txt
+
+# Secrets
+*.pem
+*.key
+credentials.json
+
+# Alembic
+# Keep migrations, ignore temp files
+
+# OS
+Thumbs.db
