@@ -1,0 +1,117 @@
+{
+  "baseline_name": "realistic-active-v1.0.0",
+  "baseline_type": "realistic_pinned_active",
+  "description": "Pinned Juice Shop and crAPI active subset calibration inside isolated benchmark Docker lab only. Does not represent general product security accuracy. Active scans are guard-allowlisted and must not be exposed to customer APIs or production orchestrators.",
+  "fixture_version": "1.0.0",
+  "ground_truth_version": "1.0.0",
+  "subset": "main",
+  "scope": [
+    "web-realistic-active",
+    "api-realistic-active"
+  ],
+  "created_at": "2026-07-22T22:31:00+00:00",
+  "git_commit": "766fcab",
+  "calibration_ci_run_ids": [
+    "29962166237",
+    "29962166237-rerun"
+  ],
+  "calibration_attempts": 2,
+  "fixture_startup_seconds": 38,
+  "image_digests": {
+    "juice-shop": "sha256:2765a26de7647609099a338d5b7f61085d95903c8703bb70f03fcc4b12f0818d",
+    "nginx-alpine": "sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591",
+    "crapi-web": "sha256:7e5f6604c3be5b6f65ed5c22b00b53de6b4ea1dd6ab548bfe856ee081f119504",
+    "zaproxy-stable": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+    "nuclei": "sha256:embedded-in-benchmark-runner-image"
+  },
+  "scanner_versions": {
+    "app": "0.1.0",
+    "zap": "2.17.0",
+    "zap_image_digest": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+    "nuclei_version": "3.3.7",
+    "nuclei_active_template_allowlist_hash": "659b992990aa23b9e1e73b9fc9c5007bd7f8a98c8eb72c7dae2b2facb0a2c52b",
+    "images_lock_schema": 1
+  },
+  "active_guard": {
+    "request_budget": 250,
+    "concurrency_limit": 2,
+    "timeout_seconds": 240,
+    "kill_switch_env": "BENCHMARK_ACTIVE_KILL_SWITCH",
+    "destructive_endpoints_blocked": true,
+    "external_access_blocked": true
+  },
+  "reproducibility_notes": {
+    "web-realistic-active": "TP/FN/recall stable across runs; confirmed FP and duplicate counts vary with ZAP active alert volume (52-96 raw findings).",
+    "api-realistic-active": "Detection metrics fully reproducible across both calibration runs."
+  },
+  "suites": {
+    "web-realistic-active": {
+      "run_id": "calibration-29962166237-web-active-main",
+      "true_positive_count": 3,
+      "false_negative_count": 2,
+      "confirmed_false_positive_count": 24,
+      "additional_valid_finding_count": 0,
+      "informational_count": 11,
+      "duplicate_count": 16,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "request_count": 4,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 0,
+      "precision": 0.111,
+      "recall": 0.6,
+      "f1_score": 0.188,
+      "duration_seconds": 175.0,
+      "scanner_metrics": {
+        "zap": {
+          "finding_count": 52,
+          "execution_seconds": 153.941,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "2.17.0"
+        },
+        "nuclei": {
+          "finding_count": 2,
+          "execution_seconds": 18.893,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "3.3.7"
+        }
+      }
+    },
+    "api-realistic-active": {
+      "run_id": "calibration-29962166237-api-active-main",
+      "true_positive_count": 1,
+      "false_negative_count": 4,
+      "confirmed_false_positive_count": 2,
+      "additional_valid_finding_count": 0,
+      "informational_count": 1,
+      "duplicate_count": 0,
+      "matcher_failure_count": 0,
+      "scanner_error_count": 0,
+      "request_count": 3,
+      "partial_recall": 0.0,
+      "owasp_coverage_gap_count": 0,
+      "precision": 0.333,
+      "recall": 0.2,
+      "f1_score": 0.25,
+      "duration_seconds": 45.0,
+      "scanner_metrics": {
+        "zap": {
+          "finding_count": 3,
+          "execution_seconds": 40.077,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "2.17.0"
+        },
+        "nuclei": {
+          "finding_count": 1,
+          "execution_seconds": 9.527,
+          "timeout_count": 0,
+          "error_count": 0,
+          "scanner_version": "3.3.7"
+        }
+      }
+    }
+  }
+}

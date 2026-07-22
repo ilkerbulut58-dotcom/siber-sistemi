@@ -10,9 +10,11 @@ from uuid import uuid4
 import pytest
 
 from app.benchmark.baseline import (
+    REALISTIC_ACTIVE_BASELINE_NAME,
     REALISTIC_BASELINE_NAME,
     REALISTIC_BASELINE_V11_NAME,
     load_baseline,
+    load_realistic_active_baseline,
     load_realistic_baseline,
     load_realistic_baseline_v11,
 )
@@ -216,6 +218,30 @@ def test_load_realistic_baseline_suite_metrics():
     assert api["precision"] == 0.6
     assert web["scanner_metrics"]["zap"]["finding_count"] == 8
     assert api["scanner_metrics"]["nuclei"]["finding_count"] == 10
+
+
+def test_realistic_active_baseline_file_metadata():
+    baseline = load_realistic_active_baseline()
+    assert baseline is not None
+    assert baseline["baseline_name"] == REALISTIC_ACTIVE_BASELINE_NAME
+    assert baseline["baseline_type"] == "realistic_pinned_active"
+    assert "Does not represent general product security accuracy" in baseline["description"]
+    assert set(baseline["scope"]) == {"web-realistic-active", "api-realistic-active"}
+    assert baseline["scanner_versions"]["zap"] == "2.17.0"
+
+
+def test_load_realistic_active_baseline_suite_metrics():
+    web = load_baseline("web-realistic-active")
+    api = load_baseline("api-realistic-active")
+    assert web is not None
+    assert api is not None
+    assert web["true_positive_count"] == 3
+    assert web["recall"] == 0.6
+    assert web["request_count"] == 4
+    assert api["true_positive_count"] == 1
+    assert api["confirmed_false_positive_count"] == 2
+    assert api["precision"] == 0.333
+    assert api["scanner_metrics"]["zap"]["finding_count"] == 3
 
 
 def test_images_lock_includes_zap_and_nuclei():
