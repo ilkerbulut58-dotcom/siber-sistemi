@@ -25,6 +25,7 @@ from app.benchmark.docker_control import (
 from app.benchmark.fixtures import filter_fixture_subset, load_subset
 from app.benchmark.gate import evaluate_gate
 from app.benchmark.manifests import (
+    ACTIVE_REALISTIC_SUITES,
     ALLOWED_SUITES,
     REALISTIC_PASSIVE_SUITES,
     load_ground_truth,
@@ -32,6 +33,7 @@ from app.benchmark.manifests import (
     repo_benchmarks_root,
 )
 from app.benchmark.reports import build_report_payload, write_reports
+from app.benchmark.scanner_versions import collect_lab_scanner_versions
 from app.benchmark.security import assert_suite_runnable, is_realistic_suite
 from app.core.config import get_settings
 from app.core.database import async_session_factory
@@ -128,12 +130,17 @@ async def _run_web_or_api_target(
     subset: str | None = None,
 ) -> int:
     settings = get_settings()
-    realistic = suite in REALISTIC_PASSIVE_SUITES
+    active = suite in ACTIVE_REALISTIC_SUITES
+    realistic = suite in REALISTIC_PASSIVE_SUITES or active
     started_services = list(target_manifest.docker_services)
     exit_code = 0
-    suite_timeout = (
-        settings.benchmark_realistic_suite_timeout_seconds if realistic else settings.benchmark_max_duration_seconds
+    suite_timeout = settings.benchmark_realistic_active_suite_timeout_seconds if active else (
+        settings.benchmark_realistic_suite_timeout_seconds if suite in REALISTIC_PASSIVE_SUITES
+        else settings.benchmark_max_duration_seconds
     )
+    if active:
+        os.environ["BENCHMARK_ACTIVE_SCAN_ALLOWED"] = "true"
+        get_settings.cache_clear()
     try:
         if started_services:
             start_services(
@@ -164,6 +171,7 @@ async def _run_web_or_api_target(
                 benchmark_target = await BenchmarkFixtureSyncService(db).sync_target(target_manifest, ground_truth)
                 await db.commit()
 
+                scanner_versions = await collect_lab_scanner_versions()
                 run = BenchmarkRun(
                     benchmark_target_id=benchmark_target.id,
                     app_version=settings.app_version,
@@ -172,7 +180,7 @@ async def _run_web_or_api_target(
                     fixture_set=fixture_set if not subset else f"{fixture_set}-{subset}",
                     status=BenchmarkRunStatus.RUNNING,
                     started_at=datetime.now(UTC),
-                    scanner_versions={"app": settings.app_version},
+                    scanner_versions=scanner_versions,
                 )
                 db.add(run)
                 await db.flush()
@@ -251,6 +259,7 @@ async def _run_web_or_api_target(
                     scanner_errors=[run.error_log] if run.error_log else [],
                     subset=subset,
                     realistic=realistic,
+                    active=active,
                 )
                 json_path, html_path = write_reports(run_id=str(run.id), payload=payload)
                 if write_baseline:
@@ -288,12 +297,25 @@ async def _run_web_or_api_target(
                 print(
                     f"TP={result.true_positive_count} FN={result.false_negative_count} "
                     f"confirmed_FP={metrics.get('confirmed_false_positive_count', result.false_positive_count)} "
+                    f"requests={metrics.get('request_count', 0)} "
                     f"additional={metrics.get('additional_valid_finding_count', 0)} "
+                    f"informational={metrics.get('informational_count', 0)} "
                     f"partial_R={metrics.get('partial_recall', 0):.3f} "
                     f"gaps={metrics.get('owasp_coverage_gap_count', 0)} "
                     f"dup={result.duplicate_count} matcher_fail={metrics.get('matcher_failure_count', 0)} "
+                    f"zap_findings={metrics.get('zap_finding_count', 0)} "
+                    f"nuclei_findings={metrics.get('nuclei_finding_count', 0)} "
                     f"P={result.precision:.3f} R={result.recall:.3f} F1={result.f1_score:.3f}"
                 )
+                scanner_metrics = metrics.get("scanner_metrics") or {}
+                for tool, tool_metrics in scanner_metrics.items():
+                    print(
+                        f"scanner[{tool}] findings={tool_metrics.get('finding_count', 0)} "
+                        f"seconds={tool_metrics.get('execution_seconds', 0)} "
+                        f"timeouts={tool_metrics.get('timeout_count', 0)} "
+                        f"errors={tool_metrics.get('error_count', 0)} "
+                        f"version={tool_metrics.get('scanner_version')}"
+                    )
                 return gate.exit_code
 
         try:
@@ -478,6 +500,9 @@ async def run_suite(suite: str, *, write_baseline: bool = False, subset: str | N
     os.environ.setdefault("SKIP_DOMAIN_VERIFICATION", "true")
     if is_realistic_suite(suite):
         os.environ.setdefault("BENCHMARK_LAB_ISOLATED", "true")
+        if suite in ACTIVE_REALISTIC_SUITES:
+            os.environ.setdefault("BENCHMARK_ACTIVE_REALISTIC_ENABLED", "true")
+            os.environ["BENCHMARK_ACTIVE_SCAN_ALLOWED"] = "true"
         ca_default = repo_benchmarks_root() / "docker" / "realistic" / "certs" / "ca.crt"
         if ca_default.is_file():
             os.environ.setdefault("BENCHMARK_CA_CERT_PATH", str(ca_default))
@@ -486,7 +511,13 @@ async def run_suite(suite: str, *, write_baseline: bool = False, subset: str | N
     if manifest.blocked:
         raise ValueError(f"Suite {suite!r} is blocked in this release")
     settings = get_settings()
-    job_timeout = settings.benchmark_realistic_job_timeout_seconds if suite in REALISTIC_PASSIVE_SUITES else None
+    job_timeout = (
+        settings.benchmark_realistic_active_job_timeout_seconds
+        if suite in ACTIVE_REALISTIC_SUITES
+        else settings.benchmark_realistic_job_timeout_seconds
+        if suite in REALISTIC_PASSIVE_SUITES
+        else None
+    )
 
     async def _run_all() -> int:
         exit_code = 0
@@ -531,6 +562,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--suite", required=True, help="Allowlisted suite name")
     run_parser.add_argument("--subset", default=None, help="Optional subset manifest suffix (e.g. main)")
     run_parser.add_argument("--write-baseline", action="store_true")
+    sub.add_parser("blind", help="Run blind benchmark evaluation (requires BLIND_GROUND_TRUTH_SECRET)")
+    sub.add_parser("risk-eval", help="Run Risk Engine golden-set evaluation")
+    sub.add_parser("ai-remediation-eval", help="Run AI remediation golden-set evaluation")
     args = parser.parse_args(argv)
     if args.command == "run":
         if args.suite not in ALLOWED_SUITES:
@@ -541,6 +575,18 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 2
+    if args.command == "blind":
+        from app.benchmark.blind import run_blind_benchmark_cli
+
+        return run_blind_benchmark_cli()
+    if args.command == "risk-eval":
+        from app.benchmark.risk_eval import run_risk_eval_cli
+
+        return run_risk_eval_cli()
+    if args.command == "ai-remediation-eval":
+        from app.benchmark.ai_remediation_eval import run_ai_remediation_eval_cli
+
+        return run_ai_remediation_eval_cli()
     return 2
 
 

@@ -1,0 +1,7 @@
+# Pinned active benchmark template IDs (one per line).
+# Only these templates may run during realistic active lab scans.
+missing-sri
+tls-version
+tech-detect
+xss-deprecated-header
+cors-misconfig

@@ -43,6 +43,10 @@ def verify_lock(payload: dict) -> list[str]:
             errors.append(f"{name}: missing 'tag'")
         elif tag.lower() == "latest":
             errors.append(f"{name}: tag 'latest' is forbidden")
+        if entry.get("embedded_in"):
+            if not tag or not isinstance(tag, str):
+                errors.append(f"{name}: embedded entry requires 'tag' version")
+            continue
         if not digest or not isinstance(digest, str):
             errors.append(f"{name}: missing 'digest'")
         elif PLACEHOLDER_PATTERN.search(digest):

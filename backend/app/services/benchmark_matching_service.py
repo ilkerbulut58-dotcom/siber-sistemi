@@ -8,6 +8,13 @@ from dataclasses import dataclass
 from app.models.benchmark import AutomationSupport, BenchmarkClassification
 from app.models.finding import Finding
 
+INFORMATIONAL_CORRELATION_KEYS = frozenset(
+    {
+        "info-modern-web-app",
+        "generic.info-modern-web-app",
+    }
+)
+
 
 @dataclass(frozen=True)
 class MatchRecord:
@@ -38,6 +45,7 @@ class BenchmarkMetrics:
     partial_recall: float = 0.0
     conditional_coverage_count: int = 0
     owasp_coverage_gap_count: int = 0
+    informational_count: int = 0
 
     def as_dict(self) -> dict[str, float | int]:
         denominator = self.true_positive_count + self.confirmed_false_positive_count
@@ -115,6 +123,15 @@ def _relaxed_match(expected, finding: Finding) -> bool:
     return expected.expected_key.lower() in (finding.title or "").lower()
 
 
+def _is_informational_unmatched(finding: Finding) -> bool:
+    severity = getattr(finding, "severity", None)
+    source_tool = getattr(finding, "source_tool", None)
+    correlation_key = getattr(finding, "correlation_key", None) or ""
+    return correlation_key in INFORMATIONAL_CORRELATION_KEYS or (
+        severity == "info" and source_tool in {"zap", "nuclei"}
+    )
+
+
 def _would_match(expected, finding: Finding) -> bool:
     return _relaxed_match(expected, finding)
 
@@ -144,7 +161,7 @@ def match_findings(
     records: list[MatchRecord] = []
     tp = fn = legacy_fp = duplicates = 0
     confirmed_fp = additional_valid = gt_gap = matcher_failure = unsupported = 0
-    partial_tp = partial_fn = conditional_coverage = owasp_gap = 0
+    partial_tp = partial_fn = conditional_coverage = owasp_gap = informational = 0
 
     measurable = [
         item
@@ -252,6 +269,19 @@ def match_findings(
             )
             continue
 
+        if _is_informational_unmatched(finding):
+            used_actual.add(finding.id)
+            informational += 1
+            records.append(
+                MatchRecord(
+                    None,
+                    finding.id,
+                    BenchmarkClassification.OUT_OF_SCOPE_INFORMATIONAL,
+                    "informational",
+                )
+            )
+            continue
+
         used_actual.add(finding.id)
         confirmed_fp += 1
         legacy_fp += 1
@@ -298,4 +328,5 @@ def match_findings(
         partial_recall=partial_recall,
         conditional_coverage_count=conditional_coverage,
         owasp_coverage_gap_count=owasp_gap,
+        informational_count=informational,
     )

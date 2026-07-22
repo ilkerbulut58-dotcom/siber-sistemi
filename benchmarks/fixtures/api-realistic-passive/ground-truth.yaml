@@ -9,18 +9,40 @@ expected_findings:
     severity: medium
     automation_support: supported
     detection_required: true
+    accepted_alternative_keys:
+      - zap-10038
   - expected_key: missing-header-strict-transport-security
     title: HSTS eksik
     category: missing-header-strict-transport-security
     severity: medium
     automation_support: supported
     detection_required: true
+    accepted_alternative_keys:
+      - zap-10035
+  - expected_key: missing-header-x-frame-options
+    title: X-Frame-Options eksik
+    category: missing-header-x-frame-options
+    severity: low
+    automation_support: supported
+    detection_required: false
+    accepted_alternative_keys:
+      - zap-10020
+  - expected_key: missing-header-referrer-policy
+    title: Referrer-Policy eksik
+    category: missing-header-referrer-policy
+    severity: low
+    automation_support: supported
+    detection_required: false
+    accepted_alternative_keys:
+      - zap-10063
   - expected_key: server-disclosure
     title: Sunucu ifşası
     category: server-disclosure
     severity: info
     automation_support: supported
     detection_required: true
+    accepted_alternative_keys:
+      - zap-10096
   - expected_key: permissive-cors
     title: İzin verici CORS yapılandırması
     category: permissive-cors

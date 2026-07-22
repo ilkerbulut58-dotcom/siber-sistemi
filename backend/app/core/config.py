@@ -184,11 +184,41 @@ class Settings(BaseSettings):
     )
     benchmark_active_realistic_enabled: bool = Field(
         default=False,
-        description="Gate for active realistic suites (phase 11.3); remains disabled in 11.1",
+        description="Gate for active realistic suites (phase 11.3); auto-enabled in lab container mode",
+    )
+    benchmark_active_request_budget: int = Field(
+        default=250,
+        ge=1,
+        le=5000,
+        description="Maximum outbound HTTP requests per active benchmark scan",
+    )
+    benchmark_active_concurrency_limit: int = Field(
+        default=2,
+        ge=1,
+        le=10,
+        description="Maximum concurrent active scanners during benchmark lab runs",
+    )
+    benchmark_active_timeout_seconds: int = Field(
+        default=180,
+        ge=30,
+        le=900,
+        description="Hard timeout for active benchmark scan profiles",
     )
     benchmark_realistic_startup_seconds: int = Field(default=120, ge=30, le=600)
     benchmark_realistic_suite_timeout_seconds: int = Field(default=90, ge=30, le=600)
+    benchmark_realistic_active_suite_timeout_seconds: int = Field(
+        default=240,
+        ge=60,
+        le=900,
+        description="Per-suite timeout for active realistic benchmark runs",
+    )
     benchmark_realistic_job_timeout_seconds: int = Field(default=300, ge=60, le=3600)
+    benchmark_realistic_active_job_timeout_seconds: int = Field(
+        default=600,
+        ge=120,
+        le=3600,
+        description="Overall timeout for active realistic benchmark jobs",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

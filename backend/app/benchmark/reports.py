@@ -90,19 +90,31 @@ def build_report_payload(
     scanner_errors: list[str],
     subset: str | None = None,
     realistic: bool = False,
+    active: bool = False,
 ) -> dict[str, Any]:
     settings = get_settings()
-    scope_note = (
-        "Metrics reflect pinned realistic passive fixture coverage only "
-        "(baseline_type=realistic_pinned_passive), not general product security accuracy."
-        if realistic
-        else "Metrics reflect controlled smoke fixture coverage only "
-        "(baseline_type=deterministic_smoke), not general product security accuracy."
-    )
+    if active:
+        scope_note = (
+            "Metrics reflect pinned realistic active fixture coverage only "
+            "(baseline_type=realistic_pinned_active), not general product security accuracy."
+        )
+        baseline_type = "realistic_pinned_active"
+    elif realistic:
+        scope_note = (
+            "Metrics reflect pinned realistic passive fixture coverage only "
+            "(baseline_type=realistic_pinned_passive), not general product security accuracy."
+        )
+        baseline_type = "realistic_pinned_passive"
+    else:
+        scope_note = (
+            "Metrics reflect controlled smoke fixture coverage only "
+            "(baseline_type=deterministic_smoke), not general product security accuracy."
+        )
+        baseline_type = "deterministic_smoke"
     return {
         "suite": suite,
         "subset": subset,
-        "baseline_type": "realistic_pinned_passive" if realistic else "deterministic_smoke",
+        "baseline_type": baseline_type,
         "app_version": settings.app_version,
         "git_commit": git_commit,
         "fixture_version": fixture_version,

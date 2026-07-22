@@ -11,6 +11,7 @@ expected_findings:
     detection_required: true
     accepted_alternative_keys:
       - missing-csp
+      - zap-10038
   - expected_key: missing-header-strict-transport-security
     title: HSTS eksik
     category: missing-header-strict-transport-security
@@ -19,12 +20,39 @@ expected_findings:
     detection_required: true
     accepted_alternative_keys:
       - missing-hsts
+      - zap-10035
   - expected_key: missing-header-x-content-type-options
     title: X-Content-Type-Options eksik
     category: missing-header-x-content-type-options
     severity: low
     automation_support: supported
     detection_required: true
+    accepted_alternative_keys:
+      - zap-10021
+  - expected_key: missing-header-x-frame-options
+    title: X-Frame-Options eksik
+    category: missing-header-x-frame-options
+    severity: low
+    automation_support: supported
+    detection_required: false
+    accepted_alternative_keys:
+      - zap-10020
+  - expected_key: missing-header-referrer-policy
+    title: Referrer-Policy eksik
+    category: missing-header-referrer-policy
+    severity: low
+    automation_support: supported
+    detection_required: false
+    accepted_alternative_keys:
+      - zap-10063
+  - expected_key: info-modern-web-app
+    title: Modern web application sinyali
+    category: info-modern-web-app
+    severity: info
+    automation_support: supported
+    detection_required: false
+    accepted_alternative_keys:
+      - zap-10109
   - expected_key: x-powered-by-disclosure
     title: X-Powered-By ifşası
     category: x-powered-by-disclosure
@@ -37,6 +65,8 @@ expected_findings:
     severity: info
     automation_support: supported
     detection_required: true
+    accepted_alternative_keys:
+      - zap-10096
   - expected_key: insecure-cookie-flags
     title: Cookie güvenlik bayrakları eksik
     category: insecure-cookie-flags

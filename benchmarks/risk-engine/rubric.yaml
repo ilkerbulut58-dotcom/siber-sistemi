@@ -1,0 +1,30 @@
+version: "1.0.0"
+name: risk-engine-golden-v1
+description: >
+  Human-reviewed rubric for Risk Engine golden-set evaluation.
+  Official benchmark metrics exclude assistant-generated labels.
+risk_model_version: "1.0.0"
+severity_bands:
+  critical:
+    min: 85.0
+    max: 100.0
+  high:
+    min: 65.0
+    max: 84.9
+  medium:
+    min: 40.0
+    max: 64.9
+  low:
+    min: 15.0
+    max: 39.9
+  info:
+    min: 1.0
+    max: 14.9
+metrics:
+  - severity_band_compliance
+  - severity_agreement
+  - false_severity_rate
+label_sources:
+  human: Human security engineer review
+  assistant_generated: AI-generated draft — excluded from official metrics
+  provisional: Awaiting human review — excluded from official metrics

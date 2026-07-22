@@ -58,6 +58,21 @@
       "tag": "4.4.29",
       "digest": "sha256:52c42cbab240b3c5b1748582cc13ef46d521ddacae002bbbda645cebed270ec0",
       "platform_digest": "sha256:6189a342f8da4568b4b111c378a890b1fe186b1bc133742bff8811fe63d2e01e"
+    },
+    "zaproxy-stable": {
+      "image": "ghcr.io/zaproxy/zaproxy",
+      "tag": "stable",
+      "digest": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+      "platform_digest": "sha256:c558ee87358911ab17278c70991e856f57793e115d9cd0f88ca475cf82907a1a",
+      "health_internal_url": "http://benchmark-zap:8080/JSON/core/view/version/"
+    },
+    "nuclei": {
+      "image": "projectdiscovery/nuclei",
+      "tag": "3.3.7",
+      "digest": "sha256:embedded-in-benchmark-runner-image",
+      "platform_digest": "sha256:embedded-in-benchmark-runner-image",
+      "embedded_in": "benchmark-runner",
+      "templates_path": "/opt/nuclei-templates"
     }
   }
 }

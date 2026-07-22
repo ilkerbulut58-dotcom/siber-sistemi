@@ -1,0 +1,61 @@
+version: "1.0.0"
+description: Risk Engine golden set for controlled benchmark evaluation.
+entries:
+  - case_id: re-001
+    correlation_key: missing-header-content-security-policy
+    title: Content Security Policy eksik
+    severity: medium
+    human_severity: medium
+    expected_risk_score_min: 40.0
+    expected_risk_score_max: 64.9
+    label_source: human
+    source_tools:
+      - passive_http
+    verified_confidence: high
+    verification_status: verified
+    exposure_score: 0.85
+    cvss_score: 5.0
+    notes: Human-labeled baseline for CSP header gap on HTTP benchmark target.
+
+  - case_id: re-002
+    correlation_key: hardcoded-password
+    title: Hardcoded password sinyali
+    severity: high
+    human_severity: high
+    expected_risk_score_min: 65.0
+    expected_risk_score_max: 84.9
+    label_source: human
+    source_tools:
+      - passive_http
+    verified_confidence: high
+    verification_status: verified
+    exposure_score: 0.85
+    notes: Human-labeled baseline for sensitive data exposure signal.
+
+  - case_id: re-003
+    correlation_key: missing-header-x-frame-options
+    title: X-Frame-Options eksik
+    severity: medium
+    expected_risk_score_min: 40.0
+    expected_risk_score_max: 64.9
+    label_source: assistant_generated
+    source_tools:
+      - zap
+    verified_confidence: medium
+    verification_status: verified
+    exposure_score: 1.0
+    notes: Assistant-generated draft label — must not be counted as human-labeled.
+
+  - case_id: re-004
+    correlation_key: server-disclosure
+    title: Sunucu yazılım bilgisi görünüyor
+    severity: info
+    expected_risk_score_min: 1.0
+    expected_risk_score_max: 14.9
+    label_source: provisional
+    source_tools:
+      - passive_http
+    verified_confidence: medium
+    verification_status: verified
+    exposure_score: 0.85
+    notes: Awaiting human review; excluded from official metrics.

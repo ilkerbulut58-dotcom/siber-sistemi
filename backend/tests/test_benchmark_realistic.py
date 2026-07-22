@@ -9,7 +9,15 @@ from uuid import uuid4
 
 import pytest
 
-from app.benchmark.baseline import REALISTIC_BASELINE_NAME, load_baseline, load_realistic_baseline
+from app.benchmark.baseline import (
+    REALISTIC_ACTIVE_BASELINE_NAME,
+    REALISTIC_BASELINE_NAME,
+    REALISTIC_BASELINE_V11_NAME,
+    load_baseline,
+    load_realistic_active_baseline,
+    load_realistic_baseline,
+    load_realistic_baseline_v11,
+)
 from app.benchmark.fixtures import (
     BenchmarkFixture,
     ExpectedFindingFixture,
@@ -23,6 +31,7 @@ from app.benchmark.manifests import (
     load_suite_manifest,
 )
 from app.benchmark.security import assert_scan_profile_allowed, assert_suite_runnable
+from app.core.config import get_settings
 from app.services.benchmark_matching_service import match_findings
 
 
@@ -82,10 +91,11 @@ def test_supported_metrics_exclude_manual_only_and_partial():
     assert any(record.classification == "true_positive" for record in records)
 
 
-def test_active_suite_blocked_in_11_1():
-    with pytest.raises(ValueError, match="blocked"):
+def test_active_suite_blocked_without_lab_env():
+    get_settings.cache_clear()
+    with pytest.raises(ValueError, match="requires"):
         assert_suite_runnable("web-realistic-active")
-    with pytest.raises(ValueError, match="blocked"):
+    with pytest.raises(ValueError, match="requires"):
         assert_suite_runnable("api-realistic-active")
 
 
@@ -137,9 +147,10 @@ def test_realistic_manifest_loads():
     assert manifest.targets[0].health_url == "https://benchmark-crapi-proxy/health"
 
 
-def test_active_manifest_is_blocked():
+def test_active_manifest_is_enabled():
     manifest = load_suite_manifest("web-realistic-active")
-    assert manifest.blocked is True
+    assert manifest.blocked is False
+    assert manifest.targets[0].scan_profile == "benchmark-active-web"
 
 
 def test_fixture_loader_accepts_automation_support():
@@ -170,15 +181,100 @@ def test_realistic_baseline_file_metadata():
     assert set(baseline["scope"]) == {"web-realistic-passive", "api-realistic-passive"}
 
 
+def test_load_realistic_baseline_v10_suite_metrics():
+    baseline = load_realistic_baseline()
+    assert baseline is not None
+    web = baseline["suites"]["web-realistic-passive"]
+    api = baseline["suites"]["api-realistic-passive"]
+    assert web["true_positive_count"] == 3
+    assert web["confirmed_false_positive_count"] == 1
+    assert api["confirmed_false_positive_count"] == 3
+    assert api["precision"] == 0.5
+
+
+def test_load_realistic_baseline_v11_metadata():
+    baseline = load_realistic_baseline_v11()
+    assert baseline is not None
+    assert baseline["baseline_name"] == REALISTIC_BASELINE_V11_NAME
+    assert baseline["baseline_type"] == "realistic_pinned_passive"
+    assert "Does not represent general product security accuracy" in baseline["description"]
+    assert baseline["scanner_versions"]["zap"] == "2.17.0"
+    assert baseline["scanner_versions"]["nuclei_version"] == "3.3.7"
+    assert baseline["scanner_versions"]["nuclei_template_allowlist_hash"]
+
+
 def test_load_realistic_baseline_suite_metrics():
     web = load_baseline("web-realistic-passive")
     api = load_baseline("api-realistic-passive")
     assert web is not None
     assert api is not None
+    assert web["baseline_name"] == REALISTIC_BASELINE_V11_NAME
     assert web["true_positive_count"] == 3
     assert web["false_negative_count"] == 2
-    assert web["confirmed_false_positive_count"] == 1
+    assert web["confirmed_false_positive_count"] == 3
     assert web["partial_recall"] == 0.0
-    assert web["owasp_coverage_gap_count"] == 0
-    assert api["confirmed_false_positive_count"] == 3
-    assert api["precision"] == 0.5
+    assert web["owasp_coverage_gap_count"] == 2
+    assert api["confirmed_false_positive_count"] == 2
+    assert api["precision"] == 0.6
+    assert web["scanner_metrics"]["zap"]["finding_count"] == 8
+    assert api["scanner_metrics"]["nuclei"]["finding_count"] == 10
+
+
+def test_realistic_active_baseline_file_metadata():
+    baseline = load_realistic_active_baseline()
+    assert baseline is not None
+    assert baseline["baseline_name"] == REALISTIC_ACTIVE_BASELINE_NAME
+    assert baseline["baseline_type"] == "realistic_pinned_active"
+    assert "Does not represent general product security accuracy" in baseline["description"]
+    assert set(baseline["scope"]) == {"web-realistic-active", "api-realistic-active"}
+    assert baseline["scanner_versions"]["zap"] == "2.17.0"
+
+
+def test_load_realistic_active_baseline_suite_metrics():
+    web = load_baseline("web-realistic-active")
+    api = load_baseline("api-realistic-active")
+    assert web is not None
+    assert api is not None
+    assert web["true_positive_count"] == 3
+    assert web["recall"] == 0.6
+    assert web["request_count"] == 4
+    assert api["true_positive_count"] == 1
+    assert api["confirmed_false_positive_count"] == 2
+    assert api["precision"] == 0.333
+    assert api["scanner_metrics"]["zap"]["finding_count"] == 3
+
+
+def test_images_lock_includes_zap_and_nuclei():
+    lock_path = _repo_root() / "benchmarks" / "docker" / "images.lock.json"
+    payload = json.loads(lock_path.read_text(encoding="utf-8"))
+    images = payload["images"]
+    assert "zaproxy-stable" in images
+    assert images["zaproxy-stable"]["digest"].startswith("sha256:")
+    assert "nuclei" in images
+    assert images["nuclei"]["tag"] == "3.3.7"
+
+
+def test_realistic_compose_pins_zap_daemon():
+    compose = (_repo_root() / "docker-compose.realistic.yml").read_text(encoding="utf-8")
+    lock = json.loads(
+        (_repo_root() / "benchmarks" / "docker" / "images.lock.json").read_text(encoding="utf-8")
+    )
+    zap_digest = lock["images"]["zaproxy-stable"]["digest"]
+    assert "benchmark-zap:" in compose
+    assert zap_digest in compose
+    assert "ZAP_API_URL: http://benchmark-zap:8080" in compose
+    assert "ZAP_ENABLED: \"true\"" in compose
+
+
+@pytest.mark.asyncio
+async def test_collect_lab_scanner_versions_without_zap(monkeypatch):
+    from app.benchmark.scanner_versions import collect_lab_scanner_versions
+
+    monkeypatch.setenv("ZAP_ENABLED", "false")
+    get_settings.cache_clear()
+    versions = await collect_lab_scanner_versions()
+    get_settings.cache_clear()
+    assert versions["app"]
+    assert versions["zap"] == "disabled"
+    assert versions["zap_image_digest"].startswith("sha256:")
+    assert versions["nuclei_version"] == "3.3.7"

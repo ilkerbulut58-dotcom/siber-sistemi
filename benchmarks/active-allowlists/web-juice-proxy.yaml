@@ -1,0 +1,6 @@
+# Active benchmark allowlist for Juice Shop via benchmark-juice-proxy (phase 11.3).
+entries:
+  - host: benchmark-juice-proxy
+    port: 443
+    path_prefix: /
+    methods: [GET, HEAD, OPTIONS, POST]
