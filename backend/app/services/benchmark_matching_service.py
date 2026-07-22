@@ -124,8 +124,11 @@ def _relaxed_match(expected, finding: Finding) -> bool:
 
 
 def _is_informational_unmatched(finding: Finding) -> bool:
-    return finding.correlation_key in INFORMATIONAL_CORRELATION_KEYS or (
-        finding.severity == "info" and getattr(finding, "source_tool", None) in {"zap", "nuclei"}
+    severity = getattr(finding, "severity", None)
+    source_tool = getattr(finding, "source_tool", None)
+    correlation_key = getattr(finding, "correlation_key", None) or ""
+    return correlation_key in INFORMATIONAL_CORRELATION_KEYS or (
+        severity == "info" and source_tool in {"zap", "nuclei"}
     )
 
 
