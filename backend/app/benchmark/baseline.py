@@ -7,7 +7,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.benchmark.manifests import ACTIVE_REALISTIC_SUITES, REALISTIC_PASSIVE_SUITES, repo_benchmarks_root
+from app.benchmark.manifests import (
+    ACTIVE_REALISTIC_SUITES,
+    REALISTIC_PASSIVE_SUITES,
+    repo_benchmarks_root,
+)
 
 SMOKE_BASELINE_NAME = "smoke-v1.1.0"
 SMOKE_BASELINE_FILENAME = f"{SMOKE_BASELINE_NAME}.json"
