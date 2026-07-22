@@ -172,6 +172,7 @@ services:
       MONGO_DB_NAME: crapi
       SECRET_KEY: crapi
       SERVER_PORT: "8000"
+      API_GATEWAY_URL: https://api.mypremiumdealership.com
       TLS_ENABLED: "false"
       FILES_LIMIT: "1000"
     healthcheck:
@@ -193,6 +194,7 @@ services:
       COMMUNITY_SERVICE: benchmark-crapi-community:8087
       IDENTITY_SERVICE: benchmark-crapi-identity:8080
       WORKSHOP_SERVICE: benchmark-crapi-workshop:8000
+      CHATBOT_SERVICE: benchmark-crapi-identity:8080
       MAILHOG_WEB_SERVICE: benchmark-crapi-mailhog:8025
       TLS_ENABLED: "false"
     healthcheck:
