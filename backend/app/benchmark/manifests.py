@@ -105,7 +105,12 @@ class BenchmarkSuiteManifest(BaseModel):
 
 
 def repo_benchmarks_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "benchmarks"
+    module_root = Path(__file__).resolve()
+    container_layout = module_root.parents[2] / "benchmarks"
+    repo_layout = module_root.parents[3] / "benchmarks"
+    if container_layout.is_dir():
+        return container_layout
+    return repo_layout
 
 
 def load_suite_manifest(suite: str) -> BenchmarkSuiteManifest:
