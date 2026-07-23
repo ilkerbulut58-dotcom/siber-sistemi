@@ -979,6 +979,11 @@ jobs:
       - name: Wait for fixtures
         working-directory: ${{ github.workspace }}
         run: bash scripts/wait-realistic-fixtures.sh "${{ github.workspace }}"
+      - name: Probe crAPI OpenAPI runtime exposure
+        working-directory: ${{ github.workspace }}
+        run: |
+          python scripts/probe-crapi-openapi-paths.py https://benchmark-crapi-proxy \
+            | tee benchmarks/reports/crapi-openapi-probe.json || true
       - name: Run 5x api-realistic-active benchmark
         working-directory: ${{ github.workspace }}
         timeout-minutes: 40

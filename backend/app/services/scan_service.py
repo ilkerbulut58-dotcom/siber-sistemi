@@ -20,6 +20,7 @@ from app.models.scan import AuthorizationAcceptance, ScanJob, ScanProfile, ScanS
 from app.models.user import User
 from app.scanners.orchestrator import run_scan_for_profile
 from app.schemas.scan import ScanCreate
+from app.security.url_guard import UrlGuardError, validate_scan_url
 from app.services.audit_service import log_audit_event
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
@@ -119,6 +120,60 @@ class ScanService:
                 f"Target URL must belong to verified domain {domain.hostname}.",
                 status_code=400,
             )
+
+        if not is_blocked_benchmark_profile(profile.name):
+            resolve_dns = (
+                not settings.skip_domain_verification
+                and settings.environment in {"production", "staging"}
+            )
+            try:
+                validate_scan_url(target, resolve_dns=resolve_dns)
+            except UrlGuardError as exc:
+                raise AppError("TARGET_BLOCKED", str(exc), status_code=400) from exc
+
+        active_profiles = {"deep", "code"}
+        if (
+            (profile.name in active_profiles or profile.name.endswith("-active"))
+            and not domain.active_scan_allowed
+            and not settings.skip_domain_verification
+        ):
+            raise AppError(
+                "ACTIVE_SCAN_NOT_ALLOWED",
+                "Active scanning requires domain admin approval.",
+                status_code=403,
+            )
+
+        if settings.environment in {"production", "staging"}:
+            running = await self.db.execute(
+                select(func.count())
+                .select_from(ScanJob)
+                .where(
+                    ScanJob.organization_id == organization_id,
+                    ScanJob.status.in_(_ACTIVE_SCAN_STATUSES),
+                )
+            )
+            if running.scalar_one() >= settings.scan_concurrency_limit:
+                raise AppError(
+                    "SCAN_CONCURRENCY_LIMIT",
+                    "Too many concurrent scans for this organization.",
+                    status_code=429,
+                )
+
+            today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            daily = await self.db.execute(
+                select(func.count())
+                .select_from(ScanJob)
+                .where(
+                    ScanJob.organization_id == organization_id,
+                    ScanJob.created_at >= today_start,
+                )
+            )
+            if daily.scalar_one() >= settings.scan_daily_quota:
+                raise AppError(
+                    "SCAN_QUOTA_EXCEEDED",
+                    "Daily scan quota exceeded for this organization.",
+                    status_code=429,
+                )
 
         if (
             profile.name in ("deep", "code")
@@ -321,6 +376,24 @@ async def run_scan_job(
             scan.status = ScanStatus.COMPLETED
             scan.findings_count = len(saved)
             scan.completed_at = datetime.now(UTC)
+            await log_audit_event(
+                db,
+                action="scan.completed",
+                user_id=scan.initiated_by,
+                organization_id=scan.organization_id,
+                resource_type="scan_job",
+                resource_id=scan.id,
+                details={
+                    "target": scan.target_url,
+                    "profile": scan.scan_profile,
+                    "findings_count": len(saved),
+                    "duration_seconds": (
+                        (scan.completed_at - scan.started_at).total_seconds()
+                        if scan.started_at and scan.completed_at
+                        else None
+                    ),
+                },
+            )
             await db.commit()
 
             from app.services.site_profile_service import SiteProfileService

@@ -11,7 +11,6 @@ API_ACTIVE_REQUIRED_KEYS = frozenset(
         "missing-header-strict-transport-security",
         "server-disclosure",
         "permissive-cors",
-        "exposed-api-docs",
     }
 )
 
@@ -51,9 +50,9 @@ FN_ROOT_CAUSES: dict[str, ApiFnRootCause] = {
     ),
     "exposed-api-docs": ApiFnRootCause(
         "exposed-api-docs",
-        "crawl_schema_discovery_gap",
-        "OpenAPI paths (/openapi.json, /swagger) not discovered without explicit path enumeration.",
-        "Add api_surface_scanner OpenAPI discovery to active API profile.",
+        "fixture_expectation_mismatch",
+        "Pinned crAPI realistic proxy does not serve OpenAPI/Swagger at runtime; spec exists in upstream repo only.",
+        "See openapi-runtime-evidence.md; scanner probes remain for targets that do expose specs.",
     ),
 }
 

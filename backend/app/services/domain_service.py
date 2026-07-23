@@ -204,6 +204,7 @@ class DomainService:
             domain.is_verified = True
             domain.verified_at = datetime.now(UTC)
             domain.last_checked_at = datetime.now(UTC)
+            domain.verification_method = method.value
             verification.verified_at = datetime.now(UTC)
             message = "Domain verified successfully."
             await log_audit_event(
@@ -222,6 +223,60 @@ class DomainService:
         await self.db.flush()
         await self.db.refresh(domain)
         return domain, ok, message
+
+    async def admin_approve_active_scan(
+        self,
+        organization_id: UUID,
+        project_id: UUID,
+        domain_id: UUID,
+        *,
+        actor: User,
+        ip_address: str | None = None,
+    ) -> Domain:
+        domain = await self.get(organization_id, project_id, domain_id)
+        if not domain.is_verified:
+            raise AppError("DOMAIN_NOT_VERIFIED", "Domain must be verified before active scan approval.", status_code=400)
+        domain.active_scan_allowed = True
+        domain.admin_approved_at = datetime.now(UTC)
+        domain.admin_approved_by = actor.id
+        await log_audit_event(
+            self.db,
+            action="domain.active_scan_approved",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="domain",
+            resource_id=domain.id,
+            ip_address=ip_address,
+            details={"hostname": domain.hostname, "verification_method": domain.verification_method},
+        )
+        await self.db.flush()
+        await self.db.refresh(domain)
+        return domain
+
+    async def revoke_active_scan(
+        self,
+        organization_id: UUID,
+        project_id: UUID,
+        domain_id: UUID,
+        *,
+        actor: User,
+        ip_address: str | None = None,
+    ) -> Domain:
+        domain = await self.get(organization_id, project_id, domain_id)
+        domain.active_scan_allowed = False
+        await log_audit_event(
+            self.db,
+            action="domain.active_scan_revoked",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="domain",
+            resource_id=domain.id,
+            ip_address=ip_address,
+            details={"hostname": domain.hostname},
+        )
+        await self.db.flush()
+        await self.db.refresh(domain)
+        return domain
 
     async def _active_verification(self, domain_id: UUID) -> DomainVerification | None:
         result = await self.db.execute(

@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     auth_rate_limit_per_minute: int = Field(default=10, ge=1, le=1_000)
     upload_rate_limit_per_hour: int = Field(default=20, ge=1, le=10_000)
     retest_rate_limit_per_hour: int = Field(default=30, ge=1, le=10_000)
+    scan_rate_limit_per_hour: int = Field(default=20, ge=1, le=10_000)
+    scan_concurrency_limit: int = Field(default=2, ge=1, le=20)
+    scan_daily_quota: int = Field(default=50, ge=1, le=10_000)
+    scan_max_duration_seconds: int = Field(default=600, ge=60, le=7200)
+    scan_max_redirects: int = Field(default=5, ge=0, le=20)
+    scan_max_response_bytes: int = Field(default=2_000_000, ge=10_000, le=50_000_000)
 
     # Logging
     log_level: str = "INFO"

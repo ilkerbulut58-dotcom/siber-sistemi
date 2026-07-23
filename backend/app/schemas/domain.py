@@ -25,6 +25,9 @@ class DomainResponse(BaseModel):
     hostname: str
     is_verified: bool
     verified_at: datetime | None
+    verification_method: str | None = None
+    active_scan_allowed: bool = False
+    admin_approved_at: datetime | None = None
     last_checked_at: datetime | None
     created_at: datetime
     updated_at: datetime

@@ -37,6 +37,8 @@ def _rule_for_request(request: Request) -> tuple[str, int, int] | None:
         return ("upload", settings.upload_rate_limit_per_hour, 3600)
     if request.method == "POST" and path.endswith("/retest"):
         return ("retest", settings.retest_rate_limit_per_hour, 3600)
+    if request.method == "POST" and path.endswith("/scans"):
+        return ("scan", settings.scan_rate_limit_per_hour, 3600)
     return None
 
 

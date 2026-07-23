@@ -134,3 +134,37 @@ async def verify_domain(
         ),
         meta=_meta(request),
     )
+
+
+@router.post("/{domain_id}/approve-active-scan", response_model=APIResponse[DomainResponse])
+async def approve_active_scan(
+    org_id: UUID,
+    project_id: UUID,
+    domain_id: UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[DomainResponse]:
+    service = DomainService(db)
+    domain = await service.admin_approve_active_scan(
+        org_id, project_id, domain_id, actor=user, ip_address=get_client_ip(request)
+    )
+    return APIResponse(data=DomainResponse.model_validate(domain), meta=_meta(request))
+
+
+@router.post("/{domain_id}/revoke-active-scan", response_model=APIResponse[DomainResponse])
+async def revoke_active_scan(
+    org_id: UUID,
+    project_id: UUID,
+    domain_id: UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[DomainResponse]:
+    service = DomainService(db)
+    domain = await service.revoke_active_scan(
+        org_id, project_id, domain_id, actor=user, ip_address=get_client_ip(request)
+    )
+    return APIResponse(data=DomainResponse.model_validate(domain), meta=_meta(request))

@@ -56,8 +56,12 @@ expected_findings:
     title: API dokümantasyonu açık
     category: exposed-api-docs
     severity: medium
-    automation_support: supported
-    detection_required: true
+    automation_support: unsupported
+    detection_required: false
+    description: >
+      Pinned crAPI realistic stack does not expose OpenAPI/Swagger at runtime through
+      benchmark-crapi-proxy. See fixtures/api-realistic-passive/openapi-runtime-evidence.md
+      and benchmarks/reports/crapi-openapi-probe.json from CI probe.
   - expected_key: verbose-error-response
     title: Ayrıntılı hata yanıtı
     category: verbose-error-response

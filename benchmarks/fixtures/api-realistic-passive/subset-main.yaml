@@ -3,4 +3,3 @@ expected_keys:
   - missing-header-strict-transport-security
   - server-disclosure
   - permissive-cors
-  - exposed-api-docs

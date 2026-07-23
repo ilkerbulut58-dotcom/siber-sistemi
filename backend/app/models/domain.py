@@ -25,6 +25,10 @@ class Domain(Base, TimestampMixin):
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_method: Mapped[str | None] = mapped_column(String(50))
+    active_scan_allowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    admin_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    admin_approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped["Project"] = relationship(back_populates="domains")

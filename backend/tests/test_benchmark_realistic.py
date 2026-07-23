@@ -139,6 +139,8 @@ def test_subset_manifest_max_five():
     subset = load_subset(root / "fixtures/web-realistic-passive/subset-main.yaml", fixtures_root=root)
     assert len(subset.expected_keys) <= 5
     assert len(subset.expected_keys) == 5
+    api_subset = load_subset(root / "fixtures/api-realistic-passive/subset-main.yaml", fixtures_root=root)
+    assert len(api_subset.expected_keys) == 4
 
 
 def test_realistic_manifest_loads():

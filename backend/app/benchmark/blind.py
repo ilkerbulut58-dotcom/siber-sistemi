@@ -15,9 +15,9 @@ from uuid import uuid4
 
 import yaml
 
+from app.benchmark.blind_matching import match_blind_holdout_findings
 from app.benchmark.fixtures import BenchmarkFixture
 from app.benchmark.manifests import repo_benchmarks_root
-from app.services.benchmark_matching_service import match_findings
 
 BLIND_SECRET_ENV = "BLIND_GROUND_TRUTH_SECRET"
 MAGIC = b"SIBER-BLIND1"
@@ -250,7 +250,7 @@ def evaluate_blind_benchmark(
         )
         for item in expected
     ]
-    matches, metrics = match_findings(expected_records, findings)
+    matches, metrics, fp_analysis = match_blind_holdout_findings(expected_records, findings)
     return BlindBenchmarkResult(
         status="completed",
         metadata=public_meta,
@@ -259,6 +259,7 @@ def evaluate_blind_benchmark(
             "match_count": len(matches),
             "evaluated_at": datetime.now(UTC).isoformat(),
             "ground_truth_version": metadata.ground_truth_version,
+            "blind_fp_analysis": fp_analysis,
         },
         message="Blind benchmark completed against decrypted holdout ground truth.",
     )
