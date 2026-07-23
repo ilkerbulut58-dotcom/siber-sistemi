@@ -128,11 +128,20 @@ node scripts/deploy-full.cjs
 ```
 
 Deploy scripti otomatik olarak:
-- Docker imajlarını build eder (API + Frontend + Nuclei)
-- PostgreSQL migration'ları çalıştırır
-- Admin kullanıcısı oluşturur/günceller
+- Deploy öncesi PostgreSQL yedeği alır (`/opt/siber/backups/<timestamp>/`)
+- Docker imajlarını build eder (API + Frontend + Worker + ZAP)
+- PostgreSQL migration'ları çalıştırır (016, 017 dahil)
+- Platform admin bootstrap (`.env` içinde tanımlıysa)
 - Plesk proxy ayarlarını yapılandırır
-- `SKIP_DOMAIN_VERIFICATION=true` test modunu etkinleştirir
+- `SKIP_DOMAIN_VERIFICATION=false` — domain doğrulama zorunlu
+
+Pilot production deploy için:
+
+```powershell
+$env:DEPLOY_SSH_PASSWORD = "..."   # operator secret — commit etmeyin
+$env:DEPLOY_CONFIRM = "production-pilot"
+node scripts/deploy-pilot-production.cjs
+```
 
 ### Servisler (Production)
 
