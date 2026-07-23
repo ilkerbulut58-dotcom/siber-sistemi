@@ -88,7 +88,7 @@ async function main() {
   const remoteCmd = `
 set -euo pipefail
 TS=$(date -u +%Y%m%dT%H%M%SZ)
-BACKUP_DIR=${remoteRoot}/backups/${TS}
+BACKUP_DIR=${remoteRoot}/backups/\${TS}
 mkdir -p "$BACKUP_DIR"
 
 echo "=== PRE-DEPLOY INVENTORY ==="
@@ -248,7 +248,7 @@ curl -sS https://${domain}/api/v1/health -k | head -c 300; echo
 curl -sS https://${domain}/api/v1/health/ready -k | head -c 400; echo
 docker compose -f docker-compose.prod.yml ps
 
-echo "BACKUP_DIR=$BACKUP_DIR"
+echo "BACKUP_DIR=\$BACKUP_DIR"
 echo "DEPLOY_SHA=${deploySha}"
 echo PILOT_PRODUCTION_DEPLOY_OK
 `;
