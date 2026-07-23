@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.benchmark import BenchmarkRunResponse, QualitySummaryResponse
 from app.schemas.common import APIResponse, ResponseMeta
 from app.schemas.organization import OrganizationCreate, OrganizationResponse
+from app.schemas.pilot import PilotTenantResponse, PilotTenantUpdate
 from app.schemas.support_grant import SupportGrantCreate, SupportGrantResponse
 from app.services.benchmark_quality_service import BenchmarkQualityService
 from app.services.organization_service import OrganizationService
@@ -180,5 +181,53 @@ async def quality_runs(
     )
     return APIResponse(
         data=[BenchmarkRunResponse.model_validate(run) for run in result.scalars()],
+        meta=_meta(request),
+    )
+
+
+@router.get("/pilot-tenants", response_model=APIResponse[list[PilotTenantResponse]])
+async def list_pilot_tenants(
+    request: Request,
+    _platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list[PilotTenantResponse]]:
+    tenants = await OrganizationService(db).list_pilot_tenants()
+    return APIResponse(
+        data=[PilotTenantResponse.model_validate(tenant) for tenant in tenants],
+        meta=_meta(request),
+    )
+
+
+@router.patch(
+    "/pilot-tenants/{organization_id}",
+    response_model=APIResponse[PilotTenantResponse],
+)
+async def update_pilot_tenant(
+    organization_id: UUID,
+    data: PilotTenantUpdate,
+    request: Request,
+    platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[PilotTenantResponse]:
+    from sqlalchemy import select
+
+    from app.models.organization import Organization
+
+    organization = (
+        await db.execute(select(Organization).where(Organization.id == organization_id))
+    ).scalar_one_or_none()
+    if organization is None:
+        from app.core.exceptions import AppError
+
+        raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+    updated = await OrganizationService(db).update_pilot_tenant(
+        organization,
+        data,
+        actor=platform_admin,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent"),
+    )
+    return APIResponse(
+        data=PilotTenantResponse.model_validate(updated),
         meta=_meta(request),
     )

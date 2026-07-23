@@ -25,7 +25,9 @@ from app.schemas.organization import (
     OrganizationResponse,
     OrganizationUpdate,
 )
+from app.schemas.pilot import OnboardingStatusResponse
 from app.services.organization_service import OrganizationService
+from app.services.pilot_service import PilotService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -85,6 +87,39 @@ async def get_organization_detail(
         data=OrganizationResponse.model_validate(organization),
         meta=_meta(request),
     )
+
+
+@router.get("/{org_id}/onboarding-status", response_model=APIResponse[OnboardingStatusResponse])
+async def get_onboarding_status(
+    org_id: UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_organization),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[OnboardingStatusResponse]:
+    _ = org_id
+    from sqlalchemy import func, select
+
+    from app.models.domain import Domain
+    from app.models.scan import AuthorizationAcceptance
+
+    verified_domains = await db.execute(
+        select(func.count())
+        .select_from(Domain)
+        .where(Domain.organization_id == organization.id, Domain.is_verified.is_(True))
+    )
+    auth_count = await db.execute(
+        select(func.count())
+        .select_from(AuthorizationAcceptance)
+        .where(AuthorizationAcceptance.organization_id == organization.id)
+    )
+    status = await PilotService(db).get_onboarding_status(
+        organization,
+        owner_email_verified=user.is_email_verified,
+        verified_domain_count=int(verified_domains.scalar_one()),
+        authorization_accepted=int(auth_count.scalar_one()) > 0,
+    )
+    return APIResponse(data=OnboardingStatusResponse.model_validate(status), meta=_meta(request))
 
 
 @router.patch("/{org_id}", response_model=APIResponse[OrganizationResponse])

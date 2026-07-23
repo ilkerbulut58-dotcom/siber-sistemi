@@ -23,6 +23,7 @@ from app.scanners.orchestrator import run_scan_for_profile
 from app.schemas.scan import ScanCreate
 from app.security.url_guard import UrlGuardError, validate_scan_url
 from app.services.audit_service import log_audit_event
+from app.services.pilot_service import PilotService
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.project_service import ProjectService
@@ -104,6 +105,7 @@ class ScanService:
         ).scalar_one_or_none()
         if organization is None:
             raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+        PilotService.assert_can_scan(organization)
         if is_blocked_benchmark_profile(profile.name):
             try:
                 assert_active_benchmark_create_allowed(
@@ -135,6 +137,7 @@ class ScanService:
             except UrlGuardError as exc:
                 raise AppError("TARGET_BLOCKED", str(exc), status_code=400) from exc
 
+        PilotService.assert_active_scan_allowed(organization, profile.name)
         active_profiles = {"deep", "code"}
         if (
             (profile.name in active_profiles or profile.name.endswith("-active"))
@@ -164,6 +167,7 @@ class ScanService:
                 )
 
             today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            daily_quota = PilotService.effective_daily_quota(organization, settings.scan_daily_quota)
             daily = await self.db.execute(
                 select(func.count())
                 .select_from(ScanJob)
@@ -172,7 +176,14 @@ class ScanService:
                     ScanJob.created_at >= today_start,
                 )
             )
-            if daily.scalar_one() >= settings.scan_daily_quota:
+            if daily.scalar_one() >= daily_quota:
+                from app.notifications.service import notify_quota_exceeded
+
+                await notify_quota_exceeded(
+                    user_id=actor.id,
+                    organization_id=organization_id,
+                    quota=daily_quota,
+                )
                 raise AppError(
                     "SCAN_QUOTA_EXCEEDED",
                     "Daily scan quota exceeded for this organization.",
@@ -313,6 +324,16 @@ async def _mark_scan_failed(
     scan.error_log = error[:4000]
     scan.completed_at = datetime.now(UTC)
     await db.commit()
+    if scan.initiated_by:
+        from app.notifications.service import notify_scan_failed
+
+        await notify_scan_failed(
+            user_id=scan.initiated_by,
+            organization_id=scan.organization_id,
+            scan_id=scan.id,
+            target=scan.target_url,
+            error=error,
+        )
 
 
 async def run_scan_job(
@@ -399,6 +420,17 @@ async def run_scan_job(
                 },
             )
             await db.commit()
+
+            from app.notifications.service import notify_scan_completed
+
+            if scan.initiated_by:
+                await notify_scan_completed(
+                    user_id=scan.initiated_by,
+                    organization_id=scan.organization_id,
+                    scan_id=scan.id,
+                    target=scan.target_url,
+                    findings_count=len(saved),
+                )
 
             from app.services.site_profile_service import SiteProfileService
 

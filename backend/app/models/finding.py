@@ -26,6 +26,9 @@ class FindingStatus(enum.StrEnum):
     FALSE_POSITIVE = "false_positive"
     ACCEPTED_RISK = "accepted_risk"
     INCONCLUSIVE = "inconclusive"
+    NEEDS_HELP = "needs_help"
+    DUPLICATE = "duplicate"
+    NOT_APPLICABLE = "not_applicable"
 
 
 class Finding(Base, TimestampMixin):

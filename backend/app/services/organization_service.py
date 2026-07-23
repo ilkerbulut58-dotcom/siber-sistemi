@@ -351,6 +351,45 @@ class OrganizationService:
             ip_address=ip_address,
         )
 
+    async def list_pilot_tenants(self) -> list[Organization]:
+        result = await self.db.execute(
+            select(Organization)
+            .where(Organization.is_pilot.is_(True))
+            .order_by(Organization.name)
+        )
+        return list(result.scalars())
+
+    async def update_pilot_tenant(
+        self,
+        organization: Organization,
+        data: "PilotTenantUpdate",
+        *,
+        actor: User,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> Organization:
+        from app.schemas.pilot import PilotTenantUpdate
+
+        if not isinstance(data, PilotTenantUpdate):
+            raise TypeError("Expected PilotTenantUpdate")
+
+        updates = data.model_dump(exclude_unset=True)
+        for field, value in updates.items():
+            setattr(organization, field, value)
+        await self.db.flush()
+        await log_audit_event(
+            self.db,
+            action="pilot.tenant_updated",
+            user_id=actor.id,
+            organization_id=organization.id,
+            resource_type="organization",
+            resource_id=organization.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=updates,
+        )
+        return organization
+
     async def _unique_slug(self, name: str) -> str:
         base = slugify(name) or "organization"
         slug = base

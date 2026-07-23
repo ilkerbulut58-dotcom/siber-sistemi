@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -25,6 +25,13 @@ class Organization(Base, TimestampMixin):
     is_managed_workspace: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Internal benchmark workspaces are never tenant-visible.
     is_system_scope: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_pilot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pilot_starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pilot_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pilot_scan_quota: Mapped[int | None] = mapped_column(Integer)
+    pilot_notes: Mapped[str | None] = mapped_column(Text)
+    scans_disabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pilot_active_scan_allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     owner: Mapped["User"] = relationship(back_populates="owned_organizations")
     members: Mapped[list["OrganizationMember"]] = relationship(

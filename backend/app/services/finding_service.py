@@ -399,8 +399,18 @@ class FindingService:
                 details={"from": old, "to": data.status},
             )
             if actor is not None:
+                feedback_statuses = {
+                    FindingStatus.FALSE_POSITIVE,
+                    FindingStatus.ACCEPTED_RISK,
+                    FindingStatus.RESOLVED,
+                    FindingStatus.NEEDS_HELP,
+                    FindingStatus.DUPLICATE,
+                    FindingStatus.NOT_APPLICABLE,
+                }
                 action = "finding.status_changed"
-                if data.status == FindingStatus.ACCEPTED_RISK:
+                if data.status in feedback_statuses:
+                    action = "finding.feedback_submitted"
+                elif data.status == FindingStatus.ACCEPTED_RISK:
                     action = "finding.risk_accepted"
                 await log_audit_event(
                     self.db,
