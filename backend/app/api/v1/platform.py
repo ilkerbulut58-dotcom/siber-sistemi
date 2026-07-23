@@ -15,6 +15,7 @@ from app.core.logging import request_id_ctx
 from app.models.user import User
 from app.schemas.benchmark import BenchmarkRunResponse, QualitySummaryResponse
 from app.schemas.common import APIResponse, ResponseMeta
+from app.schemas.domain import DomainResponse
 from app.schemas.organization import OrganizationCreate, OrganizationResponse
 from app.schemas.pilot import PilotTenantResponse, PilotTenantUpdate
 from app.schemas.support_grant import SupportGrantCreate, SupportGrantResponse
@@ -231,3 +232,28 @@ async def update_pilot_tenant(
         data=PilotTenantResponse.model_validate(updated),
         meta=_meta(request),
     )
+
+
+@router.post(
+    "/pilot-tenants/{organization_id}/projects/{project_id}/domains/{domain_id}/verify",
+    response_model=APIResponse[DomainResponse],
+)
+async def platform_verify_pilot_domain(
+    organization_id: UUID,
+    project_id: UUID,
+    domain_id: UUID,
+    request: Request,
+    platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[DomainResponse]:
+    from app.services.domain_service import DomainService
+
+    domain = await DomainService(db).platform_admin_verify_domain(
+        organization_id,
+        project_id,
+        domain_id,
+        actor=platform_admin,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent"),
+    )
+    return APIResponse(data=DomainResponse.model_validate(domain), meta=_meta(request))

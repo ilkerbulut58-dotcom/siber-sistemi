@@ -13,6 +13,14 @@ from app.models.organization import Organization
 from app.models.scan import ScanJob
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 class PilotService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -34,13 +42,15 @@ class PilotService:
                 status_code=403,
             )
         now = datetime.now(UTC)
-        if organization.pilot_starts_at and now < organization.pilot_starts_at:
+        pilot_starts_at = _as_utc(organization.pilot_starts_at)
+        pilot_ends_at = _as_utc(organization.pilot_ends_at)
+        if pilot_starts_at and now < pilot_starts_at:
             raise AppError(
                 "PILOT_NOT_STARTED",
                 "Pilot access has not started yet.",
                 status_code=403,
             )
-        if organization.pilot_ends_at and now > organization.pilot_ends_at:
+        if pilot_ends_at and now > pilot_ends_at:
             raise AppError(
                 "PILOT_EXPIRED",
                 "Pilot access has expired.",

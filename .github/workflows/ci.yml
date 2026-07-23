@@ -72,6 +72,71 @@ jobs:
           ENVIRONMENT: development
         run: pytest --cov=app --cov-report=term-missing
 
+  closed-pilot-simulation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: siber
+          POSTGRES_PASSWORD: siber
+          POSTGRES_DB: siber
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
+        run: alembic upgrade head
+
+      - name: Run closed pilot simulation tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://siber:siber@localhost:5432/siber
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: staging
+          BENCHMARK_LAB_ISOLATED: "true"
+        run: pytest tests/pilot -q --tb=short
+
+      - name: Upload closed pilot simulation report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: closed-pilot-simulation-junit
+          path: backend/.pytest_cache/v/cache/lastfailed
+          if-no-files-found: ignore
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

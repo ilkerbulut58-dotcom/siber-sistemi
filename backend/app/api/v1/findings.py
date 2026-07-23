@@ -97,6 +97,7 @@ async def update_finding(
         user_agent=request.headers.get("User-Agent"),
     )
     await db.commit()
+    await db.refresh(updated)
     return APIResponse(data=to_finding_response(updated), meta=_meta(request))
 
 

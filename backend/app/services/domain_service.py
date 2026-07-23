@@ -278,6 +278,57 @@ class DomainService:
         await self.db.refresh(domain)
         return domain
 
+    async def platform_admin_verify_domain(
+        self,
+        organization_id: UUID,
+        project_id: UUID,
+        domain_id: UUID,
+        *,
+        actor: User,
+        approve_active_scan: bool = True,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> Domain:
+        domain = await self.get(organization_id, project_id, domain_id)
+        domain.is_verified = True
+        domain.verified_at = datetime.now(UTC)
+        domain.last_checked_at = datetime.now(UTC)
+        domain.verification_method = "manual_admin"
+        domain.admin_approved_by = actor.id
+        if approve_active_scan:
+            domain.active_scan_allowed = True
+            domain.admin_approved_at = datetime.now(UTC)
+        await log_audit_event(
+            self.db,
+            action="domain.verified",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="domain",
+            resource_id=domain.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={
+                "hostname": domain.hostname,
+                "verification_method": "manual_admin",
+                "approved_by_platform_admin": True,
+            },
+        )
+        if approve_active_scan:
+            await log_audit_event(
+                self.db,
+                action="domain.active_scan_approved",
+                user_id=actor.id,
+                organization_id=organization_id,
+                resource_type="domain",
+                resource_id=domain.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"hostname": domain.hostname, "verification_method": "manual_admin"},
+            )
+        await self.db.flush()
+        await self.db.refresh(domain)
+        return domain
+
     async def _active_verification(self, domain_id: UUID) -> DomainVerification | None:
         result = await self.db.execute(
             select(DomainVerification)

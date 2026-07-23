@@ -88,3 +88,41 @@ async def notify_verification_required(
         body=f"Verify ownership of {domain_hostname} before scanning.",
         metadata={"domain_hostname": domain_hostname},
     )
+
+
+async def notify_pilot_expired(
+    *,
+    user_id: UUID,
+    organization_id: UUID,
+) -> None:
+    provider = get_notification_provider()
+    if not provider.is_configured():
+        return
+    await provider.send(
+        event_type="pilot.expired",
+        recipient_user_id=str(user_id),
+        organization_id=str(organization_id),
+        subject="Pilot access expired",
+        body="Pilot access has expired; new scans are blocked.",
+        metadata={},
+    )
+
+
+async def notify_critical_finding(
+    *,
+    user_id: UUID,
+    organization_id: UUID,
+    finding_id: UUID,
+    title: str,
+) -> None:
+    provider = get_notification_provider()
+    if not provider.is_configured():
+        return
+    await provider.send(
+        event_type="critical_finding",
+        recipient_user_id=str(user_id),
+        organization_id=str(organization_id),
+        subject="Critical finding detected",
+        body=f"Critical finding: {title[:200]}",
+        metadata={"finding_id": str(finding_id)},
+    )

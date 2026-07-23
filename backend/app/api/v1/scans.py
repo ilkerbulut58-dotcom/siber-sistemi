@@ -170,5 +170,12 @@ async def cancel_scan(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[ScanResponse]:
     service = ScanService(db)
-    scan = await service.cancel(org_id, scan_id, actor=user)
+    scan = await service.cancel(
+        org_id,
+        scan_id,
+        actor=user,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent"),
+    )
+    await db.refresh(scan)
     return APIResponse(data=ScanResponse.model_validate(scan), meta=_meta(request))

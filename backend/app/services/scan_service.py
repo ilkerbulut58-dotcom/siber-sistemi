@@ -41,6 +41,71 @@ class ScanService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    async def _reject_scan(
+        self,
+        *,
+        actor: User,
+        organization_id: UUID,
+        reason_code: str,
+        message: str,
+        status_code: int,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        details: dict | None = None,
+    ) -> None:
+        await log_audit_event(
+            self.db,
+            action="scan.rejected",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="scan_job",
+            resource_id=None,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={"reason_code": reason_code, **(details or {})},
+        )
+        if reason_code == "PILOT_EXPIRED":
+            from app.notifications.service import notify_pilot_expired
+
+            await notify_pilot_expired(
+                user_id=actor.id,
+                organization_id=organization_id,
+            )
+        if reason_code == "SCAN_QUOTA_EXCEEDED":
+            quota = (details or {}).get("quota")
+            if quota is not None:
+                from app.notifications.service import notify_quota_exceeded
+
+                await notify_quota_exceeded(
+                    user_id=actor.id,
+                    organization_id=organization_id,
+                    quota=int(quota),
+                )
+        await self.db.commit()
+        raise AppError(reason_code, message, status_code=status_code)
+
+    async def _guard_pilot_scan(
+        self,
+        organization: Organization,
+        *,
+        actor: User,
+        organization_id: UUID,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> None:
+        try:
+            PilotService.assert_can_scan(organization)
+        except AppError as exc:
+            await self._reject_scan(
+                actor=actor,
+                organization_id=organization_id,
+                reason_code=exc.code,
+                message=exc.message,
+                status_code=exc.status_code,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
     async def list_profiles(self) -> list[ScanProfile]:
         result = await self.db.execute(
             select(ScanProfile)
@@ -91,21 +156,44 @@ class ScanService:
         await ProjectService(self.db).get(organization_id, data.project_id)
         domain = await DomainService(self.db).get(organization_id, data.project_id, data.domain_id)
         settings = get_settings()
+        profile = await self._resolve_profile(data.scan_profile)
 
         if not settings.skip_domain_verification and not domain.is_verified:
-            raise AppError(
-                "DOMAIN_NOT_VERIFIED",
-                "Domain must be verified before scanning.",
+            active_profiles = {"deep", "code"}
+            if profile.name in active_profiles or profile.name.endswith("-active"):
+                await self._reject_scan(
+                    actor=actor,
+                    organization_id=organization_id,
+                    reason_code="DOMAIN_NOT_VERIFIED",
+                    message="Domain must be verified before active scanning.",
+                    status_code=403,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"domain_id": str(domain.id), "hostname": domain.hostname},
+                )
+            await self._reject_scan(
+                actor=actor,
+                organization_id=organization_id,
+                reason_code="DOMAIN_NOT_VERIFIED",
+                message="Domain must be verified before scanning.",
                 status_code=400,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"domain_id": str(domain.id), "hostname": domain.hostname},
             )
 
-        profile = await self._resolve_profile(data.scan_profile)
         organization = (
             await self.db.execute(select(Organization).where(Organization.id == organization_id))
         ).scalar_one_or_none()
         if organization is None:
             raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
-        PilotService.assert_can_scan(organization)
+        await self._guard_pilot_scan(
+            organization,
+            actor=actor,
+            organization_id=organization_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         if is_blocked_benchmark_profile(profile.name):
             try:
                 assert_active_benchmark_create_allowed(
@@ -137,20 +225,38 @@ class ScanService:
             except UrlGuardError as exc:
                 raise AppError("TARGET_BLOCKED", str(exc), status_code=400) from exc
 
-        PilotService.assert_active_scan_allowed(organization, profile.name)
+        try:
+            PilotService.assert_active_scan_allowed(organization, profile.name)
+        except AppError as exc:
+            await self._reject_scan(
+                actor=actor,
+                organization_id=organization_id,
+                reason_code=exc.code,
+                message=exc.message,
+                status_code=exc.status_code,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"profile": profile.name},
+            )
         active_profiles = {"deep", "code"}
         if (
             (profile.name in active_profiles or profile.name.endswith("-active"))
             and not domain.active_scan_allowed
             and not settings.skip_domain_verification
         ):
-            raise AppError(
-                "ACTIVE_SCAN_NOT_ALLOWED",
-                "Active scanning requires domain admin approval.",
+            await self._reject_scan(
+                actor=actor,
+                organization_id=organization_id,
+                reason_code="ACTIVE_SCAN_NOT_ALLOWED",
+                message="Active scanning requires domain admin approval.",
                 status_code=403,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"domain_id": str(domain.id), "profile": profile.name},
             )
 
-        if settings.environment in {"production", "staging"}:
+        enforce_limits = settings.environment in {"production", "staging"} or organization.is_pilot
+        if enforce_limits:
             running = await self.db.execute(
                 select(func.count())
                 .select_from(ScanJob)
@@ -177,17 +283,15 @@ class ScanService:
                 )
             )
             if daily.scalar_one() >= daily_quota:
-                from app.notifications.service import notify_quota_exceeded
-
-                await notify_quota_exceeded(
-                    user_id=actor.id,
+                await self._reject_scan(
+                    actor=actor,
                     organization_id=organization_id,
-                    quota=daily_quota,
-                )
-                raise AppError(
-                    "SCAN_QUOTA_EXCEEDED",
-                    "Daily scan quota exceeded for this organization.",
+                    reason_code="SCAN_QUOTA_EXCEEDED",
+                    message="Daily scan quota exceeded for this organization.",
                     status_code=429,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"quota": daily_quota},
                 )
 
         if (
@@ -262,12 +366,31 @@ class ScanService:
             raise AppError("NOT_FOUND", "Scan not found.", status_code=404)
         return scan
 
-    async def cancel(self, organization_id: UUID, scan_id: UUID, *, actor: User) -> ScanJob:
+    async def cancel(
+        self,
+        organization_id: UUID,
+        scan_id: UUID,
+        *,
+        actor: User,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> ScanJob:
         scan = await self.get(organization_id, scan_id)
         if scan.status in (ScanStatus.COMPLETED, ScanStatus.FAILED, ScanStatus.CANCELLED):
             raise AppError("INVALID_STATE", "Scan cannot be cancelled.", status_code=400)
         scan.status = ScanStatus.CANCELLED
         scan.cancelled_at = datetime.now(UTC)
+        await log_audit_event(
+            self.db,
+            action="scan.cancelled",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="scan_job",
+            resource_id=scan.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={"target": scan.target_url, "profile": scan.scan_profile},
+        )
         await self.db.flush()
         return scan
 
