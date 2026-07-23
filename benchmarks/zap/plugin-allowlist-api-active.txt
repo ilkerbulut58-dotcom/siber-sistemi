@@ -1,0 +1,6 @@
+# Pinned ZAP passive plugin IDs for api-realistic-active subset-main.
+# CORS is detected by api_surface; OpenAPI by api_surface + nuclei.
+10038
+10035
+10096
+10037

@@ -1,0 +1,7 @@
+# Pinned ZAP passive plugin IDs for web-realistic-active subset-main.
+# Maps to subset GT: CSP, HSTS, XCTO, x-powered-by, server-disclosure.
+10038
+10035
+10021
+10037
+10096

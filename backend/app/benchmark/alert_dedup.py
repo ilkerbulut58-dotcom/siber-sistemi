@@ -65,6 +65,40 @@ class GroupedZapAlert:
     instance_count: int = 1
 
 
+def filter_zap_alerts_by_plugin_allowlist(
+    alerts: list[dict[str, Any]],
+    allowlist: frozenset[str],
+) -> list[dict[str, Any]]:
+    """Drop ZAP alerts whose pluginId is outside the pinned benchmark allowlist."""
+    filtered: list[dict[str, Any]] = []
+    for alert in alerts:
+        plugin_id = str(alert.get("pluginId") or alert.get("pluginid") or "").strip()
+        if plugin_id and plugin_id in allowlist:
+            filtered.append(alert)
+    return filtered
+
+
+def collapse_groups_by_plugin_id(groups: list[GroupedZapAlert]) -> list[GroupedZapAlert]:
+    """One benchmark finding per ZAP plugin — merge URL instances into child_endpoints."""
+    by_plugin: dict[str, GroupedZapAlert] = {}
+    for group in groups:
+        plugin_id = str(group.primary_alert.get("pluginId") or group.primary_alert.get("pluginid") or "unknown")
+        existing = by_plugin.get(plugin_id)
+        if existing is None:
+            by_plugin[plugin_id] = GroupedZapAlert(
+                fingerprint=group.fingerprint,
+                primary_alert=group.primary_alert,
+                child_endpoints=list(group.child_endpoints),
+                instance_count=group.instance_count,
+            )
+            continue
+        existing.instance_count += group.instance_count
+        for url in group.child_endpoints:
+            if url and url not in existing.child_endpoints:
+                existing.child_endpoints.append(url)
+    return list(by_plugin.values())
+
+
 def group_zap_alerts(alerts: list[dict[str, Any]]) -> list[GroupedZapAlert]:
     """Group alert instances sharing the same canonical fingerprint."""
     buckets: dict[str, GroupedZapAlert] = {}

@@ -9,6 +9,19 @@ from app.utils.url_canonicalization import (
 )
 
 # ZAP passive plugin IDs -> canonical keys (aligned with passive_http rule IDs)
+ZAP_ALERT_TITLE_MAP: list[tuple[str, str]] = [
+    ("server leaks version information", "server-disclosure"),
+    ("server leaks information via \"x-powered-by\"", "x-powered-by-disclosure"),
+    ("content security policy", "missing-header-content-security-policy"),
+    ("strict-transport-security", "missing-header-strict-transport-security"),
+    ("x-content-type-options", "missing-header-x-content-type-options"),
+    ("x-frame-options", "missing-header-x-frame-options"),
+    ("referrer-policy", "missing-header-referrer-policy"),
+    ("cross-origin resource sharing", "permissive-cors"),
+    ("cross-domain javascript", "cross-domain-javascript-inclusion"),
+    ("modern web application", "info-modern-web-app"),
+]
+
 ZAP_RULE_MAP: dict[str, str] = {
     "10020": "missing-header-x-frame-options",
     "10021": "missing-header-x-content-type-options",
@@ -61,6 +74,12 @@ def resolve_correlation_key(source_tool: str, source_rule_id: str, title: str) -
         plugin = rule.removeprefix("zap-")
         if plugin in ZAP_RULE_MAP:
             return ZAP_RULE_MAP[plugin]
+
+    if source_tool == "zap":
+        title_lower = title.lower()
+        for fragment, key in ZAP_ALERT_TITLE_MAP:
+            if fragment in title_lower:
+                return key
 
     if source_tool == "passive_http" and rule:
         return rule

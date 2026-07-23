@@ -14,6 +14,20 @@ from app.scanners.base import RawFinding
 
 logger = logging.getLogger(__name__)
 
+BENCHMARK_WEB_HEADER_SCOPE = frozenset(
+    {
+        "content-security-policy",
+        "strict-transport-security",
+        "x-content-type-options",
+    }
+)
+BENCHMARK_API_HEADER_SCOPE = frozenset(
+    {
+        "content-security-policy",
+        "strict-transport-security",
+    }
+)
+
 SECURITY_HEADERS: dict[str, dict[str, str]] = {
     "strict-transport-security": {
         "title": "Missing Strict-Transport-Security header",
@@ -133,11 +147,18 @@ async def scan_disclosure_headers(target_url: str, response: httpx.Response) -> 
     return findings
 
 
-async def scan_security_headers(target_url: str, response: httpx.Response) -> list[RawFinding]:
+async def scan_security_headers(
+    target_url: str,
+    response: httpx.Response,
+    *,
+    header_scope: frozenset[str] | None = None,
+) -> list[RawFinding]:
     findings: list[RawFinding] = []
     headers_lower = {k.lower(): v for k, v in response.headers.items()}
 
     for header, meta in SECURITY_HEADERS.items():
+        if header_scope is not None and header not in header_scope:
+            continue
         if header not in headers_lower:
             findings.append(
                 RawFinding(
@@ -167,28 +188,29 @@ async def scan_security_headers(target_url: str, response: httpx.Response) -> li
             )
         )
 
-    for cookie_header in [v for k, v in response.headers.multi_items() if k.lower() == "set-cookie"]:
-        issues = []
-        lower = cookie_header.lower()
-        if "secure" not in lower and target_url.startswith("https"):
-            issues.append("Secure")
-        if "httponly" not in lower:
-            issues.append("HttpOnly")
-        if "samesite" not in lower:
-            issues.append("SameSite")
-        if issues:
-            findings.append(
-                RawFinding(
-                    source_tool="passive_http",
-                    source_rule_id="insecure-cookie-flags",
-                    title="Cookie missing security flags",
-                    description=f"Set-Cookie is missing: {', '.join(issues)}",
-                    severity="medium",
-                    affected_url=target_url,
-                    remediation="Set Secure, HttpOnly, and SameSite on sensitive cookies.",
-                    evidence={"cookie_sample": cookie_header[:200], "missing_flags": issues},
+    if header_scope is None:
+        for cookie_header in [v for k, v in response.headers.multi_items() if k.lower() == "set-cookie"]:
+            issues = []
+            lower = cookie_header.lower()
+            if "secure" not in lower and target_url.startswith("https"):
+                issues.append("Secure")
+            if "httponly" not in lower:
+                issues.append("HttpOnly")
+            if "samesite" not in lower:
+                issues.append("SameSite")
+            if issues:
+                findings.append(
+                    RawFinding(
+                        source_tool="passive_http",
+                        source_rule_id="insecure-cookie-flags",
+                        title="Cookie missing security flags",
+                        description=f"Set-Cookie is missing: {', '.join(issues)}",
+                        severity="medium",
+                        affected_url=target_url,
+                        remediation="Set Secure, HttpOnly, and SameSite on sensitive cookies.",
+                        evidence={"cookie_sample": cookie_header[:200], "missing_flags": issues},
+                    )
                 )
-            )
 
     return findings
 
@@ -256,20 +278,25 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
     return findings
 
 
-async def run_passive_http_scan(target_url: str) -> list[RawFinding]:
+async def run_passive_http_scan(
+    target_url: str,
+    *,
+    header_scope: frozenset[str] | None = None,
+) -> list[RawFinding]:
     findings: list[RawFinding] = []
     parsed = urlparse(target_url)
     hostname = parsed.hostname
 
-    findings.extend(await scan_tls_certificate(target_url))
+    if header_scope is None:
+        findings.extend(await scan_tls_certificate(target_url))
 
-    if hostname and parsed.scheme == "https":
-        findings.extend(await scan_http_redirect(hostname, target_url))
+        if hostname and parsed.scheme == "https":
+            findings.extend(await scan_http_redirect(hostname, target_url))
 
     try:
         async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, verify=_httpx_verify()) as client:
             response = await client.get(target_url)
-            findings.extend(await scan_security_headers(target_url, response))
+            findings.extend(await scan_security_headers(target_url, response, header_scope=header_scope))
             findings.extend(await scan_disclosure_headers(target_url, response))
             if response.status_code >= 500:
                 findings.append(

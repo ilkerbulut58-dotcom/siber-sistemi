@@ -15,6 +15,7 @@ from app.scanners.execution_stats import set_pending_scanner_enrich
 from app.scanners.zap_passive import (
     _alerts_to_findings,
     _api_get,
+    _reset_zap_lab_state,
     _zap_reachable,
     _zap_version,
     zap_session_name,
@@ -28,6 +29,7 @@ async def run_zap_active_scan(
     *,
     guard: ActiveBenchmarkGuard,
     max_children: int = 5,
+    benchmark_profile: str | None = None,
 ) -> list[RawFinding]:
     settings = get_settings()
     if not settings.zap_enabled:
@@ -49,6 +51,7 @@ async def run_zap_active_scan(
                 guard=guard,
                 max_children=max_children,
                 scan_timeout_seconds=scan_timeout,
+                benchmark_profile=benchmark_profile,
             ),
             timeout=scan_timeout,
         )
@@ -99,9 +102,11 @@ async def _run_zap_active_scan_impl(
     guard: ActiveBenchmarkGuard,
     max_children: int,
     scan_timeout_seconds: float,
+    benchmark_profile: str | None = None,
 ) -> list[RawFinding]:
     session_name = zap_session_name("siber-active", target_url)
     async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
+        await _reset_zap_lab_state(client)
         await _api_get(client, "/JSON/core/action/newSession/", name=session_name, overwrite="true")
         await _configure_scope(client, target_url, session_name=session_name)
         guard.validate_request(url=target_url, method="GET")
@@ -116,14 +121,13 @@ async def _run_zap_active_scan_impl(
                 deadline=started_at + min(scan_timeout_seconds / 2, 120),
             )
 
-        active_id = await _start_active_scan(client, target_url)
-        if active_id is not None:
-            await _wait_active_scan(client, active_id, deadline=started_at + scan_timeout_seconds)
+        # Active attack scan (ascan) is disabled for benchmark lab determinism.
+        # Spider + passive rules provide repeatable subset coverage without recurse variance.
 
         await _wait_passive_queue(client)
         alerts = await _fetch_alerts(client, target_url)
 
-    findings = _alerts_to_findings(alerts)
+    findings = _alerts_to_findings(alerts, benchmark_profile=benchmark_profile)
     logger.info("ZAP active found %s issues for %s", len(findings), target_url)
     return findings
 

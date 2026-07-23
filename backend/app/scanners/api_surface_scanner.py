@@ -159,9 +159,29 @@ async def run_api_surface_scan(target_url: str) -> list[RawFinding]:
     cors_urls, _ = _crapi_probe_paths(target_url)
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, verify=_httpx_verify()) as client:
+            cors_findings: list[RawFinding] = []
             for probe_url in dict.fromkeys(cors_urls):
                 request_method = "POST" if "/auth/" in probe_url else "GET"
-                findings.extend(await scan_cors_policy(probe_url, client, request_method=request_method))
+                cors_findings.extend(await scan_cors_policy(probe_url, client, request_method=request_method))
+            if cors_findings:
+                primary = cors_findings[0]
+                probed_urls = sorted({item.affected_url for item in cors_findings if item.affected_url})
+                evidence = dict(primary.evidence or {})
+                if len(probed_urls) > 1:
+                    evidence["probed_urls"] = probed_urls
+                findings.append(
+                    RawFinding(
+                        source_tool=primary.source_tool,
+                        source_rule_id=primary.source_rule_id,
+                        title=primary.title,
+                        description=primary.description,
+                        severity=primary.severity,
+                        affected_url=primary.affected_url,
+                        remediation=primary.remediation,
+                        confidence=primary.confidence,
+                        evidence=evidence,
+                    )
+                )
             findings.extend(await scan_openapi_exposure(origin, client))
     except httpx.HTTPError as exc:
         logger.warning("API surface scan failed for %s: %s", target_url, exc)

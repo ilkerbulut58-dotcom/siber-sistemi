@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import os
 import time
 
 import httpx
@@ -35,6 +36,7 @@ async def run_zap_passive_scan(
     *,
     spider: bool = False,
     max_children: int = 8,
+    benchmark_profile: str | None = None,
 ) -> list[RawFinding]:
     settings = get_settings()
     if not settings.zap_enabled:
@@ -53,6 +55,7 @@ async def run_zap_passive_scan(
                 target_url,
                 spider=spider,
                 max_children=max_children,
+                benchmark_profile=benchmark_profile,
             ),
             timeout=float(settings.zap_scan_timeout_seconds),
         )
@@ -92,9 +95,11 @@ async def _run_zap_passive_scan_impl(
     *,
     spider: bool,
     max_children: int,
+    benchmark_profile: str | None = None,
 ) -> list[RawFinding]:
     session_name = zap_session_name("siber", target_url)
     async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
+        await _reset_zap_lab_state(client)
         await _api_get(client, "/JSON/core/action/newSession/", name=session_name, overwrite="true")
         await _api_get(client, "/JSON/core/action/accessUrl/", url=target_url)
 
@@ -106,7 +111,7 @@ async def _run_zap_passive_scan_impl(
         await _wait_passive_scan(client)
         alerts = await _fetch_alerts(client, target_url)
 
-    findings = _alerts_to_findings(alerts)
+    findings = _alerts_to_findings(alerts, benchmark_profile=benchmark_profile)
     logger.info("ZAP passive found %s issues for %s (spider=%s)", len(findings), target_url, spider)
     return findings
 
@@ -203,6 +208,21 @@ async def _wait_passive_scan(client: httpx.AsyncClient) -> None:
     logger.warning("ZAP passive scan queue did not drain in time")
 
 
+async def _reset_zap_lab_state(client: httpx.AsyncClient) -> None:
+    """Stop in-flight ZAP work and clear alerts so shared daemon state does not leak between runs."""
+    if os.environ.get("BENCHMARK_LAB_ISOLATED") != "true":
+        return
+    for path in (
+        "/JSON/ascan/action/stopAllScans/",
+        "/JSON/spider/action/stopAllScans/",
+        "/JSON/core/action/deleteAllAlerts/",
+    ):
+        try:
+            await _api_get(client, path)
+        except Exception as exc:
+            logger.debug("ZAP reset step %s skipped: %s", path, exc)
+
+
 async def _fetch_alerts(client: httpx.AsyncClient, target_url: str) -> list[dict]:
     payload = await _api_get(
         client,
@@ -215,8 +235,31 @@ async def _fetch_alerts(client: httpx.AsyncClient, target_url: str) -> list[dict
     return alerts if isinstance(alerts, list) else []
 
 
-def _alerts_to_findings(alerts: list[dict]) -> list[RawFinding]:
-    from app.benchmark.alert_dedup import group_zap_alerts, grouped_alerts_to_raw_findings
+def _alerts_to_findings(
+    alerts: list[dict],
+    *,
+    benchmark_profile: str | None = None,
+) -> list[RawFinding]:
+    from app.benchmark.alert_dedup import (
+        collapse_groups_by_plugin_id,
+        filter_zap_alerts_by_plugin_allowlist,
+        group_zap_alerts,
+        grouped_alerts_to_raw_findings,
+    )
+    from app.benchmark.zap_allowlist import zap_allowlist_for_profile
+
+    allowlist = zap_allowlist_for_profile(benchmark_profile) if benchmark_profile else None
+    if allowlist is not None:
+        before = len(alerts)
+        alerts = filter_zap_alerts_by_plugin_allowlist(alerts, allowlist)
+        logger.info(
+            "ZAP benchmark allowlist (%s) kept %s/%s alerts",
+            benchmark_profile,
+            len(alerts),
+            before,
+        )
 
     groups = group_zap_alerts(alerts)
+    if allowlist is not None:
+        groups = collapse_groups_by_plugin_id(groups)
     return grouped_alerts_to_raw_findings(groups, risk_map=RISK_MAP)
