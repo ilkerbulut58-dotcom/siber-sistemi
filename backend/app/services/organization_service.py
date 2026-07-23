@@ -18,6 +18,7 @@ from app.schemas.organization import (
     OrganizationMemberResponse,
     OrganizationUpdate,
 )
+from app.schemas.pilot import PilotTenantUpdate
 from app.services.audit_service import log_audit_event
 
 
@@ -362,17 +363,12 @@ class OrganizationService:
     async def update_pilot_tenant(
         self,
         organization: Organization,
-        data: "PilotTenantUpdate",
+        data: PilotTenantUpdate,
         *,
         actor: User,
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> Organization:
-        from app.schemas.pilot import PilotTenantUpdate
-
-        if not isinstance(data, PilotTenantUpdate):
-            raise TypeError("Expected PilotTenantUpdate")
-
         updates = data.model_dump(exclude_unset=True)
         for field, value in updates.items():
             setattr(organization, field, value)

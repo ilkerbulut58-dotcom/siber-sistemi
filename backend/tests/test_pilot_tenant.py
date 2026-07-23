@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from app.core.database import async_session_factory
 from app.core.exceptions import AppError
