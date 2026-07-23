@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from app.analysis.correlation_rules import resolve_correlation_key
 from app.benchmark.alert_dedup import (
     collapse_groups_by_plugin_id,
     filter_zap_alerts_by_plugin_allowlist,
     group_zap_alerts,
 )
 from app.benchmark.zap_allowlist import load_zap_api_active_allowlist, load_zap_web_active_allowlist
-from app.analysis.correlation_rules import resolve_correlation_key
 
 
 def test_web_active_allowlist_matches_subset_plugins():
