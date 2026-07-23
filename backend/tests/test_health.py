@@ -24,6 +24,38 @@ async def test_liveness_probe(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_readiness_probe(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _ok() -> bool:
+        return True
+
+    monkeypatch.setattr("app.api.v1.health.check_database_connection", _ok)
+    monkeypatch.setattr("app.api.v1.health.check_redis_connection", _ok)
+    response = await client.get("/api/v1/health/ready")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["status"] == "ready"
+    assert body["data"]["checks"]["database"] == "ok"
+    assert body["data"]["checks"]["redis"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_readiness_probe_unavailable(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _db_ok() -> bool:
+        return True
+
+    async def _redis_fail() -> bool:
+        return False
+
+    monkeypatch.setattr("app.api.v1.health.check_database_connection", _db_ok)
+    monkeypatch.setattr("app.api.v1.health.check_redis_connection", _redis_fail)
+    response = await client.get("/api/v1/health/ready")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["data"]["status"] == "not_ready"
+    assert body["data"]["checks"]["redis"] == "failed"
+
+
+@pytest.mark.asyncio
 async def test_root_endpoint(client: AsyncClient) -> None:
     response = await client.get("/")
     assert response.status_code == 200

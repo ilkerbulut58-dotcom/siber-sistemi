@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.database import check_database_connection
@@ -66,7 +67,7 @@ async def readiness_probe(request: Request) -> APIResponse[ReadinessStatus]:
     if not all_ok:
         logger.warning("Readiness check failed", extra={"checks": checks})
 
-    return APIResponse(
+    payload = APIResponse(
         success=all_ok,
         data=ReadinessStatus(
             status=status,
@@ -76,3 +77,6 @@ async def readiness_probe(request: Request) -> APIResponse[ReadinessStatus]:
         ),
         meta=_meta(request),
     )
+    if not all_ok:
+        return JSONResponse(status_code=503, content=payload.model_dump(mode="json"))
+    return payload
