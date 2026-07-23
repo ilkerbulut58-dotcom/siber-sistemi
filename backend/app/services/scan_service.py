@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -121,7 +122,10 @@ class ScanService:
                 status_code=400,
             )
 
-        if not is_blocked_benchmark_profile(profile.name):
+        if (
+            not is_blocked_benchmark_profile(profile.name)
+            and os.environ.get("BENCHMARK_LAB_ISOLATED") != "true"
+        ):
             resolve_dns = (
                 not settings.skip_domain_verification
                 and settings.environment in {"production", "staging"}
