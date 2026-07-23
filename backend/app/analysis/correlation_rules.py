@@ -16,6 +16,7 @@ ZAP_RULE_MAP: dict[str, str] = {
     "10038": "missing-header-content-security-policy",
     "10063": "missing-header-referrer-policy",
     "10096": "server-disclosure",
+    "10037": "x-powered-by-disclosure",
     "10098": "permissive-cors",
     "10109": "info-modern-web-app",
 }

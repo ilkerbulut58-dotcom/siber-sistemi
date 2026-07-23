@@ -274,6 +274,24 @@ def write_blind_report(result: BlindBenchmarkResult, output_dir: Path | None = N
 
 def run_blind_benchmark_cli(*, secret: str | None = None, findings: list[Any] | None = None) -> int:
     """CLI entrypoint — always exits 0 on skip; exit 1 only on unexpected failure."""
+    import asyncio
+
+    resolved = _resolve_secret(secret)
+    if findings is None and resolved:
+        target_url = os.environ.get("BLIND_BENCHMARK_TARGET_URL", "http://127.0.0.1:18080/")
+        try:
+            findings = asyncio.run(collect_blind_findings(target_url))
+        except Exception as exc:
+            result = BlindBenchmarkResult(
+                status="failed",
+                skip_reason="scan_failed",
+                message=f"Blind benchmark scan failed: {exc}",
+            )
+            report_path = write_blind_report(result)
+            print(json.dumps(result.as_dict(), indent=2))
+            print(f"Report written to {report_path}", file=os.sys.stderr)
+            return 1
+
     result = evaluate_blind_benchmark(findings or [], secret=secret)
     report_path = write_blind_report(result)
     print(json.dumps(result.as_dict(), indent=2))
@@ -282,3 +300,28 @@ def run_blind_benchmark_cli(*, secret: str | None = None, findings: list[Any] | 
         print(result.message or "Blind benchmark skipped.", file=os.sys.stderr)
         return 0
     return 0
+
+
+async def collect_blind_findings(target_url: str) -> list[Any]:
+    """Run the public web-smoke safe scan profile and map results for blind holdout matching."""
+    from app.analysis.correlation_engine import correlate_findings
+    from app.scanners.orchestrator import run_scan_for_profile
+
+    raw_findings = await run_scan_for_profile(target_url, "safe")
+    correlated = correlate_findings(raw_findings)
+    findings: list[Any] = []
+    for item in correlated:
+        findings.append(
+            SimpleNamespace(
+                id=uuid4(),
+                correlation_key=item.correlation_key,
+                source_rule_id=item.source_rule_ids[0] if item.source_rule_ids else item.correlation_key,
+                fingerprint=f"{item.correlation_key}:{item.affected_url}",
+                affected_url=item.affected_url,
+                title=item.title,
+                source_tool=item.source_tools[0] if item.source_tools else "unknown",
+                severity=item.severity,
+                source_tools=item.source_tools,
+            )
+        )
+    return findings

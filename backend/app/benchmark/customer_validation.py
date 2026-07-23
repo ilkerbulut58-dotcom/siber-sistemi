@@ -49,7 +49,12 @@ class ValidationArtifact:
 
 def _has_header_evidence(raw: RawFinding) -> bool:
     evidence = raw.evidence or {}
-    return bool(evidence.get("missing_header") or evidence.get("allow_origin") or evidence.get("server"))
+    return bool(
+        evidence.get("missing_header")
+        or evidence.get("allow_origin")
+        or evidence.get("server")
+        or evidence.get("x_powered_by")
+    )
 
 
 def _has_openapi_evidence(raw: RawFinding) -> bool:

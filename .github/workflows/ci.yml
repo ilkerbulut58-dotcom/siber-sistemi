@@ -714,13 +714,35 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Start closed benchmark fixtures
+        working-directory: .
+        run: docker compose -f docker-compose.benchmark.yml --profile benchmark up -d
+
+      - name: Wait for benchmark fixture health
+        working-directory: .
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:18080/ >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Benchmark web fixture failed health check"
+          docker compose -f docker-compose.benchmark.yml --profile benchmark ps
+          exit 1
+
       - name: Run Phase 11.4 benchmark tests
         run: pytest -q tests/test_benchmark_blind.py tests/test_benchmark_risk_eval.py tests/test_benchmark_ai_remediation_eval.py
 
       - name: Run blind benchmark (skips without secret)
         env:
           BLIND_GROUND_TRUTH_SECRET: ${{ secrets.BLIND_GROUND_TRUTH_SECRET }}
+          BLIND_BENCHMARK_TARGET_URL: http://127.0.0.1:18080/
+          SKIP_DOMAIN_VERIFICATION: "true"
         run: python -m app.benchmark blind
+
+      - name: Tear down benchmark fixtures
+        if: always()
+        working-directory: .
+        run: docker compose -f docker-compose.benchmark.yml --profile benchmark down -v
 
       - name: Run Risk Engine benchmark
         run: python -m app.benchmark risk-eval

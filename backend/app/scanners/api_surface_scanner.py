@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -11,6 +12,7 @@ from app.scanners.base import RawFinding
 from app.scanners.passive_http import _httpx_verify
 
 logger = logging.getLogger(__name__)
+
 
 def _site_origin(url: str) -> str:
     parsed = urlparse(url)
@@ -25,42 +27,81 @@ OPENAPI_PATHS = (
     "/docs",
     "/v3/api-docs",
     "/swagger-ui.html",
+    "/api/openapi.json",
+    "/identity/api/openapi.json",
+    "/community/api/openapi.json",
+    "/workshop/api/openapi.json",
+    "/workshop/api/schema/",
+    "/workshop/api/swagger/",
+)
+
+# crAPI routes @CrossOrigin controllers and common API entry points (via benchmark-crapi-proxy).
+CRAPI_CORS_PATHS = (
+    "/identity/api/auth/login",
+    "/identity/api/auth/signup",
+    "/community/api/v2/community/posts",
+    "/workshop/api/shop/products",
 )
 
 
-async def scan_cors_policy(target_url: str, client: httpx.AsyncClient) -> list[RawFinding]:
+def _openapi_body_matches(body: str, content_type: str) -> bool:
+    sample = body[:4000].lower()
+    if "openapi" in sample or "swagger" in sample:
+        return True
+    if "application/json" in content_type.lower() or sample.lstrip().startswith("{"):
+        try:
+            payload = json.loads(body[:200_000])
+        except json.JSONDecodeError:
+            return False
+        if isinstance(payload, dict):
+            if payload.get("openapi") or payload.get("swagger"):
+                return True
+            paths = payload.get("paths")
+            return isinstance(paths, dict) and len(paths) > 0
+    return "text/html" in content_type.lower() and ("swagger-ui" in sample or "swagger ui" in sample)
+
+
+async def scan_cors_policy(
+    target_url: str,
+    client: httpx.AsyncClient,
+    *,
+    request_method: str = "POST",
+) -> list[RawFinding]:
     findings: list[RawFinding] = []
     origin = "https://evil-benchmark-origin.example"
-    try:
-        response = await client.request(
-            "OPTIONS",
-            target_url,
-            headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
-        )
-        allow_origin = response.headers.get("access-control-allow-origin", "")
-        if allow_origin in {"*", origin}:
-            findings.append(
-                RawFinding(
-                    source_tool="passive_http",
-                    source_rule_id="permissive-cors",
-                    title="Permissive CORS configuration",
-                    description=(
-                        f"OPTIONS {target_url} reflects Origin with Access-Control-Allow-Origin: {allow_origin}"
-                    ),
-                    severity="medium",
-                    affected_url=target_url,
-                    remediation="Restrict CORS to trusted origins; avoid wildcard with credentials.",
-                    confidence="high",
-                    evidence={
-                        "allow_origin": allow_origin,
-                        "request_origin": origin,
-                        "status_code": response.status_code,
-                        "validator": "cors_preflight_response",
-                    },
+    for method in ("OPTIONS", "GET"):
+        try:
+            headers = {"Origin": origin}
+            if method == "OPTIONS":
+                headers["Access-Control-Request-Method"] = request_method
+            response = await client.request(method, target_url, headers=headers)
+            allow_origin = response.headers.get("access-control-allow-origin", "")
+            if allow_origin in {"*", origin}:
+                findings.append(
+                    RawFinding(
+                        source_tool="passive_http",
+                        source_rule_id="permissive-cors",
+                        title="Permissive CORS configuration",
+                        description=(
+                            f"{method} {target_url} reflects Origin with "
+                            f"Access-Control-Allow-Origin: {allow_origin}"
+                        ),
+                        severity="medium",
+                        affected_url=target_url,
+                        remediation="Restrict CORS to trusted origins; avoid wildcard with credentials.",
+                        confidence="high",
+                        evidence={
+                            "allow_origin": allow_origin,
+                            "request_origin": origin,
+                            "status_code": response.status_code,
+                            "http_method": method,
+                            "validator": "cors_preflight_response",
+                        },
+                    )
                 )
-            )
-    except httpx.HTTPError as exc:
-        logger.debug("CORS check skipped for %s: %s", target_url, exc)
+                break
+        except httpx.HTTPError as exc:
+            logger.debug("CORS check skipped for %s (%s): %s", target_url, method, exc)
     return findings
 
 
@@ -71,11 +112,11 @@ async def scan_openapi_exposure(base_url: str, client: httpx.AsyncClient) -> lis
     for path in OPENAPI_PATHS:
         url = urljoin(origin.rstrip("/") + "/", path.lstrip("/"))
         try:
-            response = await client.get(url)
+            response = await client.get(url, headers={"Accept": "application/json, text/html;q=0.9"})
             if response.status_code != 200:
                 continue
-            body_sample = response.text[:400].lower()
-            if "openapi" in body_sample or "swagger" in body_sample or "paths" in body_sample:
+            content_type = response.headers.get("content-type", "")
+            if _openapi_body_matches(response.text, content_type):
                 discovered.append(url)
         except httpx.HTTPError:
             continue
@@ -99,13 +140,28 @@ async def scan_openapi_exposure(base_url: str, client: httpx.AsyncClient) -> lis
     return findings
 
 
+def _crapi_probe_paths(target_url: str) -> tuple[list[str], list[str]]:
+    """Return CORS and OpenAPI probe URLs for crAPI realistic proxy targets."""
+    origin = _site_origin(target_url)
+    parsed = urlparse(origin)
+    if parsed.hostname != "benchmark-crapi-proxy":
+        return [target_url], []
+    cors_urls = [urljoin(origin.rstrip("/") + "/", path.lstrip("/")) for path in CRAPI_CORS_PATHS]
+    if target_url not in cors_urls:
+        cors_urls.insert(0, target_url)
+    cors_urls.insert(1, origin)
+    return cors_urls, []
+
+
 async def run_api_surface_scan(target_url: str) -> list[RawFinding]:
     findings: list[RawFinding] = []
     origin = _site_origin(target_url)
+    cors_urls, _ = _crapi_probe_paths(target_url)
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, verify=_httpx_verify()) as client:
-            for probe_url in dict.fromkeys([origin, target_url]):
-                findings.extend(await scan_cors_policy(probe_url, client))
+            for probe_url in dict.fromkeys(cors_urls):
+                request_method = "POST" if "/auth/" in probe_url else "GET"
+                findings.extend(await scan_cors_policy(probe_url, client, request_method=request_method))
             findings.extend(await scan_openapi_exposure(origin, client))
     except httpx.HTTPError as exc:
         logger.warning("API surface scan failed for %s: %s", target_url, exc)

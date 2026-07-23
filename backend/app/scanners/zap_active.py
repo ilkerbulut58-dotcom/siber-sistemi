@@ -12,7 +12,13 @@ from app.benchmark.active_guard import ActiveBenchmarkGuard, zap_exclude_regexes
 from app.core.config import get_settings
 from app.scanners.base import RawFinding
 from app.scanners.execution_stats import set_pending_scanner_enrich
-from app.scanners.zap_passive import _alerts_to_findings, _api_get, _zap_reachable, _zap_version
+from app.scanners.zap_passive import (
+    _alerts_to_findings,
+    _api_get,
+    _zap_reachable,
+    _zap_version,
+    zap_session_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +100,10 @@ async def _run_zap_active_scan_impl(
     max_children: int,
     scan_timeout_seconds: float,
 ) -> list[RawFinding]:
-    session_name = f"siber-active-{int(time.time())}"
+    session_name = zap_session_name("siber-active", target_url)
     async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
         await _api_get(client, "/JSON/core/action/newSession/", name=session_name, overwrite="true")
-        await _configure_scope(client, target_url)
+        await _configure_scope(client, target_url, session_name=session_name)
         guard.validate_request(url=target_url, method="GET")
         await _api_get(client, "/JSON/core/action/accessUrl/", url=target_url, followRedirects="false")
 
@@ -122,7 +128,7 @@ async def _run_zap_active_scan_impl(
     return findings
 
 
-async def _configure_scope(client: httpx.AsyncClient, target_url: str) -> None:
+async def _configure_scope(client: httpx.AsyncClient, target_url: str, *, session_name: str) -> None:
     await _api_get(client, "/JSON/core/action/excludeFromProxy/", regex=".*metadata.*")
     await _api_get(client, "/JSON/core/action/excludeFromProxy/", regex=".*169\\.254\\.169\\.254.*")
     for pattern in zap_exclude_regexes():
@@ -131,7 +137,7 @@ async def _configure_scope(client: httpx.AsyncClient, target_url: str) -> None:
     await _api_get(
         client,
         "/JSON/context/action/newContext/",
-        contextName=f"benchmark-{int(time.time())}",
+        contextName=session_name,
     )
     await _api_get(client, "/JSON/context/action/includeInContext/", contextName="Default Context", regex=f"{target_url}.*")
 
@@ -147,6 +153,7 @@ async def _start_spider(
         "/JSON/spider/action/scan/",
         url=target_url,
         maxChildren=str(max_children),
+        maxDepth="3",
         subtreeOnly="true",
     )
     scan_id = payload.get("scan")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 
@@ -21,6 +22,12 @@ RISK_MAP = {
     "informational": "info",
     "info": "info",
 }
+
+
+def zap_session_name(prefix: str, target_url: str) -> str:
+    """Deterministic ZAP session name for repeatable benchmark runs."""
+    digest = hashlib.sha256(target_url.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}-{digest}"
 
 
 async def run_zap_passive_scan(
@@ -86,7 +93,7 @@ async def _run_zap_passive_scan_impl(
     spider: bool,
     max_children: int,
 ) -> list[RawFinding]:
-    session_name = f"siber-{int(time.time())}"
+    session_name = zap_session_name("siber", target_url)
     async with httpx.AsyncClient(base_url=base_url, timeout=30.0) as client:
         await _api_get(client, "/JSON/core/action/newSession/", name=session_name, overwrite="true")
         await _api_get(client, "/JSON/core/action/accessUrl/", url=target_url)
@@ -127,12 +134,14 @@ async def _start_spider(
     target_url: str,
     *,
     max_children: int,
+    max_depth: int = 3,
 ) -> str | None:
     payload = await _api_get(
         client,
         "/JSON/spider/action/scan/",
         url=target_url,
         maxChildren=str(max_children),
+        maxDepth=str(max_depth),
         subtreeOnly="true",
     )
     scan_id = payload.get("scan")

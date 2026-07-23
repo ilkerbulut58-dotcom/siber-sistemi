@@ -84,3 +84,19 @@ def test_low_evidence_finding_needs_review():
     artifact = build_customer_validation_artifact([raw])
     assert artifact.findings[0].visibility == CustomerVisibility.NEEDS_REVIEW
     assert artifact.suppressions
+
+
+def test_x_powered_by_disclosure_is_high_confidence():
+    raw = RawFinding(
+        source_tool="passive_http",
+        source_rule_id="x-powered-by-disclosure",
+        title="X-Powered-By disclosure",
+        description="disclosure",
+        severity="info",
+        affected_url="https://benchmark-juice-proxy/",
+        evidence={"x_powered_by": "Express"},
+        confidence="high",
+    )
+    artifact = build_customer_validation_artifact([raw])
+    assert artifact.findings[0].visibility == CustomerVisibility.HIGH_CONFIDENCE
+    assert artifact.customer_visible_count == 1
