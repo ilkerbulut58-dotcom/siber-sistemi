@@ -552,8 +552,8 @@ async def _run_android_target(*, suite: str, suite_manifest, target_manifest, fi
 async def run_suite(suite: str, *, write_baseline: bool = False, subset: str | None = None) -> int:
     assert_suite_runnable(suite)
     os.environ.setdefault("SKIP_DOMAIN_VERIFICATION", "true")
+    os.environ.setdefault("BENCHMARK_LAB_ISOLATED", "true")
     if is_realistic_suite(suite):
-        os.environ.setdefault("BENCHMARK_LAB_ISOLATED", "true")
         if suite in ACTIVE_REALISTIC_SUITES:
             os.environ.setdefault("BENCHMARK_ACTIVE_REALISTIC_ENABLED", "true")
             os.environ["BENCHMARK_ACTIVE_SCAN_ALLOWED"] = "true"
