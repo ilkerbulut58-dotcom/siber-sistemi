@@ -1,4 +1,4 @@
-"""Bulguları Türkçeleştir ve Plesk çözüm rehberi ekle."""
+"""Bulguları Türkçeleştir ve çoklu hosting çözüm rehberi ekle."""
 
 from __future__ import annotations
 
@@ -47,8 +47,10 @@ def localize_raw_finding(raw: RawFinding) -> RawFinding:
             "Düzeltmeyi test ortamında uygulayın, ardından SIBER'de yeniden tarayın.",
         ]
         raw.config_file_paths = [
-            f"Plesk → {domain} → Apache & nginx Settings",
-            "İlgili uygulama kaynak kodu (Git/FTP)",
+            f"[Nginx] /etc/nginx/sites-available/{domain}",
+            f"[Apache] Site kökünde .htaccess",
+            f"[Hosting paneli] Sağlayıcınızın domain/SSL ayarları (Plesk, cPanel, DirectAdmin vb.)",
+            "[Uygulama] İlgili kaynak kodu (Git/FTP)",
         ]
     else:
         raw.risk_explanation = (

@@ -2,32 +2,35 @@
 
 import { CheckCircle2, AlertCircle, HelpCircle } from "lucide-react";
 import type { HeaderStatusItem } from "@/lib/scan-analytics";
+import { useTranslation } from "@/components/locale-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-const STATUS_UI = {
-  present: {
-    icon: CheckCircle2,
-    label: "Var",
-    className: "border-green-500/30 bg-green-500/5 text-green-400",
-  },
-  missing: {
-    icon: AlertCircle,
-    label: "Eksik",
-    className: "border-red-500/30 bg-red-500/5 text-red-400",
-  },
-  recommended: {
-    icon: HelpCircle,
-    label: "Öneriliyor",
-    className: "border-yellow-500/30 bg-yellow-500/5 text-yellow-400",
-  },
-};
-
 export function SecurityHeadersStatusGrid({ headers }: { headers: HeaderStatusItem[] }) {
+  const { t } = useTranslation();
+
+  const STATUS_UI = {
+    present: {
+      icon: CheckCircle2,
+      label: t("analytics.headerPresent"),
+      className: "border-green-500/30 bg-green-500/5 text-green-400",
+    },
+    missing: {
+      icon: AlertCircle,
+      label: t("analytics.headerMissing"),
+      className: "border-red-500/30 bg-red-500/5 text-red-400",
+    },
+    recommended: {
+      icon: HelpCircle,
+      label: t("analytics.headerRecommended"),
+      className: "border-yellow-500/30 bg-yellow-500/5 text-yellow-400",
+    },
+  };
+
   return (
     <Card className="border-border/60 bg-card/80" id="section-headers">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Güvenlik Başlıkları Durumu</CardTitle>
+        <CardTitle className="text-base">{t("analytics.securityHeaders")}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

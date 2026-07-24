@@ -2,6 +2,7 @@
 
 import type { TrendPoint } from "@/lib/scan-analytics";
 import { scoreColor } from "@/lib/scan-analytics";
+import { useTranslation } from "@/components/locale-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function RiskTrendChart({
@@ -11,6 +12,7 @@ export function RiskTrendChart({
   points: TrendPoint[];
   currentScanId: string;
 }) {
+  const { t } = useTranslation();
   const w = 320;
   const h = 140;
   const pad = { t: 16, r: 12, b: 28, l: 32 };
@@ -22,13 +24,11 @@ export function RiskTrendChart({
       <Card className="border-border/60 bg-card/80">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Risk Trendi (Son Taramalar)
+            {t("analytics.riskTrend")}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Trend için en az 2 tamamlanmış tarama gerekir.
-          </p>
+          <p className="text-sm text-muted-foreground">{t("analytics.riskTrendMinScans")}</p>
         </CardContent>
       </Card>
     );
@@ -51,7 +51,7 @@ export function RiskTrendChart({
     <Card className="border-border/60 bg-card/80 shadow-[0_0_24px_-8px_rgba(99,102,241,0.15)]">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Risk Trendi (Son {points.length} Tarama)
+          {t("analytics.riskTrendLast", { count: points.length })}
         </CardTitle>
       </CardHeader>
       <CardContent>

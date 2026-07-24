@@ -91,3 +91,65 @@ async def test_start_safe_scan(client: AsyncClient) -> None:
     listing = await client.get(f"/api/v1/organizations/{org['id']}/scans", headers=headers)
     assert listing.status_code == 200
     assert len(listing.json()["data"]) == 1
+
+
+async def _make_platform_admin(client: AsyncClient, headers: dict) -> None:
+    from uuid import UUID
+
+    from sqlalchemy import update
+
+    from app.core.database import async_session_factory
+    from app.models.user import User
+
+    me = (await client.get("/api/v1/users/me", headers=headers)).json()["data"]
+    async with async_session_factory() as session:
+        await session.execute(
+            update(User).where(User.id == UUID(me["id"])).values(is_platform_admin=True)
+        )
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_platform_admin_scans_unverified_domain(client: AsyncClient) -> None:
+    reg = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "admin-scan@example.com", "password": "SecurePass123!", "full_name": "Admin"},
+    )
+    headers = {"Authorization": f"Bearer {reg.json()['data']['tokens']['access_token']}"}
+    await _make_platform_admin(client, headers)
+
+    org = (
+        await client.post("/api/v1/organizations", json={"name": "Admin Scan Org"}, headers=headers)
+    ).json()["data"]
+    project = (
+        await client.post(
+            f"/api/v1/organizations/{org['id']}/projects",
+            json={"name": "Friend Site", "environment": "production"},
+            headers=headers,
+        )
+    ).json()["data"]
+
+    with patch("app.services.domain_service.hostname_resolves", return_value=True):
+        domain = (
+            await client.post(
+                f"/api/v1/organizations/{org['id']}/projects/{project['id']}/domains",
+                json={"hostname": "friend.example.com", "method": "dns_txt"},
+                headers=headers,
+            )
+        ).json()["data"]
+    assert domain["is_verified"] is False
+
+    with patch("app.api.v1.scans.dispatch_scan_job", new_callable=AsyncMock):
+        response = await client.post(
+            f"/api/v1/organizations/{org['id']}/scans",
+            json={
+                "project_id": project["id"],
+                "domain_id": domain["id"],
+                "scan_profile": "deep",
+                "target_url": "https://friend.example.com",
+                "authorization_accepted": True,
+            },
+            headers=headers,
+        )
+    assert response.status_code == 201
+    assert response.json()["data"]["scan_profile"] == "deep"

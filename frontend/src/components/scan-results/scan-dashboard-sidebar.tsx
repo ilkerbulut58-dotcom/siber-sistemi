@@ -8,13 +8,13 @@ import {
   Globe,
   LayoutDashboard,
   Lock,
-  Monitor,
   Radar,
   Server,
   Settings,
   Shield,
   Users,
 } from "lucide-react";
+import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/lib/utils";
 
 export type ScanSection =
@@ -41,97 +41,96 @@ interface Props {
 }
 
 export function ScanDashboardSidebar({ orgId, projectId, active, onNavigate }: Props) {
+  const { t } = useTranslation();
+
   const scanItems: NavItem[] = [
-    { id: "overview", label: "Özet", icon: LayoutDashboard },
-    { id: "findings", label: "Bulgular", icon: Shield },
-    { id: "all-findings", label: "Tüm Bulgular", icon: BarChart3 },
-    { id: "site-profile", label: "Site Profili", icon: Globe },
-    { id: "headers", label: "HTTP Başlıkları", icon: Lock },
-    { id: "reports", label: "Raporlar", icon: FileText },
+    { id: "overview", label: t("scanResults.overview"), icon: LayoutDashboard },
+    { id: "findings", label: t("scanResults.findings"), icon: Shield },
+    { id: "all-findings", label: t("scanResults.allFindings"), icon: BarChart3 },
+    { id: "site-profile", label: t("scanResults.siteProfile"), icon: Globe },
+    { id: "headers", label: t("scanResults.headers"), icon: Lock },
+    { id: "reports", label: t("scanResults.reports"), icon: FileText },
   ];
 
   const platformItems: NavItem[] = [
     {
       id: "monitoring",
-      label: "İzleme",
+      label: t("scanResults.monitoring"),
       icon: Activity,
-      href: projectId ? `/dashboard/${orgId}/projects/${projectId}` : undefined,
-      disabled: !projectId,
+      href: `/dashboard/${orgId}/monitoring`,
     },
     {
       id: "assets",
-      label: "Varlıklar (ASM)",
+      label: t("scanResults.assets"),
       icon: Radar,
       href: projectId ? `/dashboard/${orgId}/projects/${projectId}/attack-surface` : undefined,
       disabled: !projectId,
     },
     {
       id: "projects",
-      label: "Projeler",
+      label: t("scanResults.projects"),
       icon: Server,
       href: `/dashboard/${orgId}`,
     },
-    { id: "team", label: "Ekip", icon: Users, disabled: true },
-    { id: "settings", label: "Ayarlar", icon: Settings, disabled: true },
+    { id: "team", label: t("scanResults.team"), icon: Users, href: `/dashboard/${orgId}/team` },
+    { id: "settings", label: t("scanResults.settings"), icon: Settings, href: "/dashboard/settings" },
   ];
 
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
     const isActive = item.id === active;
+    const baseClass = cn(
+      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+      isActive
+        ? "bg-primary/15 font-medium text-primary"
+        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+      item.disabled && "pointer-events-none opacity-40"
+    );
 
     if (item.href && !item.disabled) {
       return (
-        <Link
-          key={item.id}
-          href={item.href}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
-        >
+        <Link key={item.id} href={item.href} className={baseClass}>
           <Icon className="h-4 w-4 shrink-0" />
           {item.label}
         </Link>
       );
     }
 
+    if (item.id in { overview: 1, findings: 1, "all-findings": 1, "site-profile": 1, headers: 1, reports: 1 }) {
+      return (
+        <button
+          key={item.id}
+          type="button"
+          className={baseClass}
+          onClick={() => onNavigate(item.id as ScanSection)}
+        >
+          <Icon className="h-4 w-4 shrink-0" />
+          {item.label}
+        </button>
+      );
+    }
+
     return (
-      <button
-        key={item.id}
-        type="button"
-        disabled={item.disabled}
-        onClick={() => !item.disabled && onNavigate(item.id as ScanSection)}
-        className={cn(
-          "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-          isActive
-            ? "bg-indigo-500/15 font-medium text-indigo-200 ring-1 ring-indigo-500/30"
-            : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground",
-          item.disabled && "cursor-not-allowed opacity-40"
-        )}
-      >
+      <span key={item.id} className={baseClass}>
         <Icon className="h-4 w-4 shrink-0" />
         {item.label}
-      </button>
+      </span>
     );
   };
 
   return (
-    <aside className="hidden w-56 shrink-0 lg:block">
-      <div className="sticky top-4 space-y-6 rounded-xl border border-border/60 bg-card/50 p-3 backdrop-blur-sm">
-        <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Tarama
-          </p>
-          <nav className="space-y-0.5">{scanItems.map(renderItem)}</nav>
-        </div>
-        <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Platform
-          </p>
-          <nav className="space-y-0.5">{platformItems.map(renderItem)}</nav>
-        </div>
-        <div className="flex items-center gap-2 px-3 pt-2 text-xs text-muted-foreground">
-          <Globe className="h-3.5 w-3.5" />
-          <Monitor className="h-3.5 w-3.5" />
-          SIBER Platform
-        </div>
+    <aside className="space-y-6">
+      <div>
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("scanResults.scanNav")}
+        </p>
+        <nav className="space-y-1">{scanItems.map(renderItem)}</nav>
+      </div>
+      <div>
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("scanResults.platformNav")}
+        </p>
+        <nav className="space-y-1">{platformItems.map(renderItem)}</nav>
       </div>
     </aside>
   );

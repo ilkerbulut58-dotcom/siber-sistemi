@@ -149,9 +149,44 @@ export interface Domain {
   hostname: string;
   is_verified: boolean;
   verified_at: string | null;
+  verification_method: string | null;
+  active_scan_allowed: boolean;
+  admin_approved_at: string | null;
   last_checked_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface OnboardingStepStatus {
+  step_id: string;
+  label: string;
+  completed: boolean;
+}
+
+export interface OnboardingStatus {
+  organization_id: string;
+  is_pilot: boolean;
+  steps: OnboardingStepStatus[];
+  ready_to_scan: boolean;
+  daily_scan_count?: number;
+  daily_scan_quota?: number | null;
+  pilot_ends_at?: string | null;
+  pilot_active_scan_allowed?: boolean | null;
+}
+
+export interface PilotTenant {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  is_pilot: boolean;
+  pilot_starts_at: string | null;
+  pilot_ends_at: string | null;
+  pilot_scan_quota: number | null;
+  pilot_notes: string | null;
+  scans_disabled: boolean;
+  pilot_active_scan_allowed: boolean;
+  created_at: string;
 }
 
 export interface VerificationInstructions {
@@ -286,4 +321,57 @@ export interface SupportGrant {
   revoked_at: string | null;
   created_at: string;
   is_active: boolean;
+}
+
+export interface OrganizationMember {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: string;
+  invited_by: string | null;
+  joined_at: string;
+  email: string | null;
+  full_name: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  is_email_verified: boolean;
+  is_platform_admin: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScanSchedule {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  domain_id: string;
+  name: string;
+  target_url: string;
+  scan_profile: string;
+  interval_hours: number;
+  enabled: boolean;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_scan_job_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MonitoringEvent {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  schedule_id: string | null;
+  scan_job_id: string;
+  previous_scan_job_id: string | null;
+  event_type: string;
+  finding_id: string | null;
+  correlation_key: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
 }

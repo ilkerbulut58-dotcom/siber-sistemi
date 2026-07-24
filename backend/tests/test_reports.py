@@ -80,3 +80,37 @@ async def test_report_html_and_json(client: AsyncClient, db_session) -> None:
 async def test_report_service_risk_summary() -> None:
     assert "Yüksek" in ReportService._risk_summary({"high": 1})
     assert "Önemli bir sorun" in ReportService._risk_summary({})
+
+
+@pytest.mark.asyncio
+async def test_report_html_german_locale(client: AsyncClient, db_session) -> None:
+    headers, org, ctx = await _verified_domain(client, "report-de@example.com")
+
+    with patch("app.api.v1.scans.dispatch_scan_job", new_callable=AsyncMock):
+        create = await client.post(
+            f"/api/v1/organizations/{org['id']}/scans",
+            json={
+                "project_id": ctx["project"]["id"],
+                "domain_id": ctx["domain"]["id"],
+                "scan_profile": "safe",
+                "target_url": "https://scan.example.com",
+                "authorization_accepted": True,
+            },
+            headers=headers,
+        )
+    scan_id = create.json()["data"]["id"]
+
+    scan = await db_session.get(ScanJob, UUID(scan_id))
+    assert scan is not None
+    scan.status = ScanStatus.COMPLETED
+    scan.findings_count = 0
+    await db_session.commit()
+
+    html = await client.get(
+        f"/api/v1/organizations/{org['id']}/scans/{scan_id}/report?format=html&locale=de",
+        headers=headers,
+    )
+    assert html.status_code == 200
+    assert "Sicherheits-Scan-Bericht" in html.text
+    assert "Zusammenfassung" in html.text
+    assert "Keine wesentlichen Probleme" in html.text

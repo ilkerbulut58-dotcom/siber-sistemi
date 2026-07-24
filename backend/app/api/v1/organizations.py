@@ -26,8 +26,10 @@ from app.schemas.organization import (
     OrganizationUpdate,
 )
 from app.schemas.pilot import OnboardingStatusResponse
+from app.core.config import get_settings
 from app.services.organization_service import OrganizationService
 from app.services.pilot_service import PilotService
+from app.services.quota_service import QuotaService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -113,11 +115,19 @@ async def get_onboarding_status(
         .select_from(AuthorizationAcceptance)
         .where(AuthorizationAcceptance.organization_id == organization.id)
     )
-    status = await PilotService(db).get_onboarding_status(
+    pilot = PilotService(db)
+    status = await pilot.get_onboarding_status(
         organization,
         owner_email_verified=user.is_email_verified,
         verified_domain_count=int(verified_domains.scalar_one()),
         authorization_accepted=int(auth_count.scalar_one()) > 0,
+    )
+    settings = get_settings()
+    status["daily_scan_count"] = await pilot.daily_scan_count(organization.id)
+    status["daily_scan_quota"] = QuotaService.effective_daily_quota(
+        user,
+        organization,
+        settings.scan_daily_quota,
     )
     return APIResponse(data=OnboardingStatusResponse.model_validate(status), meta=_meta(request))
 

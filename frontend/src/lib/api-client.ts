@@ -1,6 +1,7 @@
 "use client";
 
 import { getApiBase } from "@/lib/api-base";
+import { ApiError } from "@/lib/i18n";
 import { ensureFreshAccessToken, readStoredTokens, refreshAccessToken } from "@/lib/auth-tokens";
 
 export type {
@@ -26,6 +27,12 @@ export type {
   RiskBreakdownItem,
   BenchmarkRun,
   QualitySummary,
+  OnboardingStatus,
+  PilotTenant,
+  OrganizationMember,
+  UserProfile,
+  ScanSchedule,
+  MonitoringEvent,
 } from "@/lib/api-types";
 
 export interface APIResponse<T> {
@@ -80,7 +87,9 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok || !body.success || body.data === null) {
-    throw new Error(body.error?.message || "Request failed");
+    const code = body.error?.code || "REQUEST_FAILED";
+    const message = body.error?.message || "Request failed";
+    throw new ApiError(code, message);
   }
   return body.data as T;
 }

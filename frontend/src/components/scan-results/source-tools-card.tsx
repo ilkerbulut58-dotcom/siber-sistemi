@@ -1,19 +1,23 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslation } from "@/components/locale-provider";
 
 export function SourceToolsCard({ sources }: { sources: Record<string, number> }) {
+  const { t } = useTranslation();
   const entries = Object.entries(sources).sort((a, b) => b[1] - a[1]);
   const max = Math.max(...entries.map(([, v]) => v), 1);
 
   return (
     <Card className="border-border/60 bg-card/80 shadow-[0_0_24px_-8px_rgba(99,102,241,0.15)]">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Bulgu Kaynakları</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {t("scanResults.sourceTools")}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Kaynak verisi yok</p>
+          <p className="text-sm text-muted-foreground">{t("scanResults.noSourceData")}</p>
         ) : (
           entries.map(([name, count]) => (
             <div key={name}>

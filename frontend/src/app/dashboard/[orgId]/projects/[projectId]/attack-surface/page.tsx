@@ -5,6 +5,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
+import { useTranslation } from "@/components/locale-provider";
+import { assetTypeLabel } from "@/lib/i18n";
 import {
   apiFetch,
   type Asset,
@@ -17,17 +19,6 @@ import { getApiBase } from "@/lib/api-base";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-
-const TYPE_LABELS: Record<string, string> = {
-  domain: "Domain",
-  subdomain: "Alt domain",
-  ip: "IP",
-  url: "URL",
-  api: "API",
-  mobile: "Mobil",
-  service: "Servis",
-  certificate: "Sertifika",
-};
 
 const STATUS_COLORS: Record<string, string> = {
   active: "text-green-400",
@@ -47,6 +38,7 @@ export default function AttackSurfacePage() {
   const params = useParams<{ orgId: string; projectId: string }>();
   const { orgId, projectId } = params;
   const { getAccessToken } = useAuth();
+  const { t, formatApiError, locale } = useTranslation();
 
   const [project, setProject] = useState<Project | null>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -115,7 +107,7 @@ export default function AttackSurfacePage() {
       setJobs(jobData);
       setError(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Veri yüklenemedi";
+      const msg = formatApiError(err);
       if (!/token/i.test(msg)) {
         setError(msg);
       }
@@ -150,10 +142,10 @@ export default function AttackSurfacePage() {
           }),
         }
       );
-      setMessage("Saldırı yüzeyi analizi başlatıldı — pasif keşif çalışıyor.");
+      setMessage(t("attackSurface.analysisStarted"));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analiz başlatılamadı");
+      setError(formatApiError(err));
     }
   }
 
@@ -165,12 +157,12 @@ export default function AttackSurfacePage() {
           href={`/dashboard/${orgId}/projects/${projectId}`}
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← Proje
+          {t("attackSurface.backToProject")}
         </Link>
-        <h1 className="mt-2 mb-2 text-3xl font-bold">Saldırı Yüzeyi (ASM)</h1>
+        <h1 className="mt-2 mb-2 text-3xl font-bold">{t("attackSurface.title")}</h1>
         {project && (
           <p className="mb-6 text-muted-foreground">
-            {project.name} · Pasif varlık keşfi ve envanter
+            {project.name} · {t("attackSurface.subtitle")}
           </p>
         )}
 
@@ -180,19 +172,19 @@ export default function AttackSurfacePage() {
         <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Toplam varlık</CardDescription>
+              <CardDescription>{t("attackSurface.totalAssets")}</CardDescription>
               <CardTitle className="text-3xl">{summary?.total_assets ?? 0}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Alt domain</CardDescription>
+              <CardDescription>{t("attackSurface.subdomains")}</CardDescription>
               <CardTitle className="text-3xl">{summary?.subdomains ?? 0}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Ortalama risk</CardDescription>
+              <CardDescription>{t("attackSurface.avgRisk")}</CardDescription>
               <CardTitle className={`text-3xl ${riskColor(summary?.avg_risk_score)}`}>
                 {summary?.avg_risk_score ?? "—"}
               </CardTitle>
@@ -200,7 +192,7 @@ export default function AttackSurfacePage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Max risk</CardDescription>
+              <CardDescription>{t("attackSurface.maxRisk")}</CardDescription>
               <CardTitle className={`text-3xl ${riskColor(summary?.max_risk_score)}`}>
                 {summary?.max_risk_score ?? "—"}
               </CardTitle>
@@ -211,15 +203,13 @@ export default function AttackSurfacePage() {
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Yeni keşif başlat</CardTitle>
-              <CardDescription>
-                Yalnızca doğrulanmış domainlerde pasif analiz — brute-force veya saldırı yok.
-              </CardDescription>
+              <CardTitle>{t("attackSurface.startDiscovery")}</CardTitle>
+              <CardDescription>{t("attackSurface.startDiscoveryDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={startDiscovery} className="space-y-4">
                 <div>
-                  <Label htmlFor="domain_id">Domain</Label>
+                  <Label htmlFor="domain_id">{t("project.domain")}</Label>
                   <select
                     id="domain_id"
                     name="domain_id"
@@ -228,7 +218,7 @@ export default function AttackSurfacePage() {
                     onChange={(e) => setDiscoveryDomainId(e.target.value)}
                     className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">Domain seçin…</option>
+                    <option value="">{t("attackSurface.selectDomain")}</option>
                     {verifiedDomains.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.hostname}
@@ -240,15 +230,15 @@ export default function AttackSurfacePage() {
                   type="submit"
                   disabled={!discoveryDomainId || verifiedDomains.length === 0 || isRunning}
                 >
-                  {isRunning ? "Analiz devam ediyor…" : "Saldırı yüzeyini analiz et"}
+                  {isRunning ? t("attackSurface.analyzing") : t("attackSurface.analyzeBtn")}
                 </Button>
               </form>
               {latestJob && (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Son keşif: {latestJob.status}
+                  {t("attackSurface.lastDiscovery")}: {latestJob.status}
                   {latestJob.target_url ? ` · ${latestJob.target_url}` : ""}
                   {" · "}
-                  {latestJob.assets_count} varlık
+                  {latestJob.assets_count} {t("attackSurface.assetsCount")}
                   {latestJob.status === "failed" && latestJob.error_log
                     ? ` · ${latestJob.error_log}`
                     : ""}
@@ -256,7 +246,7 @@ export default function AttackSurfacePage() {
               )}
               {isRunning && activeJobForSelection && (
                 <p className="mt-1 text-xs text-yellow-400">
-                  Seçili domain için pasif keşif çalışıyor…
+                  {t("attackSurface.passiveRunning")}
                 </p>
               )}
             </CardContent>
@@ -264,12 +254,12 @@ export default function AttackSurfacePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>DNS kayıtları</CardTitle>
-              <CardDescription>Kök domain pasif DNS analizi</CardDescription>
+              <CardTitle>{t("attackSurface.dnsRecords")}</CardTitle>
+              <CardDescription>{t("attackSurface.dnsRecordsDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="text-sm">
               {Object.keys(summary?.dns_records ?? {}).length === 0 ? (
-                <p className="text-muted-foreground">Henüz DNS verisi yok.</p>
+                <p className="text-muted-foreground">{t("attackSurface.noDns")}</p>
               ) : (
                 <dl className="space-y-2">
                   {Object.entries(summary?.dns_records ?? {}).map(([rtype, values]) => (
@@ -289,11 +279,11 @@ export default function AttackSurfacePage() {
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Teknoloji tespiti</CardTitle>
+              <CardTitle>{t("attackSurface.techDetection")}</CardTitle>
             </CardHeader>
             <CardContent>
               {(summary?.technologies ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">Henüz teknoloji tespit edilmedi.</p>
+                <p className="text-sm text-muted-foreground">{t("attackSurface.noTech")}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {summary?.technologies.map((tech) => (
@@ -312,11 +302,11 @@ export default function AttackSurfacePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>CDN / WAF</CardTitle>
+              <CardTitle>{t("attackSurface.cdnWaf")}</CardTitle>
             </CardHeader>
             <CardContent>
               {(summary?.cdn_waf ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">CDN/WAF tespit edilmedi.</p>
+                <p className="text-sm text-muted-foreground">{t("attackSurface.noCdnWaf")}</p>
               ) : (
                 <ul className="space-y-1 text-sm">
                   {summary?.cdn_waf.map((entry) => (
@@ -333,21 +323,19 @@ export default function AttackSurfacePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Varlık envanteri</CardTitle>
-            <CardDescription>
-              Domain, alt domain, IP ve servisler — Risk Engine ile skorlanmış
-            </CardDescription>
+            <CardTitle>{t("attackSurface.assetInventory")}</CardTitle>
+            <CardDescription>{t("attackSurface.assetInventoryDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
-              <Label htmlFor="filter-domain">Domain filtresi</Label>
+              <Label htmlFor="filter-domain">{t("attackSurface.domainFilter")}</Label>
               <select
                 id="filter-domain"
                 className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selectedDomain}
                 onChange={(e) => setSelectedDomain(e.target.value)}
               >
-                <option value="">Tümü</option>
+                <option value="">{t("common.all")}</option>
                 {domains.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.hostname}
@@ -357,20 +345,18 @@ export default function AttackSurfacePage() {
             </div>
 
             {assets.length === 0 ? (
-              <p className="text-muted-foreground">
-                Henüz varlık keşfedilmedi. Doğrulanmış bir domain için analiz başlatın.
-              </p>
+              <p className="text-muted-foreground">{t("attackSurface.noAssets")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 pr-4">Varlık</th>
-                      <th className="py-2 pr-4">Tür</th>
-                      <th className="py-2 pr-4">Durum</th>
-                      <th className="py-2 pr-4">Risk</th>
-                      <th className="py-2 pr-4">Teknoloji</th>
-                      <th className="py-2">TLS</th>
+                      <th className="py-2 pr-4">{t("attackSurface.assetColumn")}</th>
+                      <th className="py-2 pr-4">{t("attackSurface.typeColumn")}</th>
+                      <th className="py-2 pr-4">{t("attackSurface.statusColumn")}</th>
+                      <th className="py-2 pr-4">{t("attackSurface.riskColumn")}</th>
+                      <th className="py-2 pr-4">{t("attackSurface.techColumn")}</th>
+                      <th className="py-2">{t("attackSurface.tlsColumn")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -386,7 +372,7 @@ export default function AttackSurfacePage() {
                               <div className="text-xs text-muted-foreground">{asset.url}</div>
                             )}
                           </td>
-                          <td className="py-3 pr-4">{TYPE_LABELS[asset.asset_type] ?? asset.asset_type}</td>
+                          <td className="py-3 pr-4">{assetTypeLabel(locale, asset.asset_type)}</td>
                           <td className={`py-3 pr-4 ${STATUS_COLORS[asset.status] ?? ""}`}>
                             {asset.status}
                           </td>
@@ -398,9 +384,9 @@ export default function AttackSurfacePage() {
                           </td>
                           <td className="py-3 text-xs text-muted-foreground">
                             {tls?.valid === false
-                              ? "Geçersiz"
+                              ? t("attackSurface.tlsInvalid")
                               : tls?.days_until_expiry != null
-                                ? `${tls.days_until_expiry} gün`
+                                ? t("attackSurface.tlsDays", { days: tls.days_until_expiry })
                                 : "—"}
                           </td>
                         </tr>

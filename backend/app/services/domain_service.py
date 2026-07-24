@@ -60,6 +60,7 @@ class DomainService:
         if self.settings.skip_domain_verification:
             domain.is_verified = True
             domain.verified_at = datetime.now(UTC)
+            domain.active_scan_allowed = True
 
         self.db.add(domain)
         await self.db.flush()
@@ -187,6 +188,7 @@ class DomainService:
             domain.is_verified = True
             domain.verified_at = datetime.now(UTC)
             domain.last_checked_at = datetime.now(UTC)
+            domain.active_scan_allowed = True
             await self.db.flush()
             await self.db.refresh(domain)
             return domain, True, "Test modu: domain otomatik doğrulandı."
@@ -206,6 +208,7 @@ class DomainService:
             domain.last_checked_at = datetime.now(UTC)
             domain.verification_method = method.value
             verification.verified_at = datetime.now(UTC)
+            domain.active_scan_allowed = True
             message = "Domain verified successfully."
             await log_audit_event(
                 self.db,
@@ -215,6 +218,20 @@ class DomainService:
                 resource_type="domain",
                 resource_id=domain.id,
                 ip_address=ip_address,
+            )
+            await log_audit_event(
+                self.db,
+                action="domain.active_scan_approved",
+                user_id=actor.id,
+                organization_id=organization_id,
+                resource_type="domain",
+                resource_id=domain.id,
+                ip_address=ip_address,
+                details={
+                    "hostname": domain.hostname,
+                    "verification_method": method.value,
+                    "self_service": True,
+                },
             )
         else:
             domain.last_checked_at = datetime.now(UTC)

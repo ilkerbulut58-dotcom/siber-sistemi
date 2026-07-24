@@ -2,7 +2,7 @@
 
 import { Download, RefreshCw } from "lucide-react";
 import type { ScanJob } from "@/lib/api-client";
-import { SCAN_STATUS_TR, scanProfileLabel } from "@/lib/i18n-tr";
+import { useTranslation } from "@/components/locale-provider";
 import { extractDomain, formatScanDuration } from "@/lib/scan-analytics";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,9 +15,10 @@ interface Props {
 }
 
 export function ScanSummaryHeader({ scan, onRescan, onDownload, isRunning }: Props) {
+  const { t, scanProfileLabel, scanStatusLabel, locale } = useTranslation();
   const duration = formatScanDuration(scan);
   const completedAt = scan.completed_at
-    ? new Date(scan.completed_at).toLocaleString("tr-TR")
+    ? new Date(scan.completed_at).toLocaleString(locale === "de" ? "de-DE" : "tr-TR")
     : null;
 
   return (
@@ -25,17 +26,17 @@ export function ScanSummaryHeader({ scan, onRescan, onDownload, isRunning }: Pro
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">
-            Tarama Özeti
+            {t("scanPage.title")}
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
             {extractDomain(scan.target_url)}
           </h1>
           <p className="mt-1 truncate text-sm text-muted-foreground">{scan.target_url}</p>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Meta label="Profil" value={scanProfileLabel(scan.scan_profile)} />
+            <Meta label={t("project.scanProfile")} value={scanProfileLabel(scan.scan_profile)} />
             <Meta
-              label="Durum"
-              value={SCAN_STATUS_TR[scan.status] ?? scan.status ?? "Bilinmiyor"}
+              label={t("common.status")}
+              value={scanStatusLabel(scan.status)}
               highlight={
                 scan.status === "completed"
                   ? "text-green-400"
@@ -44,22 +45,22 @@ export function ScanSummaryHeader({ scan, onRescan, onDownload, isRunning }: Pro
                     : "text-amber-400"
               }
             />
-            {completedAt && <Meta label="Tarih" value={completedAt} />}
-            {duration && <Meta label="Süre" value={duration} />}
-            <Meta label="Bulgu" value={String(scan.findings_count)} />
+            {completedAt && <Meta label={t("scanResults.date")} value={completedAt} />}
+            {duration && <Meta label={t("scanResults.duration")} value={duration} />}
+            <Meta label={t("common.findings")} value={String(scan.findings_count)} />
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {onRescan && (
             <Button type="button" variant="outline" size="sm" onClick={onRescan} disabled={isRunning}>
               <RefreshCw className={cn("mr-2 h-4 w-4", isRunning && "animate-spin")} />
-              Yeniden Tara
+              {t("scanResults.rescan")}
             </Button>
           )}
           {onDownload && scan.status === "completed" && (
             <Button type="button" size="sm" onClick={onDownload}>
               <Download className="mr-2 h-4 w-4" />
-              Rapor İndir
+              {t("scanResults.downloadReport")}
             </Button>
           )}
         </div>

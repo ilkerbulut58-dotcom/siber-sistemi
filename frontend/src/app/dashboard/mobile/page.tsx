@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Smartphone } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
+import { useTranslation } from "@/components/locale-provider";
 import {
   apiFetch,
   type MobileApplication,
@@ -17,6 +18,7 @@ import { Label } from "@/components/ui/label";
 
 export default function MobileHubPage() {
   const { getAccessToken } = useAuth();
+  const { t, formatApiError } = useTranslation();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
@@ -31,9 +33,9 @@ export default function MobileHubPage() {
       setOrgs(data);
       if (data[0] && !selectedOrgId) setSelectedOrgId(data[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Organizasyonlar yüklenemedi");
+      setError(formatApiError(err));
     }
-  }, [getAccessToken, selectedOrgId]);
+  }, [formatApiError, getAccessToken, selectedOrgId]);
 
   useEffect(() => {
     void loadOrgs();
@@ -66,30 +68,28 @@ export default function MobileHubPage() {
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold">
             <Smartphone className="h-8 w-8 text-primary" />
-            Mobil APK Güvenliği
+            {t("mobile.title")}
           </h1>
-          <p className="mt-2 text-muted-foreground">
-            Android uygulamalarınız için statik APK analizi — manifest, izinler, secret taraması.
-          </p>
+          <p className="mt-2 text-muted-foreground">{t("mobile.subtitle")}</p>
         </div>
 
         {error && <p className="text-destructive">{error}</p>}
 
         <Card>
           <CardHeader>
-            <CardTitle>Organizasyon seçin</CardTitle>
-            <CardDescription>Mobil analiz organizasyon ve proje kapsamında çalışır</CardDescription>
+            <CardTitle>{t("mobile.selectOrg")}</CardTitle>
+            <CardDescription>{t("org.newProjectDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="mobile-org">Organizasyon</Label>
+              <Label htmlFor="mobile-org">{t("dashboard.organizations")}</Label>
               <select
                 id="mobile-org"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={selectedOrgId}
                 onChange={(e) => setSelectedOrgId(e.target.value)}
               >
-                {orgs.length === 0 && <option value="">Organizasyon yok</option>}
+                {orgs.length === 0 && <option value="">{t("dashboard.noOrgs")}</option>}
                 {orgs.map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}
@@ -100,7 +100,7 @@ export default function MobileHubPage() {
 
             {selectedOrgId && (
               <Link href={`/dashboard/${selectedOrgId}/mobile`}>
-                <Button className="w-full sm:w-auto">APK Yükle ve Analiz Et →</Button>
+                <Button className="w-full sm:w-auto">{t("mobile.uploadApk")} →</Button>
               </Link>
             )}
           </CardContent>
@@ -110,16 +110,11 @@ export default function MobileHubPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Projeler</CardTitle>
+                <CardTitle>{t("org.projects")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {projects.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Henüz proje yok.{" "}
-                    <Link href={`/dashboard/${selectedOrgId}`} className="underline">
-                      Organizasyonda proje oluşturun
-                    </Link>
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t("org.noProjects")}</p>
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {projects.map((p) => (
@@ -134,11 +129,11 @@ export default function MobileHubPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Son mobil uygulamalar</CardTitle>
+                <CardTitle>{t("dashboard.recentScans")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {apps.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Henüz APK yüklenmedi.</p>
+                  <p className="text-sm text-muted-foreground">{t("mobile.noApps")}</p>
                 ) : (
                   <ul className="space-y-2">
                     {apps.slice(0, 6).map((app) => (
@@ -149,7 +144,8 @@ export default function MobileHubPage() {
                         >
                           <p className="font-medium">{app.application_name ?? app.original_filename}</p>
                           <p className="text-xs text-muted-foreground">
-                            {app.package_name ?? "—"} · {app.analysis_status} · {app.findings_count} bulgu
+                            {app.package_name ?? "—"} · {app.analysis_status} · {app.findings_count}{" "}
+                            {t("common.findings")}
                           </p>
                         </Link>
                       </li>
@@ -162,11 +158,9 @@ export default function MobileHubPage() {
         )}
 
         <p className="text-center text-sm text-muted-foreground">
-          Tam değerlendirme (web + ASM + mobil) için{" "}
           <Link href="/dashboard/assessment" className="underline">
-            Güvenlik Değerlendirmesi
-          </Link>{" "}
-          sayfasını kullanın.
+            {t("assessment.title")}
+          </Link>
         </p>
       </main>
     </>

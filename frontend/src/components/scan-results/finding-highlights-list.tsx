@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { FindingRowCard } from "@/components/scan-results/finding-row-card";
+import { useTranslation } from "@/components/locale-provider";
 
 
 
@@ -33,6 +34,7 @@ export function FindingHighlightsList({
   onViewAll,
 
 }: Props) {
+  const { t } = useTranslation();
 
   return (
 
@@ -40,13 +42,13 @@ export function FindingHighlightsList({
 
       <CardHeader className="flex flex-row items-center justify-between pb-2">
 
-        <CardTitle className="text-lg">En Önemli Bulgular</CardTitle>
+        <CardTitle className="text-lg">{t("analytics.topFindings")}</CardTitle>
 
         {findings.length > 0 && onViewAll && (
 
           <Button type="button" variant="outline" size="sm" onClick={onViewAll}>
 
-            Tüm Bulguları Görüntüle
+            {t("analytics.viewAllFindings")}
 
           </Button>
 

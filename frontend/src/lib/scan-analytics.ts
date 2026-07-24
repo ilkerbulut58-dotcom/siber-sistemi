@@ -1,4 +1,12 @@
 import type { Finding, ScanJob } from "@/lib/api-client";
+import { getActiveLocale } from "@/lib/i18n/locale-store";
+import {
+  interpolate,
+  securityLevelLabel,
+  sourceToolLabel,
+  translate,
+  type Locale,
+} from "@/lib/i18n";
 
 export type SecurityLevel = "critical" | "weak" | "medium" | "good" | "strong";
 
@@ -38,6 +46,10 @@ const LEVEL_LABELS: Record<SecurityLevel, string> = {
   strong: "Güçlü",
 };
 
+function levelLabel(locale: Locale, level: SecurityLevel): string {
+  return securityLevelLabel(locale, level) || LEVEL_LABELS[level];
+}
+
 const SEVERITY_WEIGHT: Record<string, number> = {
   critical: 28,
   high: 18,
@@ -64,9 +76,10 @@ export function countBySeverity(findings: Finding[]): SeverityCounts {
   return counts;
 }
 
-export function computeSecurityScore(findings: Finding[]): SecurityScoreResult {
+export function computeSecurityScore(findings: Finding[], locale?: Locale): SecurityScoreResult {
+  const loc = locale ?? getActiveLocale();
   if (findings.length === 0) {
-    return { score: 95, level: "strong", label: LEVEL_LABELS.strong };
+    return { score: 95, level: "strong", label: levelLabel(loc, "strong") };
   }
 
   const withRisk = findings.filter((f) => f.risk_score != null);
@@ -86,7 +99,7 @@ export function computeSecurityScore(findings: Finding[]): SecurityScoreResult {
   }
 
   const level = scoreToLevel(score);
-  return { score, level, label: LEVEL_LABELS[level] };
+  return { score, level, label: levelLabel(loc, level) };
 }
 
 export function scoreToLevel(score: number): SecurityLevel {
@@ -109,6 +122,7 @@ export function countSourceTools(findings: Finding[]): Record<string, number> {
   for (const f of findings) {
     const tools = f.source_tools?.length ? f.source_tools : [f.source_tool];
     for (const tool of tools) {
+      if (!tool) continue;
       const label = formatSourceTool(tool);
       counts[label] = (counts[label] ?? 0) + 1;
     }
@@ -116,17 +130,13 @@ export function countSourceTools(findings: Finding[]): Record<string, number> {
   return counts;
 }
 
-export function formatSourceTool(tool: string): string {
-  const map: Record<string, string> = {
-    passive_http: "HTTP Kontrolleri",
-    tls_check: "TLS/SSL",
-    zap: "ZAP",
-    nuclei: "Nuclei",
-    deep_scan: "Derin Tarama",
-    code_scan: "Kod Taraması",
-    correlated: "Korelasyon",
-  };
-  return map[tool] ?? tool;
+export function formatSourceTool(
+  tool: string | null | undefined,
+  locale?: Locale | string | number | null
+): string {
+  if (!tool) return "—";
+  const resolvedLocale = typeof locale === "string" ? locale : undefined;
+  return sourceToolLabel(resolvedLocale ?? getActiveLocale(), tool);
 }
 
 export function extractDomain(url: string): string {
@@ -165,11 +175,13 @@ export function getHeaderStatuses(findings: Finding[]): HeaderStatusItem[] {
     ...h,
     status: missingKeys.has(h.key)
       ? "missing"
-      : findings.some(
-            (f) =>
+      : findings.some((f) => {
+            const title = f.title?.toLowerCase() ?? "";
+            return (
               f.correlation_key?.includes(h.key) ||
-              f.title.toLowerCase().includes(h.shortLabel.toLowerCase())
-          )
+              (title && title.includes(h.shortLabel.toLowerCase()))
+            );
+          })
         ? "recommended"
         : "present",
   }));
@@ -182,47 +194,62 @@ export function buildPrioritySummary(findings: Finding[]): string[] {
   if (missing.length > 0) {
     return missing.slice(0, 4);
   }
-  return getTopFindings(findings, 3).map((f) => f.title.split("—")[0].trim());
+  return getTopFindings(findings, 3)
+    .map((f) => (f.title ?? "Bulgu").split("—")[0].trim())
+    .filter(Boolean);
 }
 
 export function buildStatusSummaryText(
   score: SecurityScoreResult,
   counts: SeverityCounts,
-  priorities: string[]
+  priorities: string[],
+  locale?: Locale
 ): string {
+  const loc = locale ?? getActiveLocale();
   const levelText =
     score.level === "strong" || score.level === "good"
-      ? "Site genel olarak iyi bir güvenlik seviyesinde."
+      ? translate(loc, "analytics.statusStrong")
       : score.level === "medium"
-        ? "Site genel olarak orta risk seviyesinde."
-        : "Site genel olarak yüksek risk taşıyor — acil inceleme önerilir.";
+        ? translate(loc, "analytics.statusMedium")
+        : translate(loc, "analytics.statusWeak");
 
   if (priorities.length === 0 && counts.critical + counts.high === 0) {
-    return `${levelText} Kritik bulgu tespit edilmedi.`;
+    return `${levelText} ${translate(loc, "analytics.statusNoCritical")}`;
   }
 
-  return `${levelText} Öncelikli düzeltme alanları: ${priorities.join(", ")}.`;
+  return `${levelText} ${interpolate(translate(loc, "analytics.statusWithPriorities"), {
+    priorities: priorities.join(", "),
+  })}`;
 }
 
-export function buildAiOverview(findings: Finding[], score: SecurityScoreResult): {
+export function buildAiOverview(
+  findings: Finding[],
+  score: SecurityScoreResult,
+  locale?: Locale
+): {
   summary: string;
   priorities: string[];
   firstSteps: string[];
 } {
+  const loc = locale ?? getActiveLocale();
   const top = getTopFindings(findings, 5);
   const priorities = buildPrioritySummary(findings);
 
   const summary =
     findings.length === 0
-      ? "Tarama sonucunda önemli bir güvenlik açığı tespit edilmedi. Periyodik izleme ile durumu koruyabilirsiniz."
-      : `Güvenlik skoru ${score.score}/100 (${score.label}). ${top.length} öncelikli bulgu tespit edildi. ${
+      ? translate(loc, "analytics.aiNoFindings")
+      : `${interpolate(translate(loc, "analytics.aiWithScore"), {
+          score: score.score,
+          label: score.label,
+          count: top.length,
+        })} ${
           score.level === "critical" || score.level === "weak"
-            ? "Eksik güvenlik başlıkları ve yapılandırma sorunları acil ele alınmalı."
-            : "Bulguların çoğu yapılandırma iyileştirmesi ile giderilebilir."
+            ? translate(loc, "analytics.aiUrgent")
+            : translate(loc, "analytics.aiConfigFix")
         }`;
 
   const firstSteps = top.slice(0, 3).map((f, i) => {
-    const step = f.remediation_steps?.[0] ?? f.remediation ?? f.title;
+    const step = f.remediation_steps?.[0] ?? f.remediation ?? f.title ?? "İnceleme gerekli";
     return `${i + 1}. ${step}`;
   });
 
@@ -237,8 +264,11 @@ export async function buildTrendPoints(
   scans: ScanJob[],
   currentScanId: string,
   currentFindings: Finding[],
-  fetchFindings: (scanId: string) => Promise<Finding[]>
+  fetchFindings: (scanId: string) => Promise<Finding[]>,
+  locale?: Locale
 ): Promise<TrendPoint[]> {
+  const loc = locale ?? getActiveLocale();
+  const dateLocale = loc === "de" ? "de-DE" : "tr-TR";
   const target = scans.find((s) => s.id === currentScanId)?.target_url;
   if (!target) return [];
 
@@ -251,12 +281,12 @@ export async function buildTrendPoints(
   for (const s of related) {
     const f =
       s.id === currentScanId ? currentFindings : await fetchFindings(s.id);
-    const { score } = computeSecurityScore(f);
+    const { score } = computeSecurityScore(f, loc);
     points.push({
       scanId: s.id,
       score,
       label: s.completed_at
-        ? new Date(s.completed_at).toLocaleDateString("tr-TR", {
+        ? new Date(s.completed_at).toLocaleDateString(dateLocale, {
             day: "numeric",
             month: "short",
           })

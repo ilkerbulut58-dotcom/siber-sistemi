@@ -45,3 +45,7 @@ class OnboardingStatusResponse(BaseModel):
     is_pilot: bool
     steps: list[OnboardingStepStatus]
     ready_to_scan: bool
+    daily_scan_count: int = 0
+    daily_scan_quota: int | None = None
+    pilot_ends_at: datetime | None = None
+    pilot_active_scan_allowed: bool | None = None

@@ -2,56 +2,23 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import {
-  Globe,
-  Radar,
-  ShieldCheck,
-  Smartphone,
-} from "lucide-react";
+import { Globe, Radar, ShieldCheck, Smartphone } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
+import { useTranslation, interpolate } from "@/components/locale-provider";
 import {
   apiFetch,
   type Organization,
   type ScanJob,
   type SupportGrant,
 } from "@/lib/api-client";
-import { SCAN_STATUS_TR } from "@/lib/i18n-tr";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-const QUICK_ACTIONS = [
-  {
-    href: "/dashboard/assessment",
-    title: "Tam Değerlendirme",
-    description: "Web + saldırı yüzeyi + mobil APK birlikte",
-    icon: ShieldCheck,
-    primary: true,
-  },
-  {
-    href: "/dashboard/scan",
-    title: "Web Tarama",
-    description: "Tek URL ile hızlı güvenlik taraması",
-    icon: Globe,
-  },
-  {
-    href: "/dashboard/mobile",
-    title: "Mobil APK",
-    description: "Android statik analiz",
-    icon: Smartphone,
-  },
-] as const satisfies ReadonlyArray<{
-  href: string;
-  title: string;
-  description: string;
-  icon: typeof ShieldCheck;
-  primary?: boolean;
-}>;
 
 export default function DashboardPage() {
   const { getAccessToken, user } = useAuth();
+  const { t, formatApiError, scanStatusLabel } = useTranslation();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [customerOrgs, setCustomerOrgs] = useState<Organization[]>([]);
   const [supportGrants, setSupportGrants] = useState<SupportGrant[]>([]);
@@ -59,6 +26,28 @@ export default function DashboardPage() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const quickActions = [
+    {
+      href: "/dashboard/assessment",
+      title: t("dashboard.quickFullAssessment"),
+      description: t("dashboard.quickFullAssessmentDesc"),
+      icon: ShieldCheck,
+      primary: true,
+    },
+    {
+      href: "/dashboard/scan",
+      title: t("dashboard.quickWebScan"),
+      description: t("dashboard.quickWebScanDesc"),
+      icon: Globe,
+    },
+    {
+      href: "/dashboard/mobile",
+      title: t("dashboard.quickMobile"),
+      description: t("dashboard.quickMobileDesc"),
+      icon: Smartphone,
+    },
+  ];
 
   const loadOrgs = useCallback(async () => {
     setLoading(true);
@@ -93,11 +82,11 @@ export default function DashboardPage() {
         setCustomerOrgs([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Veri yüklenemedi");
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
-  }, [getAccessToken, user?.is_platform_admin]);
+  }, [formatApiError, getAccessToken, user?.is_platform_admin]);
 
   useEffect(() => {
     void loadOrgs();
@@ -117,7 +106,7 @@ export default function DashboardPage() {
       formEl.reset();
       await loadOrgs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Organizasyon oluşturulamadı");
+      setError(formatApiError(err));
     }
   }
 
@@ -135,7 +124,7 @@ export default function DashboardPage() {
       formEl.reset();
       await loadOrgs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Yönetilen çalışma alanı oluşturulamadı");
+      setError(formatApiError(err));
     }
   }
 
@@ -158,7 +147,7 @@ export default function DashboardPage() {
       formEl.reset();
       await loadOrgs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Support erişimi oluşturulamadı");
+      setError(formatApiError(err));
     }
   }
 
@@ -171,26 +160,27 @@ export default function DashboardPage() {
       });
       await loadOrgs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Support erişimi iptal edilemedi");
+      setError(formatApiError(err));
     }
   }
+
+  const welcomeText = user?.full_name
+    ? interpolate(t("dashboard.welcomeName"), { name: user.full_name })
+    : t("dashboard.welcome");
 
   return (
     <>
       <Navbar />
       <main className="container mx-auto space-y-8 px-4 py-8">
         <div>
-          <h1 className="text-3xl font-bold">Güvenlik Paneli</h1>
-          <p className="mt-2 text-muted-foreground">
-            Hoş geldiniz{user?.full_name ? `, ${user.full_name}` : ""}. Testleri tek tek veya tam
-            değerlendirme olarak başlatın.
-          </p>
+          <h1 className="text-3xl font-bold">{t("dashboard.title")}</h1>
+          <p className="mt-2 text-muted-foreground">{welcomeText}</p>
         </div>
 
         {error && <p className="text-destructive">{error}</p>}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {QUICK_ACTIONS.map(({ href, title, description, icon: Icon, ...rest }) => (
+          {quickActions.map(({ href, title, description, icon: Icon, ...rest }) => (
             <Link key={href} href={href}>
               <Card
                 className={`h-full transition-colors hover:border-primary/40 hover:bg-muted/20 ${
@@ -217,13 +207,13 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Radar className="h-5 w-5 text-primary" />
-                  Saldırı Yüzeyi
+                  {t("dashboard.attackSurface")}
                 </CardTitle>
-                <CardDescription>Proje bazında varlık keşfi</CardDescription>
+                <CardDescription>{t("dashboard.attackSurfaceDesc")}</CardDescription>
               </div>
               <Link href={`/dashboard/${orgs[0].id}`}>
                 <Button variant="outline" size="sm">
-                  Projeler →
+                  {t("common.projects")} →
                 </Button>
               </Link>
             </CardHeader>
@@ -233,16 +223,16 @@ export default function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Son Taramalar</CardTitle>
+              <CardTitle>{t("dashboard.recentScans")}</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <p className="text-muted-foreground">Yükleniyor…</p>
+                <p className="text-muted-foreground">{t("common.loading")}</p>
               ) : recentScans.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Henüz tarama yok.{" "}
+                  {t("dashboard.noScans")}{" "}
                   <Link href="/dashboard/scan" className="underline">
-                    İlk taramayı başlatın
+                    {t("dashboard.startFirstScan")}
                   </Link>
                 </p>
               ) : (
@@ -253,9 +243,10 @@ export default function DashboardPage() {
                         href={`/dashboard/${scan.organization_id}/scans/${scan.id}`}
                         className="block rounded-md border border-border px-3 py-2 hover:bg-muted/40"
                       >
-                        <p className="font-medium truncate">{scan.target_url}</p>
+                        <p className="truncate font-medium">{scan.target_url}</p>
                         <p className="text-xs text-muted-foreground">
-                          {SCAN_STATUS_TR[scan.status] ?? scan.status} · {scan.findings_count} bulgu
+                          {scanStatusLabel(scan.status)} · {scan.findings_count}{" "}
+                          {t("common.findings")}
                         </p>
                       </Link>
                     </li>
@@ -267,38 +258,46 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Organizasyonlar</CardTitle>
+              <CardTitle>{t("dashboard.organizations")}</CardTitle>
               <form onSubmit={createOrg} className="flex gap-2">
-                <Input name="name" required placeholder="Yeni org adı" className="h-9 w-40" />
+                <Input
+                  name="name"
+                  required
+                  placeholder={t("dashboard.newOrgPlaceholder")}
+                  className="h-9 w-40"
+                />
                 <Button type="submit" size="sm">
-                  Ekle
+                  {t("common.add")}
                 </Button>
               </form>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <p className="text-muted-foreground">Yükleniyor…</p>
+                <p className="text-muted-foreground">{t("common.loading")}</p>
               ) : orgs.length === 0 ? (
-                <p className="text-muted-foreground">Henüz organizasyon yok.</p>
+                <p className="text-muted-foreground">{t("dashboard.noOrgs")}</p>
               ) : (
                 <ul className="space-y-2">
                   {orgs.map((org) => (
-                    <li key={org.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <li
+                      key={org.id}
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                    >
                       <div>
                         <p className="font-medium">{org.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {org.is_managed_workspace ? "Yönetilen alan" : org.slug}
+                          {org.is_managed_workspace ? t("dashboard.managedWorkspace") : org.slug}
                         </p>
                       </div>
                       <div className="flex gap-2">
                         <Link href={`/dashboard/${org.id}/mobile`}>
                           <Button variant="outline" size="sm">
-                            Mobil
+                            {t("common.mobile")}
                           </Button>
                         </Link>
                         <Link href={`/dashboard/${org.id}`}>
                           <Button variant="outline" size="sm">
-                            Aç
+                            {t("common.open")}
                           </Button>
                         </Link>
                       </div>
@@ -314,46 +313,59 @@ export default function DashboardPage() {
           <Card className="border-amber-500/20 bg-amber-500/5">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Platform Yönetimi</CardTitle>
-                <CardDescription>Yönetilen alanlar ve müşteri support erişimi</CardDescription>
+                <CardTitle>{t("dashboard.platformAdmin")}</CardTitle>
+                <CardDescription>{t("dashboard.platformAdminDesc")}</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Link href="/dashboard/platform/quality">
-                  <Button variant="outline" size="sm">Kalite Lab</Button>
+                  <Button variant="outline" size="sm">
+                    {t("dashboard.qualityLab")}
+                  </Button>
+                </Link>
+                <Link href="/dashboard/platform/pilot">
+                  <Button variant="outline" size="sm">
+                    {t("dashboard.pilotTenants")}
+                  </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={() => setShowAdmin((v) => !v)}>
-                  {showAdmin ? "Gizle" : "Göster"}
+                  {showAdmin ? t("common.hide") : t("common.show")}
                 </Button>
               </div>
             </CardHeader>
             {showAdmin && (
               <CardContent className="grid gap-6 lg:grid-cols-2">
-                <form onSubmit={createManagedWorkspace} className="space-y-3 rounded-md border border-border p-4">
-                  <p className="font-medium text-sm">Yönetilen çalışma alanı</p>
-                  <Input name="name" required placeholder="Örn: Müşteri denetimi" />
+                <form
+                  onSubmit={createManagedWorkspace}
+                  className="space-y-3 rounded-md border border-border p-4"
+                >
+                  <p className="text-sm font-medium">{t("dashboard.managedWorkspaceForm")}</p>
+                  <Input name="name" required placeholder={t("dashboard.managedWorkspacePlaceholder")} />
                   <Button type="submit" size="sm">
-                    Oluştur
+                    {t("common.create")}
                   </Button>
                 </form>
 
-                <form onSubmit={createSupportGrant} className="space-y-3 rounded-md border border-border p-4">
-                  <p className="font-medium text-sm">Müşteri support erişimi</p>
+                <form
+                  onSubmit={createSupportGrant}
+                  className="space-y-3 rounded-md border border-border p-4"
+                >
+                  <p className="text-sm font-medium">{t("dashboard.supportGrant")}</p>
                   <select
                     name="organization_id"
                     required
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">Organizasyon…</option>
+                    <option value="">{t("dashboard.supportOrgPlaceholder")}</option>
                     {customerOrgs.map((org) => (
                       <option key={org.id} value={org.id}>
                         {org.name}
                       </option>
                     ))}
                   </select>
-                  <Input name="reason" required minLength={10} placeholder="Gerekçe" />
+                  <Input name="reason" required minLength={10} placeholder={t("dashboard.supportReason")} />
                   <Input name="duration_hours" type="number" min={1} max={168} defaultValue={24} />
                   <Button type="submit" size="sm">
-                    Erişim ver
+                    {t("dashboard.grantAccess")}
                   </Button>
                   {supportGrants.length > 0 && (
                     <ul className="space-y-1 pt-2 text-xs">
@@ -366,7 +378,7 @@ export default function DashboardPage() {
                             size="sm"
                             onClick={() => revokeSupportGrant(grant.id)}
                           >
-                            İptal
+                            {t("common.revoke")}
                           </Button>
                         </li>
                       ))}

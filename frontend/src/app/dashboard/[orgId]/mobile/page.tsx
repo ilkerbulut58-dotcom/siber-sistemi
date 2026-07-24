@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
+import { useTranslation } from "@/components/locale-provider";
 import {
   apiFetch,
   type Finding,
@@ -17,6 +18,7 @@ import { SecurityScoreGauge } from "@/components/scan-results/security-score-gau
 import { RiskDistributionCard } from "@/components/scan-results/risk-distribution-card";
 import { FindingRowCard } from "@/components/scan-results/finding-row-card";
 import { countBySeverity, computeSecurityScore } from "@/lib/scan-analytics";
+import { securityLevelLabel } from "@/lib/i18n";
 import {
   countMobileByCategory,
   filterMobileFindings,
@@ -33,6 +35,7 @@ type OrganizationMember = { user_id: string; role: string };
 export default function MobileSecurityPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const { getAccessToken, user } = useAuth();
+  const { t, formatApiError, locale } = useTranslation();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [apps, setApps] = useState<MobileApplication[]>([]);
@@ -56,11 +59,11 @@ export default function MobileSecurityPage() {
       return {
         score: Math.round(s),
         level: s >= 80 ? "strong" : s >= 60 ? "good" : s >= 40 ? "medium" : "weak",
-        label: s >= 80 ? "Güçlü" : s >= 60 ? "İyi" : s >= 40 ? "Orta" : "Zayıf",
+        label: securityLevelLabel(locale, s >= 80 ? "strong" : s >= 60 ? "good" : s >= 40 ? "medium" : "weak"),
       } as ReturnType<typeof computeSecurityScore>;
     }
-    return computeSecurityScore(findings);
-  }, [findings, selectedApp]);
+    return computeSecurityScore(findings, locale);
+  }, [findings, selectedApp, locale]);
   const categoryCounts = useMemo(() => countMobileByCategory(findings), [findings]);
   const filteredFindings = useMemo(
     () => filterMobileFindings(findings, category),
@@ -99,8 +102,8 @@ export default function MobileSecurityPage() {
   );
 
   useEffect(() => {
-    void load().catch((e) => setError(e instanceof Error ? e.message : "Yüklenemedi"));
-  }, [load]);
+    void load().catch((e) => setError(formatApiError(e)));
+  }, [load, formatApiError]);
 
   useEffect(() => {
     if (!selectedAppId) return;
@@ -135,15 +138,15 @@ export default function MobileSecurityPage() {
         }
       );
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error?.message || "Yükleme başarısız");
+      if (!res.ok || !body.success) throw new Error(body.error?.message || t("mobileOrg.uploadFailed"));
       const result = body.data as MobileUploadResult;
-      setToast(result.duplicate ? "Bu APK daha önce yüklendi." : "APK yüklendi, analiz başlatıldı.");
+      setToast(result.duplicate ? t("mobileOrg.duplicateApk") : t("mobileOrg.apkUploaded"));
       setSelectedAppId(result.id);
       await load();
       await loadFindings(result.id);
       setFile(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Yükleme hatası");
+      setError(formatApiError(err));
     } finally {
       setUploading(false);
     }
@@ -153,18 +156,19 @@ export default function MobileSecurityPage() {
     if (!selectedAppId) return;
     const token = getAccessToken();
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/organizations/${orgId}/mobile/applications/${selectedAppId}/report?format=${format}`,
+      `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/organizations/${orgId}/mobile/applications/${selectedAppId}/report?format=${format}&locale=${locale}`,
       { headers: token ? { Authorization: `Bearer ${token}` } : {} }
     );
-    if (!res.ok) throw new Error("Rapor indirilemedi");
+    if (!res.ok) throw new Error(t("mobileOrg.reportDownloadFailed"));
     const blob = await res.blob();
     const ext = format === "json" ? "json" : format;
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `siber-mobile-rapor.${ext}`;
+    link.download = `siber-mobile-report.${ext}`;
     link.click();
     URL.revokeObjectURL(url);
+    setToast(t("scanResults.reportDownloaded"));
   }
 
   return (
@@ -173,13 +177,11 @@ export default function MobileSecurityPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Mobil Uygulama Güvenliği</h1>
-            <p className="text-sm text-muted-foreground">
-              Statik APK analizi — dinamik saldırı veya kod çalıştırma yok
-            </p>
+            <h1 className="text-2xl font-bold">{t("mobileOrg.title")}</h1>
+            <p className="text-sm text-muted-foreground">{t("mobileOrg.subtitle")}</p>
           </div>
           <Link href={`/dashboard/${orgId}`} className="text-sm text-muted-foreground hover:text-foreground">
-            ← Organizasyon
+            {t("mobileOrg.backToOrg")}
           </Link>
         </div>
 
@@ -189,13 +191,13 @@ export default function MobileSecurityPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="border-border/60 bg-card/80 lg:col-span-1">
             <CardHeader>
-              <CardTitle>Yeni APK Yükle</CardTitle>
-              <CardDescription>Maks. 100 MB — yalnızca .apk</CardDescription>
+              <CardTitle>{t("mobileOrg.uploadTitle")}</CardTitle>
+              <CardDescription>{t("mobileOrg.uploadDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={handleUpload}>
                 <div>
-                  <Label htmlFor="project">Proje</Label>
+                  <Label htmlFor="project">{t("common.project")}</Label>
                   <select
                     id="project"
                     className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -210,7 +212,7 @@ export default function MobileSecurityPage() {
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="apk">APK dosyası</Label>
+                  <Label htmlFor="apk">{t("mobileOrg.apkFile")}</Label>
                   <Input
                     id="apk"
                     type="file"
@@ -225,10 +227,10 @@ export default function MobileSecurityPage() {
                     checked={authorized}
                     onChange={(e) => setAuthorized(e.target.checked)}
                   />
-                  Bu uygulamayı analiz etme yetkim olduğunu onaylıyorum.
+                  {t("mobileOrg.authorizationMobile")}
                 </label>
                 <Button type="submit" disabled={uploading || !file || !authorized} className="w-full">
-                  {uploading ? "Yükleniyor…" : "Analizi Başlat"}
+                  {uploading ? t("mobileOrg.uploading") : t("mobileOrg.startAnalysis")}
                 </Button>
               </form>
             </CardContent>
@@ -236,11 +238,11 @@ export default function MobileSecurityPage() {
 
           <Card className="border-border/60 bg-card/80 lg:col-span-2">
             <CardHeader>
-              <CardTitle>Mobil Uygulamalar</CardTitle>
+              <CardTitle>{t("mobileOrg.appsTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {apps.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Henüz uygulama yüklenmedi.</p>
+                <p className="text-sm text-muted-foreground">{t("mobileOrg.noApps")}</p>
               ) : (
                 apps.map((app) => (
                   <button
@@ -255,7 +257,8 @@ export default function MobileSecurityPage() {
                   >
                     <p className="font-medium">{app.application_name ?? app.original_filename}</p>
                     <p className="text-xs text-muted-foreground">
-                      {app.package_name ?? "—"} · {app.analysis_status} · {app.findings_count} bulgu
+                      {app.package_name ?? "—"} · {app.analysis_status} · {app.findings_count}{" "}
+                      {t("common.findings")}
                     </p>
                   </button>
                 ))
@@ -294,7 +297,7 @@ export default function MobileSecurityPage() {
             {selectedApp.analysis_summary && (
               <Card className="border-border/60 bg-card/80">
                 <CardHeader>
-                  <CardTitle className="text-lg">Analiz Özeti</CardTitle>
+                  <CardTitle className="text-lg">{t("mobileOrg.analysisSummary")}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   {Object.entries(selectedApp.analysis_summary).map(([k, v]) => (
@@ -309,7 +312,7 @@ export default function MobileSecurityPage() {
 
             <Card className="border-border/60 bg-card/80">
               <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-                <CardTitle>Mobil Bulgular</CardTitle>
+                <CardTitle>{t("mobileOrg.findingsTitle")}</CardTitle>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => downloadReport("json")}>
                     JSON
@@ -348,9 +351,9 @@ export default function MobileSecurityPage() {
                   <p className="text-sm text-muted-foreground">
                     {selectedApp.analysis_status === "completed"
                       ? category === "all"
-                        ? "Bulgu tespit edilmedi."
-                        : "Bu kategoride bulgu yok."
-                      : "Analiz devam ediyor…"}
+                        ? t("mobileOrg.noFindings")
+                        : t("mobileOrg.noCategoryFindings")
+                      : t("mobileOrg.analysisRunning")}
                   </p>
                 ) : (
                   filteredFindings.map((f) => (

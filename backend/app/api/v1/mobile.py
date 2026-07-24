@@ -198,11 +198,12 @@ async def get_mobile_report(
     app_id: UUID,
     request: Request,
     report_format: str = Query(default="json", alias="format", pattern="^(html|pdf|json)$"),
+    locale: str = Query(default="tr", pattern="^(tr|de)$"),
     _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.VIEWER)),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     service = MobileReportService(db)
-    content, media_type, filename = await service.build(org_id, app_id, report_format)  # type: ignore[arg-type]
+    content, media_type, filename = await service.build(org_id, app_id, report_format, locale)  # type: ignore[arg-type]
     return Response(
         content=content,
         media_type=media_type,

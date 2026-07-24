@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import type { Finding } from "@/lib/api-types";
 import { FindingDetailDrawer } from "@/components/scans/finding-detail-drawer";
 import { baseFinding, sampleRiskBreakdown } from "@/test/finding-fixtures";
+import { renderWithLocale } from "@/test/render-with-locale";
 
 vi.mock("@/lib/api-client", () => ({
   apiFetch: vi.fn(),
@@ -52,7 +53,7 @@ describe("FindingDetailDrawer", () => {
   });
 
   it("renders finding details when open", async () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -73,7 +74,7 @@ describe("FindingDetailDrawer", () => {
   });
 
   it("shows risk breakdown section", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -93,7 +94,7 @@ describe("FindingDetailDrawer", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
 
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -107,7 +108,7 @@ describe("FindingDetailDrawer", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Nginx" }));
-    const copyBtn = screen.getByRole("button", { name: /kodu kopyala/i });
+    const copyBtn = screen.getByRole("button", { name: /Kopyala/i });
     fireEvent.click(copyBtn);
 
     await waitFor(() => {
@@ -116,7 +117,7 @@ describe("FindingDetailDrawer", () => {
   });
 
   it("shows AI fallback when summary missing", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -135,7 +136,7 @@ describe("FindingDetailDrawer", () => {
 
   it("calls onOpenChange when closed via escape", async () => {
     const onOpenChange = vi.fn();
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={onOpenChange}
@@ -155,7 +156,7 @@ describe("FindingDetailDrawer", () => {
   });
 
   it("shows risk breakdown fallback when API data missing", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -168,11 +169,11 @@ describe("FindingDetailDrawer", () => {
       />
     );
     expect(screen.getByText(/Risk dağılımı henüz hesaplanmadı/)).toBeInTheDocument();
-    expect(screen.getByText(/Toplam puan: 42/)).toBeInTheDocument();
+    expect(screen.getByText(/42\./)).toBeInTheDocument();
   });
 
   it("does not render HTML from malicious finding title", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -203,7 +204,7 @@ describe("FindingDetailDrawer", () => {
       return sampleFinding;
     });
 
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}

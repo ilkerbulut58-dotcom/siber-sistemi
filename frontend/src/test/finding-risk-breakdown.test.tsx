@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { FindingDetailDrawer } from "@/components/scans/finding-detail-drawer";
 import { baseFinding, sampleRiskBreakdown } from "@/test/finding-fixtures";
+import { renderWithLocale } from "@/test/render-with-locale";
 
 describe("finding risk breakdown display", () => {
   it("renders API-provided breakdown items", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}
@@ -22,7 +23,7 @@ describe("finding risk breakdown display", () => {
   });
 
   it("shows safe fallback without backend breakdown", () => {
-    render(
+    renderWithLocale(
       <FindingDetailDrawer
         open
         onOpenChange={() => {}}

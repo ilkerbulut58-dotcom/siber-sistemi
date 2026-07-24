@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
@@ -41,7 +41,7 @@ import { SiteProfileCard } from "@/components/scan-results/site-profile-card";
 import { FindingDetailDrawer } from "@/components/scans/finding-detail-drawer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SCAN_STATUS_TR } from "@/lib/i18n-tr";
+import { useTranslation } from "@/components/locale-provider";
 
 type OrganizationMember = { user_id: string; role: string };
 
@@ -75,9 +75,29 @@ function ToastBanner({
 }
 
 export default function ScanDetailPage() {
+  const { t } = useTranslation();
+
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Navbar />
+          <main className="container mx-auto px-4 py-12 text-sm text-muted-foreground">
+            {t("scanResults.loadingScan")}
+          </main>
+        </>
+      }
+    >
+      <ScanDetailPageContent />
+    </Suspense>
+  );
+}
+
+function ScanDetailPageContent() {
   const params = useParams<{ orgId: string; scanId: string }>();
   const { orgId, scanId } = params;
   const { getAccessToken, user } = useAuth();
+  const { t, scanStatusLabel, locale, formatApiError } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -106,18 +126,18 @@ export default function ScanDetailPage() {
   );
 
   const severityCounts = useMemo(() => countBySeverity(findings), [findings]);
-  const securityScore = useMemo(() => computeSecurityScore(findings), [findings]);
+  const securityScore = useMemo(() => computeSecurityScore(findings, locale), [findings, locale]);
   const sourceCounts = useMemo(() => countSourceTools(findings), [findings]);
   const topFindings = useMemo(() => getTopFindings(findings, 8), [findings]);
   const headerStatuses = useMemo(() => getHeaderStatuses(findings), [findings]);
   const priorities = useMemo(() => buildPrioritySummary(findings), [findings]);
   const statusText = useMemo(
-    () => buildStatusSummaryText(securityScore, severityCounts, priorities),
-    [securityScore, severityCounts, priorities]
+    () => buildStatusSummaryText(securityScore, severityCounts, priorities, locale),
+    [securityScore, severityCounts, priorities, locale]
   );
   const aiOverview = useMemo(
-    () => buildAiOverview(findings, securityScore),
-    [findings, securityScore]
+    () => buildAiOverview(findings, securityScore, locale),
+    [findings, securityScore, locale]
   );
   const scoreDelta = useMemo(
     () => computeScoreDelta(trendPoints, scanId),
@@ -145,7 +165,8 @@ export default function ScanDetailPage() {
       setCanManageFindings(Boolean(ownMembership && ownMembership.role !== "viewer"));
 
       const trend = await buildTrendPoints(scansData, scanId, findingData, (sid) =>
-        apiFetch<Finding[]>(`/api/v1/organizations/${orgId}/findings?scan_id=${sid}`, { token })
+        apiFetch<Finding[]>(`/api/v1/organizations/${orgId}/findings?scan_id=${sid}`, { token }),
+        locale
       );
       setTrendPoints(trend);
 
@@ -165,10 +186,10 @@ export default function ScanDetailPage() {
 
       setError(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Veri yüklenemedi";
+      const msg = formatApiError(err);
       if (!/token/i.test(msg)) setError(msg);
     }
-  }, [getAccessToken, orgId, scanId, user?.id]);
+  }, [formatApiError, getAccessToken, locale, orgId, scanId, user?.id]);
 
   useEffect(() => {
     load();
@@ -194,8 +215,8 @@ export default function ScanDetailPage() {
     setSelectedFindingId(null);
     setDrawerOpen(false);
     setFindingQueryParam(null);
-    setToast({ message: "Bulgu bulunamadı veya erişim yok.", variant: "error" });
-  }, [setFindingQueryParam]);
+    setToast({ message: t("analytics.findingNotFound"), variant: "error" });
+  }, [setFindingQueryParam, t]);
 
   const openFindingDrawer = useCallback(
     (findingId: string) => {
@@ -244,30 +265,44 @@ export default function ScanDetailPage() {
     document.getElementById(ids[section] ?? section)?.scrollIntoView({ behavior: "smooth" });
   }
 
+  function handleRescan() {
+    if (scan) window.location.href = `/dashboard/scan?url=${encodeURIComponent(scan.target_url)}`;
+  }
+
+  async function cancelScan() {
+    if (!scan || !window.confirm(t("scanResults.cancelScanConfirm"))) return;
+    try {
+      await apiFetch(`/api/v1/organizations/${orgId}/scans/${scanId}/cancel`, {
+        method: "POST",
+        token: getAccessToken(),
+      });
+      setToast({ message: t("scanResults.cancelScanSuccess"), variant: "success" });
+      await load();
+    } catch (err) {
+      setError(formatApiError(err));
+    }
+  }
+
   async function downloadReport(format: "html" | "pdf" | "json" = "pdf") {
     try {
       const token = await ensureFreshAccessToken();
       const response = await fetch(
-        `${getApiBase()}/api/v1/organizations/${orgId}/scans/${scanId}/report?format=${format}`,
+        `${getApiBase()}/api/v1/organizations/${orgId}/scans/${scanId}/report?format=${format}&locale=${locale}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
-      if (!response.ok) throw new Error("Rapor indirilemedi");
+      if (!response.ok) throw new Error(t("scanResults.reportDownloadFailed"));
       const blob = await response.blob();
       const match = (response.headers.get("Content-Disposition") ?? "").match(/filename="([^"]+)"/);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = match?.[1] ?? `siber-rapor.${format}`;
+      link.download = match?.[1] ?? `siber-report.${format}`;
       link.click();
       URL.revokeObjectURL(url);
-      setToast({ message: "Rapor indirildi.", variant: "success" });
+      setToast({ message: t("scanResults.reportDownloaded"), variant: "success" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rapor indirilemedi");
+      setError(formatApiError(err));
     }
-  }
-
-  function handleRescan() {
-    if (scan) window.location.href = `/dashboard/scan?url=${encodeURIComponent(scan.target_url)}`;
   }
 
   return (
@@ -286,12 +321,12 @@ export default function ScanDetailPage() {
             href="/dashboard/scan"
             className="inline-block text-sm text-muted-foreground hover:text-foreground"
           >
-            ← Yeni tarama
+            ← {t("scanResults.newScan")}
           </Link>
 
           {!scan && !error && (
             <div className="rounded-lg border border-border/60 bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
-              Tarama bilgileri yükleniyor…
+              {t("scanResults.loadingScan")}
             </div>
           )}
 
@@ -307,28 +342,29 @@ export default function ScanDetailPage() {
           {isRunning && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               <p>
-                Tarama devam ediyor ({SCAN_STATUS_TR[scan?.status ?? ""] ?? scan?.status}) —
-                bulgular tarama tamamlanınca görünür.
+                {t("scanResults.scanInProgress")} ({scanStatusLabel(scan?.status ?? "")}) —
+                {t("scanResults.findingsAfterComplete")}
               </p>
               {scan?.status === "queued" && (
-                <p className="mt-1 text-xs text-amber-200/80">
-                  Kuyrukta bekliyorsa worker meşgul olabilir; birkaç dakika normaldir.
-                </p>
+                <p className="mt-1 text-xs text-amber-200/80">{t("scanResults.queuedNote")}</p>
               )}
               {scan?.started_at && (
                 <p className="mt-1 text-xs text-amber-200/80">
-                  Başlangıç: {new Date(scan.started_at).toLocaleTimeString("tr-TR")}
+                  {t("scanResults.startedAt")}:{" "}
+                  {new Date(scan.started_at).toLocaleTimeString(locale === "de" ? "de-DE" : "tr-TR")}
                   {" · "}
-                  Güvenli profil genelde 2–3 dk, derin profil 4–5 dk sürer. 12 dk sonra otomatik
-                  iptal edilir.
+                  {t("analytics.safeProfileTiming")}
                 </p>
               )}
+              <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void cancelScan()}>
+                {t("scanResults.cancelScan")}
+              </Button>
             </div>
           )}
 
           {scan?.status === "failed" && scan.error_log && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              <p className="font-medium">Tarama tamamlanamadı</p>
+              <p className="font-medium">{t("scanResults.scanFailed")}</p>
               <p className="mt-1 text-xs">{scan.error_log}</p>
             </div>
           )}
@@ -393,16 +429,17 @@ export default function ScanDetailPage() {
           </div>
 
           <div id="section-reports" className="rounded-xl border border-border/60 bg-card/50 p-6">
-            <h2 className="mb-4 text-lg font-semibold">Raporlar</h2>
+            <h2 className="mb-4 text-lg font-semibold">{t("scanResults.reports")}</h2>
+            <p className="mb-3 text-sm text-muted-foreground">{t("scanResults.reportLocaleNote")}</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => downloadReport("html")}>
-                HTML Rapor
+                {t("scanResults.htmlReport")}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => downloadReport("pdf")}>
-                PDF Rapor
+                {t("scanResults.pdfReport")}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => downloadReport("json")}>
-                JSON İndir
+                {t("scanResults.downloadJson")}
               </Button>
             </div>
           </div>

@@ -25,6 +25,7 @@ from app.services.audit_service import log_audit_event
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.project_service import ProjectService
+from app.services.quota_service import QuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,9 @@ class AsmService:
         await ProjectService(self.db).get(organization_id, project_id)
         domain = await DomainService(self.db).get(organization_id, project_id, data.domain_id)
         settings = get_settings()
+        require_domain_verification = QuotaService.requires_domain_verification(actor, settings)
 
-        if not settings.skip_domain_verification and not domain.is_verified:
+        if require_domain_verification and not domain.is_verified:
             raise AppError(
                 "DOMAIN_NOT_VERIFIED",
                 "Domain must be verified before attack surface discovery.",
@@ -91,7 +93,7 @@ class AsmService:
             )
 
         target = str(data.target_url)
-        if not settings.skip_domain_verification and domain.hostname not in target:
+        if require_domain_verification and domain.hostname not in target:
             raise AppError(
                 "TARGET_MISMATCH",
                 f"Target must belong to verified domain {domain.hostname}.",

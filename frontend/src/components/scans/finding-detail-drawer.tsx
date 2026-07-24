@@ -24,14 +24,8 @@ import {
   getWhatItMeans,
   type RemediationTab,
 } from "@/lib/finding-remediation";
-import {
-  aiConfidenceLabel,
-  confidenceLabel,
-  FINDING_WORKFLOW_STATUS_TR,
-  HISTORY_EVENT_TR,
-  VERIFICATION_STATUS_TR,
-} from "@/lib/i18n-tr";
 import { formatSourceTool } from "@/lib/scan-analytics";
+import { useTranslation } from "@/components/locale-provider";
 import { SeverityBadge, MiniRiskRing } from "@/components/scan-results/severity-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,7 +60,7 @@ function useIsMobile(breakpoint = 640): boolean {
   return mobile;
 }
 
-function CopyCodeBlock({ code }: { code: string }) {
+function CopyCodeBlock({ code, copyLabel, copiedLabel }: { code: string; copyLabel: string; copiedLabel: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -87,15 +81,15 @@ function CopyCodeBlock({ code }: { code: string }) {
         variant="ghost"
         className="absolute right-2 top-2 h-8 gap-1 text-xs"
         onClick={copy}
-        aria-label="Kodu kopyala"
+        aria-label={copyLabel}
       >
         {copied ? (
           <>
-            <Check className="h-3.5 w-3.5" /> Kopyalandı
+            <Check className="h-3.5 w-3.5" /> {copiedLabel}
           </>
         ) : (
           <>
-            <Copy className="h-3.5 w-3.5" /> Kopyala
+            <Copy className="h-3.5 w-3.5" /> {copyLabel}
           </>
         )}
       </Button>
@@ -126,12 +120,22 @@ function Section({
   );
 }
 
-function RiskBreakdownVisual({ breakdown, riskScore }: { breakdown: RiskBreakdown | null; riskScore: number | null }) {
+function RiskBreakdownVisual({
+  breakdown,
+  riskScore,
+  notCalculated,
+  totalLabel,
+}: {
+  breakdown: RiskBreakdown | null;
+  riskScore: number | null;
+  notCalculated: string;
+  totalLabel: string;
+}) {
   if (!breakdown) {
     return (
       <p className="text-sm text-muted-foreground">
-        Risk dağılımı henüz hesaplanmadı.
-        {riskScore != null && ` Toplam puan: ${Math.round(riskScore)}.`}
+        {notCalculated}
+        {riskScore != null && ` ${Math.round(riskScore)}.`}
       </p>
     );
   }
@@ -142,7 +146,7 @@ function RiskBreakdownVisual({ breakdown, riskScore }: { breakdown: RiskBreakdow
         <MiniRiskRing score={breakdown.total} />
         <div>
           <p className="text-2xl font-bold">{Math.round(breakdown.total)}</p>
-          <p className="text-xs text-muted-foreground">Toplam risk puanı (1–100)</p>
+          <p className="text-xs text-muted-foreground">{totalLabel}</p>
         </div>
       </div>
       <div className="space-y-2">
@@ -166,7 +170,7 @@ function RiskBreakdownVisual({ breakdown, riskScore }: { breakdown: RiskBreakdow
   );
 }
 
-function RemediationTabsSection({ tabs }: { tabs: RemediationTab[] }) {
+function RemediationTabsSection({ tabs, stagingWarning, copyLabel, copiedLabel }: { tabs: RemediationTab[]; stagingWarning: string; copyLabel: string; copiedLabel: string }) {
   const [active, setActive] = useState(tabs[0]?.id ?? "general");
 
   useEffect(() => {
@@ -205,12 +209,11 @@ function RemediationTabsSection({ tabs }: { tabs: RemediationTab[] }) {
               <li key={step}>{step}</li>
             ))}
           </ol>
-          {current.code && <CopyCodeBlock code={current.code} />}
+          {current.code && <CopyCodeBlock code={current.code} copyLabel={copyLabel} copiedLabel={copiedLabel} />}
         </div>
       )}
       <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90">
-        Değişiklikleri önce test/staging ortamında uygulayın; production&apos;a almadan
-        önce doğrulayın.
+        {stagingWarning}
       </p>
     </div>
   );
@@ -219,10 +222,16 @@ function RemediationTabsSection({ tabs }: { tabs: RemediationTab[] }) {
 function HistoryTimeline({
   history,
   loading,
+  eventLabel,
+  locale,
 }: {
   history: FindingHistoryEntry[];
   loading: boolean;
+  eventLabel: (event: string) => string;
+  locale: string;
 }) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -233,7 +242,7 @@ function HistoryTimeline({
   }
   if (history.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">Henüz geçmiş kaydı bulunmuyor.</p>
+      <p className="text-sm text-muted-foreground">{t("findingDrawer.noHistory")}</p>
     );
   }
 
@@ -243,10 +252,10 @@ function HistoryTimeline({
         <li key={entry.id} className="relative">
           <span className="absolute -left-[1.3rem] top-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-4 ring-background" />
           <p className="text-sm font-medium">
-            {HISTORY_EVENT_TR[entry.event_type] ?? entry.event_type}
+            {eventLabel(entry.event_type)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {new Date(entry.created_at).toLocaleString("tr-TR")}
+            {new Date(entry.created_at).toLocaleString(locale === "de" ? "de-DE" : "tr-TR")}
           </p>
           {entry.details && entry.event_type === "status_change" && (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -296,6 +305,7 @@ export function FindingDetailDrawer({
   mobileApp,
 }: FindingDetailDrawerProps) {
   const isMobile = useIsMobile();
+  const { t, locale, findingWorkflowLabel, verificationStatusLabel, historyEventLabel, confidenceLabel, aiConfidenceLabel } = useTranslation();
   const [history, setHistory] = useState<FindingHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -382,10 +392,10 @@ export function FindingDetailDrawer({
       );
       setLocalFinding(updated);
       onFindingUpdated(updated);
-      onToast("Bulgu durumu güncellendi.", "success");
+      onToast(t("findingDrawer.statusUpdated"), "success");
       await loadHistory();
     } catch (err) {
-      onToast(err instanceof Error ? err.message : "Durum güncellenemedi", "error");
+      onToast(err instanceof Error ? err.message : t("findingDrawer.statusUpdateFailed"), "error");
     } finally {
       setStatusUpdating(false);
     }
@@ -399,10 +409,10 @@ export function FindingDetailDrawer({
         `/api/v1/organizations/${orgId}/findings/${localFinding.id}/retest`,
         { method: "POST", token: getAccessToken() }
       );
-      onToast("Yeniden tarama başlatıldı.", "success");
+      onToast(t("findingDrawer.retestStarted"), "success");
       onRetestNavigate(newScan.id);
     } catch (err) {
-      onToast(err instanceof Error ? err.message : "Yeniden tarama başarısız", "error");
+      onToast(err instanceof Error ? err.message : t("findingDrawer.retestFailed"), "error");
     } finally {
       setRetestLoading(false);
     }
@@ -414,13 +424,13 @@ export function FindingDetailDrawer({
     [f]
   );
   const remediationTabs = useMemo(
-    () => (f ? buildRemediationTabs(f) : []),
-    [f]
+    () => (f ? buildRemediationTabs(f, locale) : []),
+    [f, locale]
   );
   const sources = f?.source_tools?.length
-    ? f.source_tools.map(formatSourceTool)
+    ? f.source_tools.map((tool) => formatSourceTool(tool, locale))
     : f
-      ? [formatSourceTool(f.source_tool)]
+      ? [formatSourceTool(f.source_tool, locale)]
       : [];
 
   const showAiSkeleton = aiLoading && !f?.ai_summary;
@@ -447,47 +457,47 @@ export function FindingDetailDrawer({
                 <div className="flex flex-wrap items-start gap-2 pr-8">
                   <SeverityBadge severity={f.severity} />
                   {f.risk_score != null && (
-                    <Badge variant="outline" aria-label={`Risk puanı ${Math.round(f.risk_score)}`}>
-                      Risk {Math.round(f.risk_score)}
+                    <Badge variant="outline" aria-label={`${t("findingDrawer.riskScore")} ${Math.round(f.risk_score)}`}>
+                      {t("findingDrawer.riskScore")} {Math.round(f.risk_score)}
                     </Badge>
                   )}
                   {f.confidence && (
-                    <Badge variant="muted">Güven: {confidenceLabel(f.confidence)}</Badge>
+                    <Badge variant="muted">{t("findingDrawer.confidence")}: {confidenceLabel(f.confidence)}</Badge>
                   )}
                   {f.verification_status && (
                     <Badge variant="secondary">
-                      {VERIFICATION_STATUS_TR[f.verification_status] ?? f.verification_status}
+                      {verificationStatusLabel(f.verification_status)}
                     </Badge>
                   )}
                   <Badge variant="outline">
-                    {FINDING_WORKFLOW_STATUS_TR[f.status] ?? f.status}
+                    {findingWorkflowLabel(f.status)}
                   </Badge>
                 </div>
                 <SheetTitle className="text-xl leading-snug">{f.title}</SheetTitle>
                 <SheetDescription id="finding-drawer-desc" className="sr-only">
-                  Bulgu detay paneli — {f.title}
+                  {t("findingDrawer.detailTitle", { title: f.title })}
                 </SheetDescription>
               </SheetHeader>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <div className="space-y-6">
-                <Section title="Hızlı özet" icon={<Shield className="h-4 w-4" />}>
+                <Section title={t("findingDrawer.quickSummary")} icon={<Shield className="h-4 w-4" />}>
                   <div className="grid gap-3 text-sm">
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">
-                        Bu ne anlama geliyor?
+                        {t("findingDrawer.whatItMeans")}
                       </p>
                       <p>{getWhatItMeans(f)}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground">İş etkisi</p>
-                      <p className="text-muted-foreground">{getBusinessImpact(f)}</p>
+                      <p className="text-xs font-medium text-muted-foreground">{t("findingDrawer.businessImpact")}</p>
+                      <p className="text-muted-foreground">{getBusinessImpact(f, locale)}</p>
                     </div>
                     {f.affected_url && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">
-                          Etkilenen URL
+                          {t("findingDrawer.affectedUrl")}
                         </p>
                         <a
                           href={f.affected_url}
@@ -504,20 +514,20 @@ export function FindingDetailDrawer({
                       <div className="grid gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs">
                         {mobileApp?.package_name && (
                           <p>
-                            <span className="text-muted-foreground">Paket: </span>
+                            <span className="text-muted-foreground">{t("findingDrawer.package")}: </span>
                             {mobileApp.package_name}
                           </p>
                         )}
                         {(mobileApp?.version_name || mobileApp?.version_code) && (
                           <p>
-                            <span className="text-muted-foreground">Sürüm: </span>
+                            <span className="text-muted-foreground">{t("findingDrawer.version")}: </span>
                             {mobileApp.version_name ?? "—"}
                             {mobileApp.version_code ? ` (${mobileApp.version_code})` : ""}
                           </p>
                         )}
                         {f.affected_component && (
                           <p>
-                            <span className="text-muted-foreground">Bileşen / İzin: </span>
+                            <span className="text-muted-foreground">{t("findingDrawer.component")}: </span>
                             {f.affected_component}
                           </p>
                         )}
@@ -536,39 +546,44 @@ export function FindingDetailDrawer({
                       </div>
                     )}
                     <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                      <span>Kategori: {getFindingCategory(f)}</span>
+                      <span>{t("findingDrawer.category")}: {getFindingCategory(f, locale)}</span>
                       <span>
-                        İlk görülme:{" "}
-                        {new Date(f.first_seen_at).toLocaleDateString("tr-TR")}
+                        {t("findingDrawer.firstSeen")}:{" "}
+                        {new Date(f.first_seen_at).toLocaleDateString(locale === "de" ? "de-DE" : "tr-TR")}
                       </span>
                       <span>
-                        Son görülme:{" "}
-                        {new Date(f.last_seen_at).toLocaleDateString("tr-TR")}
+                        {t("findingDrawer.lastSeen")}:{" "}
+                        {new Date(f.last_seen_at).toLocaleDateString(locale === "de" ? "de-DE" : "tr-TR")}
                       </span>
                     </div>
                   </div>
                 </Section>
 
-                <Section title="Risk açıklaması" icon={<AlertTriangle className="h-4 w-4" />}>
-                  <RiskBreakdownVisual breakdown={f.risk_breakdown} riskScore={f.risk_score} />
+                <Section title={t("findingDrawer.riskExplanation")} icon={<AlertTriangle className="h-4 w-4" />}>
+                  <RiskBreakdownVisual
+                    breakdown={f.risk_breakdown}
+                    riskScore={f.risk_score}
+                    notCalculated={t("findingDrawer.riskNotCalculated")}
+                    totalLabel={t("findingDrawer.totalRiskScore")}
+                  />
                   {f.risk_model_version && (
                     <p className="text-xs text-muted-foreground">
-                      Risk modeli: {f.risk_model_version}
+                      {t("findingDrawer.riskModel")}: {f.risk_model_version}
                     </p>
                   )}
                 </Section>
 
-                <Section title="Kanıtlar">
+                <Section title={t("findingDrawer.evidence")}>
                   <div className="space-y-2 text-sm">
                     {f.affected_url && (
                       <p>
-                        <span className="text-muted-foreground">İstek URL: </span>
+                        <span className="text-muted-foreground">{t("findingDrawer.requestUrl")}: </span>
                         <code className="break-all text-xs">{maskText(f.affected_url)}</code>
                       </p>
                     )}
                     {evidenceRows.length === 0 ? (
                       <p className="text-muted-foreground">
-                        Ek kanıt verisi bulunmuyor.
+                        {t("findingDrawer.noEvidence")}
                       </p>
                     ) : (
                       <dl className="space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3">
@@ -584,7 +599,7 @@ export function FindingDetailDrawer({
                     )}
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">
-                        Tespit eden araçlar
+                        {t("findingDrawer.sourceTools")}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {sources.map((s) => (
@@ -595,15 +610,14 @@ export function FindingDetailDrawer({
                       </div>
                       {(f.source_tools?.length ?? 0) > 1 && (
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Korelasyon: {f.correlation_key ?? "—"} — birden fazla tarayıcı aynı
-                          bulguyu doğruladı.
+                          {t("findingDrawer.correlationNote", { key: f.correlation_key ?? "—" })}
                         </p>
                       )}
                     </div>
                   </div>
                 </Section>
 
-                <Section title="AI Analizi" icon={<Sparkles className="h-4 w-4" />}>
+                <Section title={t("findingDrawer.aiAnalysis")} icon={<Sparkles className="h-4 w-4" />}>
                   {showAiSkeleton ? (
                     <div className="space-y-2">
                       <Skeleton className="h-4 w-full" />
@@ -612,8 +626,7 @@ export function FindingDetailDrawer({
                     </div>
                   ) : showAiFallback ? (
                     <p className="text-sm text-muted-foreground">
-                      AI analizi henüz hazır değil. Kural tabanlı özet kısa süre içinde
-                      görünecektir.
+                      {t("findingDrawer.aiPending")}
                     </p>
                   ) : (
                     <div className="space-y-3 rounded-lg border border-violet-500/20 bg-violet-500/5 p-4 text-sm">
@@ -621,7 +634,7 @@ export function FindingDetailDrawer({
                       {f.ai_remediation && (
                         <div>
                           <p className="mb-1 text-xs font-medium text-violet-300">
-                            Önerilen düzeltme
+                            {t("findingDrawer.aiSuggestedFix")}
                           </p>
                           <p className="whitespace-pre-wrap text-muted-foreground">
                             {f.ai_remediation}
@@ -630,7 +643,7 @@ export function FindingDetailDrawer({
                       )}
                       <div className="flex flex-wrap gap-2 text-xs">
                         <Badge variant="outline">
-                          Öncelik: {getFixPriority(f)}
+                          {t("findingDrawer.priority")}: {getFixPriority(f, locale)}
                         </Badge>
                         {f.ai_confidence_label && (
                           <Badge variant="secondary">
@@ -641,16 +654,26 @@ export function FindingDetailDrawer({
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    AI analizi destekleyicidir; otomatik doğrulama veya exploit yerine geçmez.
+                    {t("findingDrawer.aiDisclaimer")}
                   </p>
                 </Section>
 
-                <Section title="Nasıl düzeltilir?">
-                  <RemediationTabsSection tabs={remediationTabs} />
+                <Section title={t("findingDrawer.howToFix")}>
+                  <RemediationTabsSection
+                    tabs={remediationTabs}
+                    stagingWarning={t("remediation.stagingWarning")}
+                    copyLabel={t("findingDrawer.copyCode")}
+                    copiedLabel={t("findingDrawer.copied")}
+                  />
                 </Section>
 
-                <Section title="Geçmiş" icon={<History className="h-4 w-4" />}>
-                  <HistoryTimeline history={history} loading={historyLoading} />
+                <Section title={t("findingDrawer.history")} icon={<History className="h-4 w-4" />}>
+                  <HistoryTimeline
+                    history={history}
+                    loading={historyLoading}
+                    eventLabel={historyEventLabel}
+                    locale={locale}
+                  />
                 </Section>
               </div>
             </div>
@@ -660,7 +683,7 @@ export function FindingDetailDrawer({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-1 items-center gap-2">
                   <label htmlFor="finding-status" className="sr-only">
-                    Bulgu durumu
+                    {t("findingDrawer.findingStatus")}
                   </label>
                   <select
                     id="finding-status"
@@ -671,7 +694,7 @@ export function FindingDetailDrawer({
                   >
                     {WORKFLOW_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {FINDING_WORKFLOW_STATUS_TR[s]}
+                        {findingWorkflowLabel(s)}
                       </option>
                     ))}
                   </select>
@@ -689,7 +712,7 @@ export function FindingDetailDrawer({
                     ) : (
                       <RefreshCw className="h-4 w-4" />
                     )}
-                    Yeniden Doğrula
+                    {t("findingDrawer.reverify")}
                   </Button>
                 )}
               </div>

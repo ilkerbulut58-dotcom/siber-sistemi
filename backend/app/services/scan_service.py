@@ -26,6 +26,7 @@ from app.services.audit_service import log_audit_event
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.pilot_service import PilotService
+from app.services.quota_service import QuotaService
 from app.services.project_service import ProjectService
 
 logger = logging.getLogger(__name__)
@@ -157,8 +158,9 @@ class ScanService:
         domain = await DomainService(self.db).get(organization_id, data.project_id, data.domain_id)
         settings = get_settings()
         profile = await self._resolve_profile(data.scan_profile)
+        require_domain_verification = QuotaService.requires_domain_verification(actor, settings)
 
-        if not settings.skip_domain_verification and not domain.is_verified:
+        if require_domain_verification and not domain.is_verified:
             active_profiles = {"deep", "code"}
             if profile.name in active_profiles or profile.name.endswith("-active"):
                 await self._reject_scan(
@@ -187,13 +189,14 @@ class ScanService:
         ).scalar_one_or_none()
         if organization is None:
             raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
-        await self._guard_pilot_scan(
-            organization,
-            actor=actor,
-            organization_id=organization_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
+        if not QuotaService.is_unrestricted_scan_actor(actor):
+            await self._guard_pilot_scan(
+                organization,
+                actor=actor,
+                organization_id=organization_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
         if is_blocked_benchmark_profile(profile.name):
             try:
                 assert_active_benchmark_create_allowed(
@@ -205,7 +208,7 @@ class ScanService:
         else:
             assert_scan_profile_allowed(profile.name)
         target = str(data.target_url)
-        if not settings.skip_domain_verification and domain.hostname not in target:
+        if require_domain_verification and domain.hostname not in target:
             raise AppError(
                 "TARGET_MISMATCH",
                 f"Target URL must belong to verified domain {domain.hostname}.",
@@ -217,7 +220,7 @@ class ScanService:
             and os.environ.get("BENCHMARK_LAB_ISOLATED") != "true"
         ):
             resolve_dns = (
-                not settings.skip_domain_verification
+                require_domain_verification
                 and settings.environment in {"production", "staging"}
             )
             try:
@@ -225,24 +228,25 @@ class ScanService:
             except UrlGuardError as exc:
                 raise AppError("TARGET_BLOCKED", str(exc), status_code=400) from exc
 
-        try:
-            PilotService.assert_active_scan_allowed(organization, profile.name)
-        except AppError as exc:
-            await self._reject_scan(
-                actor=actor,
-                organization_id=organization_id,
-                reason_code=exc.code,
-                message=exc.message,
-                status_code=exc.status_code,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"profile": profile.name},
-            )
+        if not QuotaService.is_unrestricted_scan_actor(actor):
+            try:
+                PilotService.assert_active_scan_allowed(organization, profile.name)
+            except AppError as exc:
+                await self._reject_scan(
+                    actor=actor,
+                    organization_id=organization_id,
+                    reason_code=exc.code,
+                    message=exc.message,
+                    status_code=exc.status_code,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"profile": profile.name},
+                )
         active_profiles = {"deep", "code"}
         if (
             (profile.name in active_profiles or profile.name.endswith("-active"))
             and not domain.active_scan_allowed
-            and not settings.skip_domain_verification
+            and require_domain_verification
         ):
             await self._reject_scan(
                 actor=actor,
@@ -255,7 +259,7 @@ class ScanService:
                 details={"domain_id": str(domain.id), "profile": profile.name},
             )
 
-        enforce_limits = settings.environment in {"production", "staging"} or organization.is_pilot
+        enforce_limits = QuotaService.should_enforce_scan_limits(actor, organization, settings)
         if enforce_limits:
             running = await self.db.execute(
                 select(func.count())
@@ -297,7 +301,7 @@ class ScanService:
         if (
             profile.name in ("deep", "code")
             and domain.hostname
-            and not settings.skip_domain_verification
+            and require_domain_verification
         ):
             project = await ProjectService(self.db).get(organization_id, data.project_id)
             if project.environment == "production":

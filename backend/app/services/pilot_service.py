@@ -126,4 +126,6 @@ class PilotService:
             "is_pilot": organization.is_pilot,
             "steps": steps,
             "ready_to_scan": ready,
+            "pilot_ends_at": organization.pilot_ends_at,
+            "pilot_active_scan_allowed": organization.pilot_active_scan_allowed,
         }

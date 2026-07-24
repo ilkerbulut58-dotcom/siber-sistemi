@@ -13,39 +13,25 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
-from app.models.finding import Finding
+from app.i18n.report_strings import (
+    FINDING_STATUS_LABELS,
+    PROFILE_LABELS,
+    SCAN_REPORT_LABELS,
+    SEVERITY_LABELS,
+    STATUS_LABELS,
+    Locale,
+    normalize_locale,
+    scan_risk_summary,
+)
 from app.models.scan import ScanJob, ScanStatus
 from app.services.finding_service import FindingService
 from app.services.pdf_utils import html_to_pdf
+from app.services.report_finding_localization import localize_findings_for_report
 from app.services.scan_service import ScanService
 
 logger = logging.getLogger(__name__)
 
 ReportFormat = Literal["html", "pdf", "json"]
-
-PROFILE_LABELS = {
-    "safe": "Güvenli Tarama",
-    "deep": "Derin Tarama",
-    "code": "Kod / Dosya Taraması",
-}
-
-STATUS_LABELS = {
-    "queued": "Kuyrukta",
-    "validating": "Doğrulanıyor",
-    "running": "Taranıyor",
-    "parsing": "Analiz ediliyor",
-    "completed": "Tamamlandı",
-    "failed": "Başarısız",
-    "cancelled": "İptal",
-}
-
-SEVERITY_LABELS = {
-    "critical": "Kritik",
-    "high": "Yüksek",
-    "medium": "Orta",
-    "low": "Düşük",
-    "info": "Bilgi",
-}
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
@@ -63,7 +49,9 @@ class ReportService:
         organization_id: UUID,
         scan_id: UUID,
         report_format: ReportFormat,
+        locale: str | None = "tr",
     ) -> tuple[bytes, str, str]:
+        loc = normalize_locale(locale)
         scan = await ScanService(self.db).get(organization_id, scan_id)
         status = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
         if status != ScanStatus.COMPLETED.value:
@@ -81,11 +69,12 @@ class ReportService:
             findings,
             key=lambda f: (SEVERITY_ORDER.get(f.severity, 99), f.title),
         )
+        localized_findings = localize_findings_for_report(findings_sorted, loc)
 
         if report_format == "json":
-            return self._build_json(scan, findings_sorted)
+            return self._build_json(scan, localized_findings, loc)
 
-        html = self._render_html(scan, findings_sorted)
+        html = self._render_html(scan, localized_findings, loc)
         if report_format == "html":
             filename = self._filename(scan, "html")
             return html.encode("utf-8"), "text/html; charset=utf-8", filename
@@ -94,7 +83,7 @@ class ReportService:
         filename = self._filename(scan, "pdf")
         return pdf_bytes, "application/pdf", filename
 
-    def _render_html(self, scan: ScanJob, findings: list[Finding]) -> str:
+    def _render_html(self, scan: ScanJob, findings, locale: Locale) -> str:
         severity_counts: dict[str, int] = {}
         for finding in findings:
             severity_counts[finding.severity] = severity_counts.get(finding.severity, 0) + 1
@@ -102,19 +91,16 @@ class ReportService:
         template = self._jinja.get_template("scan_report.html")
         status_key = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
         return template.render(
+            locale=locale,
+            labels=SCAN_REPORT_LABELS[locale],
             scan=scan,
             findings=findings,
-            profile_label=PROFILE_LABELS.get(scan.scan_profile, scan.scan_profile),
-            status_label=STATUS_LABELS.get(status_key, status_key),
-            severity_labels=SEVERITY_LABELS,
-            status_labels={
-                "open": "Açık",
-                "resolved": "Giderildi",
-                "false_positive": "Yanlış alarm",
-                "accepted_risk": "Kabul edilen risk",
-            },
+            profile_label=PROFILE_LABELS[locale].get(scan.scan_profile, scan.scan_profile),
+            status_label=STATUS_LABELS[locale].get(status_key, status_key),
+            severity_labels=SEVERITY_LABELS[locale],
+            status_labels=FINDING_STATUS_LABELS[locale],
             severity_counts=severity_counts,
-            risk_summary=self._risk_summary(severity_counts),
+            risk_summary=scan_risk_summary(locale, severity_counts),
             completed_at=(
                 scan.completed_at.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC")
                 if scan.completed_at
@@ -126,7 +112,8 @@ class ReportService:
     def _build_json(
         self,
         scan: ScanJob,
-        findings: list[Finding],
+        findings,
+        locale: Locale,
     ) -> tuple[bytes, str, str]:
         severity_counts: dict[str, int] = {}
         for finding in findings:
@@ -134,18 +121,20 @@ class ReportService:
 
         status_key = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
         payload = {
+            "locale": locale,
             "scan": {
                 "id": str(scan.id),
                 "target_url": scan.target_url,
                 "scan_profile": scan.scan_profile,
-                "profile_label": PROFILE_LABELS.get(scan.scan_profile, scan.scan_profile),
+                "profile_label": PROFILE_LABELS[locale].get(scan.scan_profile, scan.scan_profile),
                 "status": status_key,
+                "status_label": STATUS_LABELS[locale].get(status_key, status_key),
                 "findings_count": scan.findings_count,
                 "started_at": scan.started_at.isoformat() if scan.started_at else None,
                 "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
             },
             "summary": {
-                "risk_summary": self._risk_summary(severity_counts),
+                "risk_summary": scan_risk_summary(locale, severity_counts),
                 "severity_counts": severity_counts,
             },
             "findings": [
@@ -153,7 +142,9 @@ class ReportService:
                     "id": str(f.id),
                     "title": f.title,
                     "severity": f.severity,
+                    "severity_label": SEVERITY_LABELS[locale].get(f.severity, f.severity),
                     "status": f.status,
+                    "status_label": FINDING_STATUS_LABELS[locale].get(f.status, f.status),
                     "description": f.description,
                     "risk_explanation": f.risk_explanation,
                     "affected_url": f.affected_url,
@@ -176,13 +167,8 @@ class ReportService:
 
     @staticmethod
     def _risk_summary(counts: dict[str, int]) -> str:
-        if (counts.get("critical") or 0) > 0 or (counts.get("high") or 0) > 0:
-            return "Yüksek öncelikli bulgular var — en kısa sürede inceleyin."
-        if (counts.get("medium") or 0) > 0:
-            return "Orta seviye iyileştirmeler önerilir."
-        if (counts.get("low") or 0) + (counts.get("info") or 0) > 0:
-            return "Kritik sorun yok; küçük iyileştirmeler yapılabilir."
-        return "Önemli bir sorun tespit edilmedi."
+        """Backward-compatible helper for tests."""
+        return scan_risk_summary("tr", counts)
 
     @staticmethod
     def _filename(scan: ScanJob, extension: str) -> str:

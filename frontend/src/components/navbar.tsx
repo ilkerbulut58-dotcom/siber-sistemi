@@ -4,10 +4,14 @@ import Link from "next/link";
 import { Shield } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { DashboardNavLinks } from "@/components/dashboard-nav-links";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslation } from "@/components/locale-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
@@ -21,22 +25,32 @@ export function Navbar() {
           <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
             <DashboardNavLinks />
             <DashboardNavLinks mobile />
+            <LanguageSwitcher />
+            {user.is_platform_admin && (
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                {t("admin.badge")}
+              </Badge>
+            )}
+            <Link href="/dashboard/settings" className="hidden text-sm text-muted-foreground hover:text-foreground md:inline">
+              {t("scanResults.settings")}
+            </Link>
             <span className="hidden max-w-[160px] truncate text-sm text-muted-foreground lg:inline">
               {user.email}
             </span>
             <Button variant="outline" size="sm" onClick={() => logout()}>
-              Çıkış
+              {t("common.logout")}
             </Button>
           </div>
         ) : (
           <nav className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Link href="/login">
               <Button variant="outline" size="sm">
-                Giriş
+                {t("common.login")}
               </Button>
             </Link>
             <Link href="/register">
-              <Button size="sm">Kayıt Ol</Button>
+              <Button size="sm">{t("common.register")}</Button>
             </Link>
           </nav>
         )}

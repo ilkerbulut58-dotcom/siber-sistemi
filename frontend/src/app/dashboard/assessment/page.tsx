@@ -11,17 +11,18 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
+import { useTranslation } from "@/components/locale-provider";
 import {
   apiFetch,
   type AsmDiscoveryJob,
   type MobileUploadResult,
+  type OnboardingStatus,
   type Organization,
   type Project,
   type QuickScanResult,
   type ScanProfile,
 } from "@/lib/api-client";
 import { getApiBase } from "@/lib/api-base";
-import { scanProfileLabel } from "@/lib/i18n-tr";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,8 @@ type AssessmentResult = {
 
 export default function AssessmentPage() {
   const router = useRouter();
-  const { getAccessToken } = useAuth();
+  const { getAccessToken, user } = useAuth();
+  const { t, formatApiError, scanProfileLabel } = useTranslation();
   const [profiles, setProfiles] = useState<ScanProfile[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -49,6 +51,7 @@ export default function AssessmentPage() {
   const [runWeb, setRunWeb] = useState(true);
   const [runAsm, setRunAsm] = useState(true);
   const [runMobile, setRunMobile] = useState(false);
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const load = useCallback(async () => {
@@ -67,9 +70,9 @@ export default function AssessmentPage() {
         setSelectedOrgId(orgData[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Veri yüklenemedi");
+      setError(formatApiError(err));
     }
-  }, [getAccessToken, selectedOrgId]);
+  }, [formatApiError, getAccessToken, selectedOrgId]);
 
   useEffect(() => {
     void load();
@@ -79,6 +82,7 @@ export default function AssessmentPage() {
     if (!selectedOrgId) {
       setProjects([]);
       setSelectedProjectId("");
+      setOnboarding(null);
       return;
     }
     void apiFetch<Project[]>(`/api/v1/organizations/${selectedOrgId}/projects`, {
@@ -92,6 +96,11 @@ export default function AssessmentPage() {
         setProjects([]);
         setSelectedProjectId("");
       });
+    void apiFetch<OnboardingStatus>(`/api/v1/organizations/${selectedOrgId}/onboarding-status`, {
+      token: getAccessToken(),
+    })
+      .then(setOnboarding)
+      .catch(() => setOnboarding(null));
   }, [selectedOrgId, getAccessToken]);
 
   async function uploadApk(
@@ -115,7 +124,7 @@ export default function AssessmentPage() {
     );
     const body = await res.json();
     if (!res.ok || !body.success) {
-      throw new Error(body.error?.message || "APK yüklenemedi");
+      throw new Error(body.error?.message || t("assessment.mobileUploadFailed"));
     }
     return body.data as MobileUploadResult;
   }
@@ -145,16 +154,16 @@ export default function AssessmentPage() {
 
     try {
       if (!authorized && (doWeb || doAsm)) {
-        throw new Error("Web ve saldırı yüzeyi testleri için yetkilendirme onayı gerekli.");
+        throw new Error(t("assessment.authRequired"));
       }
       if (doMobile && !apkFile) {
-        throw new Error("Mobil analiz için APK dosyası seçin.");
+        throw new Error(t("assessment.apkRequired"));
       }
       if (doMobile && !doWeb && (!selectedOrgId || !selectedProjectId)) {
-        throw new Error("Mobil-only tarama için organizasyon ve proje seçin.");
+        throw new Error(t("assessment.mobileOnlyNeedOrg"));
       }
       if ((doWeb || doAsm) && !targetUrl) {
-        throw new Error("Web testleri için hedef URL girin.");
+        throw new Error(t("assessment.urlRequired"));
       }
 
       let orgId = selectedOrgId;
@@ -181,16 +190,16 @@ export default function AssessmentPage() {
 
         if (doWeb) {
           nextResults.push({
-            label: "Web güvenlik taraması",
+            label: t("assessment.webScan"),
             status: "success",
             href: scanHref,
-            message: "Tarama başlatıldı",
+            message: t("assessment.webScanStarted"),
           });
         } else {
           nextResults.push({
-            label: "Web güvenlik taraması",
+            label: t("assessment.webScan"),
             status: "skipped",
-            message: "Tam taramada web adımı atlandı",
+            message: t("assessment.webScanSkipped"),
           });
         }
       }
@@ -210,10 +219,10 @@ export default function AssessmentPage() {
         );
         asmHref = `/dashboard/${orgId}/projects/${projectId}/attack-surface`;
         nextResults.push({
-          label: "Saldırı yüzeyi keşfi",
+          label: t("assessment.asmDiscoveryLabel"),
           status: "success",
           href: asmHref,
-          message: `Keşif job #${asm.id.slice(0, 8)} başlatıldı`,
+          message: t("assessment.asmJobStarted", { id: asm.id.slice(0, 8) }),
         });
       }
 
@@ -221,10 +230,12 @@ export default function AssessmentPage() {
         const mobile = await uploadApk(orgId, projectId, apkFile);
         mobileHref = `/dashboard/${orgId}/mobile`;
         nextResults.push({
-          label: "Mobil APK analizi",
+          label: t("assessment.mobileAnalysisLabel"),
           status: "success",
           href: mobileHref,
-          message: mobile.duplicate ? "Mevcut APK — analiz yenilendi" : "APK yüklendi, analiz başladı",
+          message: mobile.duplicate
+            ? t("assessment.mobileDuplicate")
+            : t("assessment.mobileUploaded"),
         });
       }
 
@@ -246,36 +257,49 @@ export default function AssessmentPage() {
         router.push(scanHref);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Değerlendirme başlatılamadı");
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
   }
+
+  const quotaUnlimited = Boolean(user?.is_platform_admin);
+  const todayCount = onboarding?.daily_scan_count ?? 0;
+  const effectiveQuota = quotaUnlimited ? null : (onboarding?.daily_scan_quota ?? 5);
+  const quotaExceeded =
+    !quotaUnlimited && effectiveQuota !== null && todayCount >= effectiveQuota;
+  const activeScanAllowed = onboarding?.pilot_active_scan_allowed !== false;
+  const isRestrictedProfile = (name: string) =>
+    !activeScanAllowed && (name === "deep" || name === "code");
 
   return (
     <>
       <Navbar />
       <main className="container mx-auto max-w-4xl space-y-6 px-4 py-8">
         <div>
-          <h1 className="text-3xl font-bold">Güvenlik Değerlendirmesi</h1>
-          <p className="mt-2 text-muted-foreground">
-            Web, saldırı yüzeyi ve mobil testleri tek tek veya tam değerlendirme olarak başlatın.
-          </p>
+          <h1 className="text-3xl font-bold">{t("assessment.title")}</h1>
+          <p className="mt-2 text-muted-foreground">{t("assessment.subtitle")}</p>
         </div>
 
         {testMode && (
           <p className="rounded-md border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm text-green-200">
-            Test modu aktif — DNS doğrulama gerekmez.
+            {t("project.testModeBanner")}
           </p>
         )}
 
         {error && <p className="text-destructive">{error}</p>}
+        {effectiveQuota != null && (
+          <p className={`text-sm ${quotaExceeded ? "text-orange-400" : "text-muted-foreground"}`}>
+            {t("scanPage.quotaToday", { count: todayCount, quota: effectiveQuota })}
+            {quotaExceeded && ` — ${t("scanPage.quotaExceededHint")}`}
+          </p>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { icon: Globe, title: "Web", desc: "HTTP, header, Nuclei" },
-            { icon: Radar, title: "Saldırı Yüzeyi", desc: "Alt domain ve varlık keşfi" },
-            { icon: Smartphone, title: "Mobil APK", desc: "Statik manifest analizi" },
+            { icon: Globe, title: t("assessment.webScan"), desc: t("assessment.webScanDesc") },
+            { icon: Radar, title: t("assessment.asm"), desc: t("dashboard.attackSurfaceDesc") },
+            { icon: Smartphone, title: t("assessment.mobile"), desc: t("dashboard.quickMobileDesc") },
           ].map(({ icon: Icon, title, desc }) => (
             <Card key={title} className="border-border/60 bg-card/80">
               <CardHeader className="pb-2">
@@ -293,10 +317,10 @@ export default function AssessmentPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-primary" />
-              Değerlendirme Ayarları
+              {t("assessment.settingsTitle")}
             </CardTitle>
             <CardDescription>
-              Tam tarama seçili adımları sırayla başlatır; tek tek butonlar yalnızca ilgili testi çalıştırır.
+              {t("assessment.fullScanNote")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -307,16 +331,19 @@ export default function AssessmentPage() {
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="target_url">Hedef URL (web / ASM)</Label>
+                  <Label htmlFor="target_url">{t("assessment.targetUrlWebAsm")}</Label>
                   <Input
                     id="target_url"
                     name="target_url"
                     type="url"
-                    placeholder="https://ornek.com"
+                    placeholder={t("project.targetUrlPlaceholder")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="scan_profile">Web tarama profili</Label>
+                  <Label htmlFor="scan_profile">{t("assessment.webProfile")}</Label>
+                  {!activeScanAllowed && (
+                    <p className="text-xs text-orange-400">{t("project.profileDisabled")}</p>
+                  )}
                   <select
                     id="scan_profile"
                     name="scan_profile"
@@ -324,25 +351,27 @@ export default function AssessmentPage() {
                     defaultValue="safe"
                   >
                     {profiles.map((p) => (
-                      <option key={p.id} value={p.name}>
+                      <option key={p.id} value={p.name} disabled={isRestrictedProfile(p.name)}>
                         {scanProfileLabel(p.name, p.display_name)}
                       </option>
                     ))}
-                    {profiles.length === 0 && <option value="safe">Güvenli (Safe)</option>}
+                    {profiles.length === 0 && (
+                      <option value="safe">{t("assessment.safeProfileFallback")}</option>
+                    )}
                   </select>
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="org">Organizasyon (mobil-only)</Label>
+                  <Label htmlFor="org">{t("assessment.orgMobileOnly")}</Label>
                   <select
                     id="org"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
                   >
-                    <option value="">Otomatik (web taramasından)</option>
+                    <option value="">{t("assessment.autoFromWeb")}</option>
                     {orgs.map((org) => (
                       <option key={org.id} value={org.id}>
                         {org.name}
@@ -351,7 +380,7 @@ export default function AssessmentPage() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="project">Proje (mobil-only)</Label>
+                  <Label htmlFor="project">{t("assessment.projectMobileOnly")}</Label>
                   <select
                     id="project"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -359,7 +388,7 @@ export default function AssessmentPage() {
                     onChange={(e) => setSelectedProjectId(e.target.value)}
                     disabled={!selectedOrgId}
                   >
-                    <option value="">Seçin…</option>
+                    <option value="">{t("common.selectEllipsis")}</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -370,7 +399,7 @@ export default function AssessmentPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="apk">APK dosyası (isteğe bağlı)</Label>
+                <Label htmlFor="apk">{t("assessment.apkOptional")}</Label>
                 <Input
                   id="apk"
                   name="apk"
@@ -386,7 +415,7 @@ export default function AssessmentPage() {
                     checked={runWeb}
                     onChange={(e) => setRunWeb(e.target.checked)}
                   />
-                  Web tarama
+                  {t("assessment.webScan")}
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -394,7 +423,7 @@ export default function AssessmentPage() {
                     checked={runAsm}
                     onChange={(e) => setRunAsm(e.target.checked)}
                   />
-                  Saldırı yüzeyi
+                  {t("assessment.asm")}
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -402,23 +431,27 @@ export default function AssessmentPage() {
                     checked={runMobile}
                     onChange={(e) => setRunMobile(e.target.checked)}
                   />
-                  Mobil APK
+                  {t("assessment.mobile")}
                 </label>
               </div>
 
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" name="authorization" className="mt-1" defaultChecked />
-                <span>Bu varlıkları test etme yetkisine sahip olduğumu onaylıyorum.</span>
+                <span>{t("project.authorization")}</span>
               </label>
 
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Başlatılıyor…" : "Tam Değerlendirme Başlat"}
+                <Button type="submit" disabled={loading || (runWeb && quotaExceeded)}>
+                  {loading
+                    ? t("scanPage.starting")
+                    : runWeb && quotaExceeded
+                      ? t("scanPage.scanDisabledQuota")
+                      : t("assessment.runFull")}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={loading}
+                  disabled={loading || quotaExceeded}
                   onClick={() => {
                     if (formRef.current) {
                       void runAssessment(
@@ -428,7 +461,7 @@ export default function AssessmentPage() {
                     }
                   }}
                 >
-                  Yalnızca Web
+                  {t("assessment.runWeb")}
                 </Button>
                 <Button
                   type="button"
@@ -443,7 +476,7 @@ export default function AssessmentPage() {
                     }
                   }}
                 >
-                  Yalnızca ASM
+                  {t("assessment.runAsm")}
                 </Button>
                 <Button
                   type="button"
@@ -458,7 +491,7 @@ export default function AssessmentPage() {
                     }
                   }}
                 >
-                  Yalnızca Mobil
+                  {t("assessment.runMobile")}
                 </Button>
               </div>
             </form>
@@ -468,7 +501,7 @@ export default function AssessmentPage() {
         {results.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Sonuçlar</CardTitle>
+              <CardTitle>{t("assessment.results")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {results.map((item) => (
@@ -484,7 +517,7 @@ export default function AssessmentPage() {
                   </div>
                   {item.href && (
                     <Link href={item.href} className="text-primary underline">
-                      Görüntüle
+                      {t("common.open")}
                     </Link>
                   )}
                 </div>

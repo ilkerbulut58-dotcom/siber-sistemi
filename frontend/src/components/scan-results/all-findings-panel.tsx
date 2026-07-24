@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { FindingRowCard } from "@/components/scan-results/finding-row-card";
+import { useTranslation } from "@/components/locale-provider";
 
 
 
@@ -23,6 +24,7 @@ interface Props {
 
 
 export function AllFindingsPanel({ findings, onOpenDetail }: Props) {
+  const { t } = useTranslation();
 
   return (
 
@@ -30,11 +32,11 @@ export function AllFindingsPanel({ findings, onOpenDetail }: Props) {
 
       <CardHeader>
 
-        <CardTitle>Tüm Bulgular</CardTitle>
+        <CardTitle>{t("analytics.allFindingsTitle")}</CardTitle>
 
         <CardDescription>
 
-          {findings.length} bulgu — detay için satıra tıklayın veya Detay butonunu kullanın
+          {t("analytics.allFindingsDesc", { count: findings.length })}
 
         </CardDescription>
 
@@ -44,7 +46,7 @@ export function AllFindingsPanel({ findings, onOpenDetail }: Props) {
 
         {findings.length === 0 ? (
 
-          <p className="text-muted-foreground">Bulgu bulunamadı.</p>
+          <p className="text-muted-foreground">{t("analytics.findingsNotFound")}</p>
 
         ) : (
 

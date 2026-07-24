@@ -1,6 +1,7 @@
 "use client";
 
 import { scoreColor, type SecurityScoreResult } from "@/lib/scan-analytics";
+import { useTranslation } from "@/components/locale-provider";
 
 interface Props {
   result: SecurityScoreResult;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function SecurityScoreGauge({ result, delta }: Props) {
+  const { t } = useTranslation();
   const { score, label } = result;
   const color = scoreColor(score);
   const angle = (score / 100) * 180;
@@ -67,7 +69,7 @@ export function SecurityScoreGauge({ result, delta }: Props) {
           className={`mt-1 text-sm font-medium ${delta >= 0 ? "text-green-400" : "text-red-400"}`}
         >
           {delta >= 0 ? "+" : ""}
-          {delta} önceki taramaya göre
+          {delta} {t("scanResults.scoreDelta")}
         </p>
       )}
     </div>

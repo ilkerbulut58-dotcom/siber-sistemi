@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="{{ locale }}">
 <head>
   <meta charset="utf-8"/>
-  <title>SIBER Tarama Raporu — {{ scan.target_url }}</title>
+  <title>{{ labels.page_title }} — {{ scan.target_url }}</title>
   <style>
     body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; margin: 32px; }
     h1 { font-size: 22px; margin-bottom: 4px; }
@@ -22,35 +22,35 @@
   </style>
 </head>
 <body>
-  <h1>SIBER Güvenlik Tarama Raporu</h1>
+  <h1>{{ labels.report_title }}</h1>
   <p class="meta">
-    Hedef: <strong>{{ scan.target_url }}</strong><br/>
-    Profil: {{ profile_label }} · Durum: {{ status_label }}<br/>
-    Tarama ID: {{ scan.id }} · Tamamlanma: {{ completed_at }}<br/>
-    Toplam bulgu: {{ scan.findings_count }}
+    {{ labels.target }}: <strong>{{ scan.target_url }}</strong><br/>
+    {{ labels.profile }}: {{ profile_label }} · {{ labels.status }}: {{ status_label }}<br/>
+    {{ labels.scan_id }}: {{ scan.id }} · {{ labels.completed_at }}: {{ completed_at }}<br/>
+    {{ labels.total_findings }}: {{ scan.findings_count }}
   </p>
 
   <div class="summary">
-    <strong>Özet:</strong> {{ risk_summary }}<br/>
+    <strong>{{ labels.summary }}:</strong> {{ risk_summary }}<br/>
     {% for sev, count in severity_counts.items() if count %}
       <span class="badge {{ sev }}">{{ severity_labels[sev] }}: {{ count }}</span>
     {% endfor %}
   </div>
 
   {% if findings %}
-  <h2>Bulgular ({{ findings|length }})</h2>
+  <h2>{{ labels.findings }} ({{ findings|length }})</h2>
   {% for f in findings %}
   <div class="finding">
     <span class="badge {{ f.severity }}">{{ severity_labels.get(f.severity, f.severity) }}</span>
     <span class="muted">{{ status_labels.get(f.status, f.status) }}</span>
     <h3>{{ f.title }}</h3>
     {% if f.risk_explanation %}
-    <p><strong>Ne anlama geliyor?</strong> {{ f.risk_explanation }}</p>
+    <p><strong>{{ labels.what_it_means }}</strong> {{ f.risk_explanation }}</p>
     {% elif f.description %}
     <p>{{ f.description }}</p>
     {% endif %}
-    {% if f.affected_url %}<p class="muted">URL: {{ f.affected_url }}</p>{% endif %}
-    {% if f.remediation %}<p><strong>Çözüm:</strong> {{ f.remediation }}</p>{% endif %}
+    {% if f.affected_url %}<p class="muted">{{ labels.url }}: {{ f.affected_url }}</p>{% endif %}
+    {% if f.remediation %}<p><strong>{{ labels.solution }}:</strong> {{ f.remediation }}</p>{% endif %}
     {% if f.remediation_steps %}
     <ol>{% for step in f.remediation_steps %}<li>{{ step }}</li>{% endfor %}</ol>
     {% endif %}
@@ -58,9 +58,9 @@
   </div>
   {% endfor %}
   {% else %}
-  <p>Bu taramada bulgu tespit edilmedi.</p>
+  <p>{{ labels.no_findings }}</p>
   {% endif %}
 
-  <p class="muted" style="margin-top:32px">SIBER Security Analysis Platform — {{ generated_at }}</p>
+  <p class="muted" style="margin-top:32px">{{ labels.footer }} — {{ generated_at }}</p>
 </body>
 </html>

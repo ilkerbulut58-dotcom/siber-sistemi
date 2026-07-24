@@ -76,3 +76,4 @@ async def test_verify_domain(
     body = response.json()["data"]
     assert body["verified"] is True
     assert body["domain"]["is_verified"] is True
+    assert body["domain"]["active_scan_allowed"] is True

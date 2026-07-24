@@ -1,3 +1,5 @@
+"use client";
+
 import { severityLabel } from "@/lib/i18n-tr";
 import { cn } from "@/lib/utils";
 

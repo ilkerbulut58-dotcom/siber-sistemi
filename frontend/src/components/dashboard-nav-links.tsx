@@ -11,6 +11,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -19,13 +20,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
-  { href: "/dashboard/assessment", label: "Tam Değerlendirme", icon: ShieldCheck },
-  { href: "/dashboard/scan", label: "Web Tarama", icon: Globe },
-  { href: "/dashboard/mobile", label: "Mobil APK", icon: Smartphone },
-] as const;
 
 function NavLink({
   href,
@@ -62,6 +56,14 @@ function NavLink({
 
 export function DashboardNavLinks({ mobile = false }: { mobile?: boolean }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
+
+  const navItems = [
+    { href: "/dashboard", label: t("nav.panel"), icon: LayoutDashboard },
+    { href: "/dashboard/assessment", label: t("nav.fullAssessment"), icon: ShieldCheck },
+    { href: "/dashboard/scan", label: t("nav.webScan"), icon: Globe },
+    { href: "/dashboard/mobile", label: t("nav.mobileApk"), icon: Smartphone },
+  ] as const;
 
   if (mobile) {
     return (
@@ -69,20 +71,16 @@ export function DashboardNavLinks({ mobile = false }: { mobile?: boolean }) {
         <SheetTrigger asChild>
           <Button variant="outline" size="sm" className="md:hidden">
             <Menu className="h-4 w-4" />
-            <span className="sr-only">Menü</span>
+            <span className="sr-only">{t("common.menu")}</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-[280px] p-0">
           <SheetHeader className="border-b border-border px-4 py-4">
-            <SheetTitle>SIBER Menü</SheetTitle>
+            <SheetTitle>{t("nav.menuTitle")}</SheetTitle>
           </SheetHeader>
           <nav className="flex flex-col gap-1 p-3">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.href}
-                {...item}
-                onClick={() => setOpen(false)}
-              />
+            {navItems.map((item) => (
+              <NavLink key={item.href} {...item} onClick={() => setOpen(false)} />
             ))}
           </nav>
         </SheetContent>
@@ -92,7 +90,7 @@ export function DashboardNavLinks({ mobile = false }: { mobile?: boolean }) {
 
   return (
     <nav className="hidden items-center gap-1 md:flex">
-      {NAV_ITEMS.map((item) => (
+      {navItems.map((item) => (
         <NavLink key={item.href} {...item} />
       ))}
     </nav>

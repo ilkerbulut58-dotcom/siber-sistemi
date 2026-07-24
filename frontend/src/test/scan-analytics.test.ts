@@ -36,6 +36,11 @@ describe("scan-analytics", () => {
     expect(scoreToLevel(92)).toBe("strong");
   });
 
+  it("handles findings without title in header status", () => {
+    const statuses = getHeaderStatuses([baseFinding({ title: undefined as unknown as string })]);
+    expect(statuses).toHaveLength(6);
+  });
+
   it("counts severities", () => {
     const c = countBySeverity([
       baseFinding({ severity: "high" }),

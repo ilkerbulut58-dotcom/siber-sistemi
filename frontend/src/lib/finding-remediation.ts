@@ -1,12 +1,19 @@
 import type { Finding } from "@/lib/api-types";
+import { dictionaries } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n/types";
+import { REMEDIATION_CONTENT } from "@/lib/remediation-content";
 
 export type RemediationTabId =
-  | "plesk"
+  | "general"
   | "nginx"
   | "apache"
+  | "plesk"
+  | "cpanel"
   | "cloudflare"
+  | "iis"
   | "framework"
-  | "general";
+  | "android"
+  | "ios";
 
 export interface RemediationTab {
   id: RemediationTabId;
@@ -14,15 +21,6 @@ export interface RemediationTab {
   steps: string[];
   code?: string;
 }
-
-const TAB_LABELS: Record<RemediationTabId, string> = {
-  plesk: "Plesk",
-  nginx: "Nginx",
-  apache: "Apache",
-  cloudflare: "Cloudflare",
-  framework: "Framework / Uygulama",
-  general: "Genel",
-};
 
 function mentions(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase();
@@ -33,110 +31,196 @@ function filterSteps(steps: string[], keywords: string[]): string[] {
   return steps.filter((s) => mentions(s, keywords));
 }
 
-export function buildRemediationTabs(finding: Finding): RemediationTab[] {
+function pathsForPlatform(paths: string[], keywords: string[]): string[] {
+  return paths.filter((p) => mentions(p, keywords));
+}
+
+function toApacheHeaderSnippet(nginxSnippet: string): string | undefined {
+  const match = nginxSnippet.match(/add_header\s+([\w-]+)\s+"([^"]*)"\s*(always)?/);
+  if (!match) return undefined;
+  const always = match[3] ? " always" : "";
+  return `Header set ${match[1]} "${match[2]}"${always}`;
+}
+
+function isSecurityHeaderFinding(finding: Finding, snippet: string, combined: string): boolean {
+  return (
+    Boolean(finding.correlation_key?.startsWith("missing-header")) ||
+    snippet.includes("add_header") ||
+    mentions(combined, ["header", "hsts", "csp", "x-frame", "nosniff"])
+  );
+}
+
+function tabLabel(locale: Locale, id: RemediationTabId): string {
+  const map: Record<RemediationTabId, keyof typeof dictionaries.tr.remediation> = {
+    general: "tabGeneral",
+    nginx: "tabNginx",
+    apache: "tabApache",
+    plesk: "tabPlesk",
+    cpanel: "tabCpanel",
+    cloudflare: "tabCloudflare",
+    iis: "tabIis",
+    framework: "tabFramework",
+    android: "tabAndroid",
+    ios: "tabIos",
+  };
+  return dictionaries[locale].remediation[map[id]];
+}
+
+export function buildRemediationTabs(finding: Finding, locale: Locale = "tr"): RemediationTab[] {
+  const r = dictionaries[locale].remediation;
+  const content = REMEDIATION_CONTENT[locale];
+  const locationPrefix = r.locationPrefix;
+
   const steps = finding.remediation_steps ?? [];
   const paths = finding.config_file_paths ?? [];
   const snippet = finding.config_snippet ?? "";
   const combined = [finding.remediation ?? "", ...steps, ...paths, snippet].join("\n");
+  const isHeaderFix = isSecurityHeaderFinding(finding, snippet, combined);
 
   const tabs: RemediationTab[] = [];
 
-  const pleskSteps = filterSteps(steps, ["plesk", "domains", "panel"]);
-  const pleskPaths = paths.filter((p) => mentions(p, ["plesk", "domains"]));
-  if (pleskSteps.length > 0 || pleskPaths.length > 0 || mentions(combined, ["plesk"])) {
+  const genericSteps = steps.filter(
+    (s) => !mentions(s, ["plesk", "domains → sitenizi", "domains →"])
+  );
+  tabs.push({
+    id: "general",
+    label: tabLabel(locale, "general"),
+    steps:
+      genericSteps.length > 0
+        ? genericSteps
+        : finding.remediation
+          ? [finding.remediation]
+          : [r.fallbackReview],
+  });
+
+  if (finding.asset_type === "mobile") {
     tabs.push({
-      id: "plesk",
-      label: TAB_LABELS.plesk,
-      steps: [...pleskSteps, ...pleskPaths.map((p) => `Konum: ${p}`)],
-      code: mentions(snippet, ["nginx", "add_header"]) ? undefined : snippet || undefined,
+      id: "android",
+      label: tabLabel(locale, "android"),
+      steps: content.androidSteps,
     });
+    tabs.push({
+      id: "ios",
+      label: tabLabel(locale, "ios"),
+      steps: content.iosSteps,
+    });
+    return tabs;
   }
 
-  if (
-    mentions(snippet, ["add_header", "nginx", "server {", "location"]) ||
-    filterSteps(steps, ["nginx"]).length > 0 ||
-    paths.some((p) => mentions(p, ["nginx", "vhost_nginx"]))
-  ) {
+  if (isHeaderFix || mentions(combined, ["nginx", "add_header", "server_tokens"])) {
+    const nginxPaths = pathsForPlatform(paths, ["[nginx", "nginx", "sites-available"]);
     tabs.push({
       id: "nginx",
-      label: TAB_LABELS.nginx,
-      steps:
-        filterSteps(steps, ["nginx"]).length > 0
-          ? filterSteps(steps, ["nginx"])
-          : ["Additional nginx directives bölümüne aşağıdaki yapılandırmayı ekleyin."],
-      code: snippet || undefined,
+      label: tabLabel(locale, "nginx"),
+      steps: [
+        ...content.nginxSteps,
+        ...nginxPaths.map((p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`),
+      ],
+      code: snippet.includes("add_header") || snippet.includes("server_tokens") ? snippet : undefined,
     });
   }
 
-  if (mentions(combined, ["apache", ".htaccess", "mod_"])) {
+  if (isHeaderFix || mentions(combined, ["apache", ".htaccess", "mod_"])) {
+    const apachePaths = pathsForPlatform(paths, ["[apache", "apache", ".htaccess"]);
     tabs.push({
       id: "apache",
-      label: TAB_LABELS.apache,
-      steps: filterSteps(steps, ["apache", ".htaccess"]).length
-        ? filterSteps(steps, ["apache", ".htaccess"])
-        : [".htaccess veya Apache virtual host yapılandırmasını güncelleyin."],
-      code: mentions(snippet, ["Header set", "RewriteEngine"]) ? snippet : undefined,
+      label: tabLabel(locale, "apache"),
+      steps: [
+        ...content.apacheSteps,
+        ...apachePaths.map((p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`),
+      ],
+      code: toApacheHeaderSnippet(snippet),
     });
   }
 
-  if (mentions(combined, ["cloudflare", "cf-"])) {
+  if (pathsForPlatform(paths, ["plesk"]).length > 0 || filterSteps(steps, ["plesk"]).length > 0) {
     tabs.push({
-      id: "cloudflare",
-      label: TAB_LABELS.cloudflare,
+      id: "plesk",
+      label: tabLabel(locale, "plesk"),
       steps: [
-        "Cloudflare Dashboard → siteniz → Rules / Transform Rules veya Page Rules.",
-        "Gerekli güvenlik başlıklarını ekleyin veya WAF ayarlarını gözden geçirin.",
+        ...content.pleskSteps,
+        ...pathsForPlatform(paths, ["plesk"]).map(
+          (p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`
+        ),
+      ],
+      code: snippet.includes("add_header") ? snippet : undefined,
+    });
+  }
+
+  if (pathsForPlatform(paths, ["cpanel", "whm"]).length > 0 || mentions(combined, ["cpanel", "whm"])) {
+    tabs.push({
+      id: "cpanel",
+      label: tabLabel(locale, "cpanel"),
+      steps: [
+        ...content.cpanelSteps,
+        ...pathsForPlatform(paths, ["cpanel", "whm"]).map(
+          (p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`
+        ),
       ],
     });
   }
 
   if (
-    mentions(combined, ["wordpress", "next.js", "nextjs", "react", "framework", "uygulama"])
+    pathsForPlatform(paths, ["cloudflare"]).length > 0 ||
+    mentions(combined, ["cloudflare", "cf-"])
   ) {
     tabs.push({
-      id: "framework",
-      label: TAB_LABELS.framework,
-      steps: filterSteps(steps, ["wordpress", "next", "framework", "uygulama", "script"]).length
-        ? filterSteps(steps, ["wordpress", "next", "framework", "uygulama", "script"])
-        : [
-            finding.remediation ??
-              "Uygulama katmanında ilgili güvenlik ayarını güncelleyin.",
-          ],
+      id: "cloudflare",
+      label: tabLabel(locale, "cloudflare"),
+      steps: [
+        ...content.cloudflareSteps,
+        ...pathsForPlatform(paths, ["cloudflare"]).map(
+          (p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`
+        ),
+      ],
     });
   }
 
-  if (tabs.length === 0) {
+  if (pathsForPlatform(paths, ["iis", "web.config"]).length > 0 || mentions(combined, ["iis", "asp.net"])) {
     tabs.push({
-      id: "general",
-      label: TAB_LABELS.general,
-      steps: steps.length
-        ? steps
-        : finding.remediation
-          ? [finding.remediation]
-          : ["Yapılandırmayı gözden geçirin ve test ortamında doğrulayın."],
-      code: snippet || undefined,
+      id: "iis",
+      label: tabLabel(locale, "iis"),
+      steps: [
+        ...content.iisSteps,
+        ...pathsForPlatform(paths, ["iis"]).map(
+          (p) => `${locationPrefix}: ${p.replace(/^\[[^\]]+\]\s*/, "")}`
+        ),
+      ],
+    });
+  }
+
+  if (
+    mentions(combined, ["wordpress", "next.js", "nextjs", "react", "framework", "uygulama", "php:", "node:", "anwendung"])
+  ) {
+    tabs.push({
+      id: "framework",
+      label: tabLabel(locale, "framework"),
+      steps: filterSteps(steps, ["wordpress", "next", "framework", "uygulama", "script", "php", "node", "anwendung"]).length
+        ? filterSteps(steps, ["wordpress", "next", "framework", "uygulama", "script", "php", "node", "anwendung"])
+        : [finding.remediation ?? r.frameworkFallback],
     });
   }
 
   return tabs;
 }
 
-export function getFindingCategory(finding: Finding): string {
-  if (finding.correlation_key?.startsWith("missing-header")) return "Güvenlik başlığı";
-  if (finding.correlation_key?.startsWith("exposed-")) return "Hassas dosya / ifşa";
+export function getFindingCategory(finding: Finding, locale: Locale = "tr"): string {
+  const r = dictionaries[locale].remediation;
+  if (finding.correlation_key?.startsWith("missing-header")) return r.categoryHeader;
+  if (finding.correlation_key?.startsWith("exposed-")) return r.categoryExposure;
   if (finding.correlation_key?.startsWith("cert-") || finding.correlation_key === "no-https") {
-    return "TLS / HTTPS";
+    return r.categoryTls;
   }
-  if (finding.source_tool === "zap") return "ZAP pasif analiz";
-  if (finding.source_tool === "nuclei") return "Nuclei şablonu";
-  return "Genel güvenlik";
+  if (finding.source_tool === "zap") return r.categoryZap;
+  if (finding.source_tool === "nuclei") return r.categoryNuclei;
+  return r.categoryGeneral;
 }
 
-export function getBusinessImpact(finding: Finding): string {
+export function getBusinessImpact(finding: Finding, locale: Locale = "tr"): string {
   return (
     finding.risk_explanation ??
     finding.description ??
-    "Bu bulgu güvenlik duruşunuzu etkileyebilir; detaylar teknik kanıt bölümünde."
+    dictionaries[locale].remediation.impactFallback
   );
 }
 
@@ -144,10 +228,11 @@ export function getWhatItMeans(finding: Finding): string {
   return finding.description ?? finding.ai_summary ?? finding.title;
 }
 
-export function getFixPriority(finding: Finding): string {
+export function getFixPriority(finding: Finding, locale: Locale = "tr"): string {
+  const r = dictionaries[locale].remediation;
   const score = finding.risk_score ?? 0;
-  if (finding.severity === "critical" || score >= 80) return "Acil — öncelikli";
-  if (finding.severity === "high" || score >= 60) return "Yüksek — bu hafta";
-  if (finding.severity === "medium" || score >= 35) return "Orta — planlı";
-  return "Düşük — iyileştirme";
+  if (finding.severity === "critical" || score >= 80) return r.priorityUrgent;
+  if (finding.severity === "high" || score >= 60) return r.priorityHigh;
+  if (finding.severity === "medium" || score >= 35) return r.priorityMedium;
+  return r.priorityLow;
 }

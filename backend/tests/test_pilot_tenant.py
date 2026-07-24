@@ -80,6 +80,69 @@ def test_pilot_effective_quota() -> None:
     assert PilotService.effective_daily_quota(org, 50) == 3
 
 
+def test_platform_admin_unlimited_quota() -> None:
+    from types import SimpleNamespace
+
+    from app.core.config import Settings
+    from app.services.quota_service import QuotaService
+
+    admin = SimpleNamespace(is_platform_admin=True)
+    org = Organization(
+        id=uuid4(),
+        name="Pilot",
+        slug="pilot",
+        owner_id=uuid4(),
+        is_pilot=True,
+        pilot_scan_quota=2,
+    )
+    settings = Settings(environment="production")
+    assert QuotaService.should_enforce_scan_limits(admin, org, settings) is False
+    assert QuotaService.effective_daily_quota(admin, org, 5) is None
+
+
+def test_regular_user_enforces_quota() -> None:
+    from types import SimpleNamespace
+
+    from app.core.config import Settings
+    from app.services.quota_service import QuotaService
+
+    user = SimpleNamespace(is_platform_admin=False)
+    org = Organization(
+        id=uuid4(),
+        name="Pilot",
+        slug="pilot-user",
+        owner_id=uuid4(),
+        is_pilot=True,
+        pilot_scan_quota=2,
+    )
+    settings = Settings(environment="production")
+    assert QuotaService.should_enforce_scan_limits(user, org, settings) is True
+    assert QuotaService.effective_daily_quota(user, org, 5) == 2
+
+
+def test_platform_admin_skips_domain_verification() -> None:
+    from types import SimpleNamespace
+
+    from app.core.config import Settings
+    from app.services.quota_service import QuotaService
+
+    admin = SimpleNamespace(is_platform_admin=True)
+    settings = Settings(environment="production", skip_domain_verification=False)
+    assert QuotaService.requires_domain_verification(admin, settings) is False
+    assert QuotaService.is_unrestricted_scan_actor(admin) is True
+
+
+def test_regular_user_requires_domain_verification() -> None:
+    from types import SimpleNamespace
+
+    from app.core.config import Settings
+    from app.services.quota_service import QuotaService
+
+    user = SimpleNamespace(is_platform_admin=False)
+    settings = Settings(environment="production", skip_domain_verification=False)
+    assert QuotaService.requires_domain_verification(user, settings) is True
+
+
 @pytest.mark.asyncio
 async def test_platform_admin_updates_pilot_tenant(client: AsyncClient) -> None:
     admin_headers, _admin_org = await _register(client, "admin-pilot@example.com")

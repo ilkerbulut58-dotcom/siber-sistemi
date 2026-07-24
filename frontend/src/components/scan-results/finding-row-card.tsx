@@ -8,7 +8,8 @@ import type { Finding } from "@/lib/api-client";
 
 import { confidenceLabel } from "@/lib/i18n-tr";
 
-import { formatSourceTool as fmtTool } from "@/lib/scan-analytics";
+import { formatSourceTool } from "@/lib/scan-analytics";
+import { useTranslation } from "@/components/locale-provider";
 
 import { Button } from "@/components/ui/button";
 
@@ -33,8 +34,10 @@ interface Props {
 
 
 export function FindingRowCard({ finding, onDetail, onRowClick, compact }: Props) {
-
-  const sources = finding.source_tools?.map(fmtTool).join(", ") ?? fmtTool(finding.source_tool);
+  const { locale } = useTranslation();
+  const sources =
+    finding.source_tools?.map((tool) => formatSourceTool(tool, locale)).join(", ") ??
+    formatSourceTool(finding.source_tool, locale);
 
 
 
@@ -96,7 +99,7 @@ export function FindingRowCard({ finding, onDetail, onRowClick, compact }: Props
 
           </div>
 
-          <h3 className="mt-2 font-semibold leading-snug">{finding.title}</h3>
+          <h3 className="mt-2 font-semibold leading-snug">{finding.title ?? "—"}</h3>
 
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
 

@@ -11,7 +11,8 @@ Kurallar:
 - Pasif doğrulama (verification_status=verified) varsa confidence_label verified olabilir.
 - Bulgu muğlak veya tek kaynaklıysa unverified kullan.
 - Yanlış alarm ihtimali yüksekse likely_false_positive kullan.
-- Özet kısa ve iş odaklı olsun; remediation Plesk/nginx odaklı pratik adımlar içersin.
+- Özet kısa ve iş odaklı olsun; remediation adımları hosting ortamından bağımsız olsun
+  (Nginx, Apache, cPanel, Plesk, Cloudflare, IIS veya uygulama katmanı — hepsine uygun genel rehber).
 """
 
 USER_PROMPT_TEMPLATE = """Aşağıdaki güvenlik bulgusunu analiz et ve JSON döndür.

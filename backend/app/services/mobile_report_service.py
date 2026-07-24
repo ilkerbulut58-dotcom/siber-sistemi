@@ -13,6 +13,14 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
+from app.i18n.report_strings import (
+    MOBILE_JSON_LIMITATIONS,
+    MOBILE_REPORT_LABELS,
+    SEVERITY_LABELS,
+    Locale,
+    mobile_risk_summary,
+    normalize_locale,
+)
 from app.mobile.services.mobile_service import MobileService
 from app.models.finding import Finding
 from app.models.mobile_application import MobileAnalysisStatus
@@ -22,14 +30,6 @@ from app.services.pdf_utils import html_to_pdf
 logger = logging.getLogger(__name__)
 
 ReportFormat = Literal["html", "pdf", "json"]
-
-SEVERITY_LABELS = {
-    "critical": "Kritik",
-    "high": "Yüksek",
-    "medium": "Orta",
-    "low": "Düşük",
-    "info": "Bilgi",
-}
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
@@ -47,7 +47,9 @@ class MobileReportService:
         organization_id: UUID,
         app_id: UUID,
         report_format: ReportFormat,
+        locale: str | None = "tr",
     ) -> tuple[bytes, str, str]:
+        loc = normalize_locale(locale)
         app = await MobileService(self.db).get(organization_id, app_id)
         status = (
             app.analysis_status.value
@@ -73,16 +75,16 @@ class MobileReportService:
         )
 
         if report_format == "json":
-            return self._build_json(app, findings_sorted)
+            return self._build_json(app, findings_sorted, loc)
 
-        html = self._render_html(app, findings_sorted)
+        html = self._render_html(app, findings_sorted, loc)
         if report_format == "html":
             return html.encode("utf-8"), "text/html; charset=utf-8", self._filename(app, "html")
 
         pdf_bytes = html_to_pdf(html)
         return pdf_bytes, "application/pdf", self._filename(app, "pdf")
 
-    def _render_html(self, app, findings: list[Finding]) -> str:
+    def _render_html(self, app, findings: list[Finding], locale: Locale) -> str:
         severity_counts: dict[str, int] = {}
         masvs_categories: dict[str, int] = {}
         for finding in findings:
@@ -94,12 +96,14 @@ class MobileReportService:
 
         template = self._jinja.get_template("mobile_report.html")
         return template.render(
+            locale=locale,
+            labels=MOBILE_REPORT_LABELS[locale],
             app=app,
             findings=findings,
-            severity_labels=SEVERITY_LABELS,
+            severity_labels=SEVERITY_LABELS[locale],
             severity_counts=severity_counts,
             masvs_categories=masvs_categories,
-            risk_summary=self._risk_summary(severity_counts, app.security_score),
+            risk_summary=mobile_risk_summary(locale, severity_counts, app.security_score),
             analyzed_at=(
                 app.analyzed_at.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC")
                 if app.analyzed_at
@@ -108,7 +112,7 @@ class MobileReportService:
             generated_at=datetime.now(UTC).strftime("%d.%m.%Y %H:%M UTC"),
         )
 
-    def _build_json(self, app, findings: list[Finding]) -> tuple[bytes, str, str]:
+    def _build_json(self, app, findings: list[Finding], locale: Locale) -> tuple[bytes, str, str]:
         severity_counts: dict[str, int] = {}
         masvs_categories: dict[str, int] = {}
         for finding in findings:
@@ -119,6 +123,7 @@ class MobileReportService:
                 )
 
         payload = {
+            "locale": locale,
             "application": {
                 "id": str(app.id),
                 "application_name": app.application_name,
@@ -134,23 +139,20 @@ class MobileReportService:
                 "analyzed_at": app.analyzed_at.isoformat() if app.analyzed_at else None,
             },
             "summary": {
-                "risk_summary": self._risk_summary(severity_counts, app.security_score),
+                "risk_summary": mobile_risk_summary(locale, severity_counts, app.security_score),
                 "severity_counts": severity_counts,
                 "masvs_categories": masvs_categories,
             },
             "scope": {
                 "method": "static_apk_analysis",
-                "limitations": [
-                    "No dynamic runtime analysis or code execution",
-                    "Binary manifest parsing not performed (text-based static checks)",
-                    "iOS IPA not supported in this release",
-                ],
+                "limitations": MOBILE_JSON_LIMITATIONS[locale],
             },
             "findings": [
                 {
                     "id": str(f.id),
                     "title": f.title,
                     "severity": f.severity,
+                    "severity_label": SEVERITY_LABELS[locale].get(f.severity, f.severity),
                     "status": f.status,
                     "description": f.description,
                     "affected_component": f.affected_component,
@@ -169,13 +171,8 @@ class MobileReportService:
 
     @staticmethod
     def _risk_summary(counts: dict[str, int], security_score: float | None) -> str:
-        if (counts.get("critical") or 0) > 0 or (counts.get("high") or 0) > 0:
-            return "Yüksek öncelikli mobil güvenlik bulguları tespit edildi."
-        if (counts.get("medium") or 0) > 0:
-            return "Orta seviye mobil güvenlik iyileştirmeleri önerilir."
-        if security_score is not None and security_score >= 80:
-            return "Mobil güvenlik durumu genel olarak iyi görünüyor."
-        return "Kritik mobil bulgu tespit edilmedi; periyodik analiz önerilir."
+        """Backward-compatible helper for tests."""
+        return mobile_risk_summary("tr", counts, security_score)
 
     @staticmethod
     def _filename(app, extension: str) -> str:

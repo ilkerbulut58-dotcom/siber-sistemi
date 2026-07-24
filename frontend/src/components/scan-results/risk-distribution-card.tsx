@@ -1,6 +1,6 @@
 "use client";
 
-import { severityLabel } from "@/lib/i18n-tr";
+import { useTranslation } from "@/components/locale-provider";
 import type { SeverityCounts } from "@/lib/scan-analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -15,6 +15,7 @@ const COLORS: Record<string, string> = {
 const ORDER = ["critical", "high", "medium", "low", "info"] as const;
 
 export function RiskDistributionCard({ counts }: { counts: SeverityCounts }) {
+  const { t, severityLabel } = useTranslation();
   const total = ORDER.reduce((s, k) => s + counts[k], 0);
   let offset = 0;
   const segments = ORDER.filter((k) => counts[k] > 0).map((k) => {
@@ -30,7 +31,9 @@ export function RiskDistributionCard({ counts }: { counts: SeverityCounts }) {
   return (
     <Card className="border-border/60 bg-card/80 shadow-[0_0_24px_-8px_rgba(99,102,241,0.15)]">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Risk Dağılımı</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {t("analytics.riskDistribution")}
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex items-center gap-4">
         <svg width="100" height="100" viewBox="0 0 100 100" className="shrink-0">
@@ -66,7 +69,7 @@ export function RiskDistributionCard({ counts }: { counts: SeverityCounts }) {
             ) : null
           )}
           {total === 0 && (
-            <li className="text-muted-foreground">Bulgu yok</li>
+            <li className="text-muted-foreground">{t("analytics.noFindings")}</li>
           )}
         </ul>
       </CardContent>
