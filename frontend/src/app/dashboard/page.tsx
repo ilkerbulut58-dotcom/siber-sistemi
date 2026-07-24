@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Globe, Radar, ShieldCheck, Smartphone } from "lucide-react";
 import { Navbar } from "@/components/navbar";
+import { EmailVerificationBanner } from "@/components/email-verification-banner";
 import { useAuth } from "@/components/auth-provider";
 import { useTranslation, interpolate } from "@/components/locale-provider";
 import {
@@ -178,6 +179,8 @@ export default function DashboardPage() {
         </div>
 
         {error && <p className="text-destructive">{error}</p>}
+
+        <EmailVerificationBanner />
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {quickActions.map(({ href, title, description, icon: Icon, ...rest }) => (

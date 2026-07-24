@@ -1,32 +1,37 @@
 "use client";
 
 import Link from "next/link";
+import { CheckCircle2, Mail } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
 import { useTranslation } from "@/components/locale-provider";
 import { apiFetch, type UserProfile } from "@/lib/api-client";
 import { getApiBase } from "@/lib/api-base";
+import { ApiError } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function SettingsPage() {
-  const { getAccessToken, user } = useAuth();
+  const { getAccessToken, user, refreshUser } = useAuth();
   const { t, formatApiError } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const emailVerified = profile?.is_email_verified ?? user?.is_email_verified ?? false;
+
   const load = useCallback(async () => {
     try {
       const data = await apiFetch<UserProfile>("/api/v1/users/me", { token: getAccessToken() });
       setProfile(data);
+      await refreshUser();
     } catch (err) {
       setError(formatApiError(err));
     }
-  }, [formatApiError, getAccessToken]);
+  }, [formatApiError, getAccessToken, refreshUser]);
 
   useEffect(() => {
     void load();
@@ -70,14 +75,19 @@ export default function SettingsPage() {
   }
 
   async function resendVerification() {
+    setError(null);
     try {
-      await fetch(`${getApiBase()}/api/v1/auth/resend-verification`, {
+      const res = await fetch(`${getApiBase()}/api/v1/auth/resend-verification`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${getAccessToken()}`,
         },
       });
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new ApiError(body.error?.code || "REQUEST_FAILED", body.error?.message || "Failed");
+      }
       setMessage(t("settings.verificationSent"));
     } catch (err) {
       setError(formatApiError(err));
@@ -125,14 +135,17 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>{t("settings.emailVerification")}</CardTitle>
             <CardDescription>
-              {profile?.is_email_verified || user?.is_email_verified
-                ? t("settings.emailVerified")
-                : t("settings.emailNotVerified")}
+              {emailVerified ? t("settings.emailVerifiedDetail") : t("settings.emailNotVerified")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {!profile?.is_email_verified && !user?.is_email_verified && (
-              <>
+          <CardContent className="space-y-4">
+            {emailVerified ? (
+              <div className="flex items-center gap-2 text-green-400">
+                <CheckCircle2 className="h-5 w-5" />
+                <span>{t("settings.emailVerified")}</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => void resendVerification()}>
                   {t("settings.resendVerification")}
                 </Button>
@@ -141,8 +154,25 @@ export default function SettingsPage() {
                     {t("auth.verifyBtn")}
                   </Button>
                 </Link>
-              </>
+              </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              {t("settings.mailNotificationsTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>• {t("settings.mailFlowRegister")}</li>
+              <li>• {t("settings.mailFlowVerify")}</li>
+              <li>• {t("settings.mailFlowForgot")}</li>
+              <li>• {t("settings.mailFlowReset")}</li>
+            </ul>
           </CardContent>
         </Card>
 

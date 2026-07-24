@@ -30,6 +30,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   getAccessToken: () => string | null;
 }
 
@@ -154,6 +155,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
 
+  const refreshUser = useCallback(async () => {
+    const token = readStoredTokens()?.access_token ?? tokens?.access_token;
+    if (!token) return;
+    const res = await authFetch("/api/v1/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json();
+    if (res.ok && body.success && body.data) {
+      setUser(body.data);
+      localStorage.setItem(USER_KEY, JSON.stringify(body.data));
+    }
+  }, [tokens?.access_token]);
+
   const logout = useCallback(async () => {
     if (tokens?.refresh_token) {
       try {
@@ -181,8 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, getAccessToken }),
-    [user, isLoading, login, register, logout, getAccessToken]
+    () => ({ user, isLoading, login, register, logout, refreshUser, getAccessToken }),
+    [user, isLoading, login, register, logout, refreshUser, getAccessToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

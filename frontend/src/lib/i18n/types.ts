@@ -71,10 +71,20 @@ export interface Dictionary {
     resetToken: string;
     resetSuccess: string;
     verifyEmailTitle: string;
-    verifyEmailDesc: string;
+    verifyEmailDescLink: string;
     verifyToken: string;
     verifyBtn: string;
+    verifyVerifying: string;
     verifySuccess: string;
+    verifySuccessTitle: string;
+    verifySuccessBody: string;
+    verifySuccessCta: string;
+    verifyExpired: string;
+    verifyInvalid: string;
+    verifyAlready: string;
+    verifyManualHint: string;
+    registerCheckEmailTitle: string;
+    registerCheckEmailBody: string;
     backToLogin: string;
   };
   home: {
@@ -124,6 +134,10 @@ export interface Dictionary {
     quickWebScanDesc: string;
     quickMobile: string;
     quickMobileDesc: string;
+    emailVerifyBannerTitle: string;
+    emailVerifyBannerBody: string;
+    emailVerifyBannerResend: string;
+    emailVerifyBannerCta: string;
     createOrgFailed: string;
     createWorkspaceFailed: string;
     createGrantFailed: string;
@@ -487,9 +501,15 @@ export interface Dictionary {
     passwordChanged: string;
     emailVerification: string;
     emailVerified: string;
+    emailVerifiedDetail: string;
     emailNotVerified: string;
     resendVerification: string;
     verificationSent: string;
+    mailNotificationsTitle: string;
+    mailFlowRegister: string;
+    mailFlowVerify: string;
+    mailFlowForgot: string;
+    mailFlowReset: string;
     loadFailed: string;
   };
   monitoring: {

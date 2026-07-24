@@ -30,7 +30,7 @@ export default function RegisterPage() {
         String(form.get("password")),
         String(form.get("full_name") || "")
       );
-      router.push("/dashboard");
+      router.push("/verify-email?registered=1");
     } catch (err) {
       setError(formatApiError(err));
     } finally {
