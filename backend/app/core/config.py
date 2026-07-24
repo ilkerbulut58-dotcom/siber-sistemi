@@ -52,9 +52,24 @@ class Settings(BaseSettings):
     scan_rate_limit_per_hour: int = Field(default=20, ge=1, le=10_000)
     scan_concurrency_limit: int = Field(default=2, ge=1, le=20)
     scan_daily_quota: int = Field(default=50, ge=1, le=10_000)
-    notifications_provider: Literal["noop"] = Field(
+    notifications_provider: Literal["noop", "smtp"] = Field(
         default="noop",
-        description="Notification delivery backend (noop logs only during closed pilot)",
+        description="Notification delivery backend (noop logs only; smtp sends when configured)",
+    )
+    smtp_enabled: bool = Field(
+        default=False,
+        description="Enable outbound SMTP for auth and notification emails",
+    )
+    smtp_host: str = Field(default="", description="SMTP server hostname")
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_user: str = Field(default="", description="SMTP AUTH username (usually full email)")
+    smtp_password: str = Field(default="", description="SMTP AUTH password")
+    smtp_use_tls: bool = Field(default=True, description="Use STARTTLS (587) or SSL (465)")
+    smtp_timeout_seconds: int = Field(default=30, ge=5, le=120)
+    email_from: str = Field(default="", description="From header, e.g. noreply@cloudnira.com")
+    frontend_public_url: str = Field(
+        default="http://localhost:3000",
+        description="Public frontend base URL for links in emails",
     )
     scan_max_duration_seconds: int = Field(default=600, ge=60, le=7200)
     scan_max_redirects: int = Field(default=5, ge=0, le=20)

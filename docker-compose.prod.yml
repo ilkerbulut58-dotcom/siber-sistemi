@@ -84,6 +84,14 @@ services:
       SCAN_CONCURRENCY_LIMIT: ${SCAN_CONCURRENCY_LIMIT:-1}
       SCAN_DAILY_QUOTA: ${SCAN_DAILY_QUOTA:-5}
       NOTIFICATIONS_PROVIDER: ${NOTIFICATIONS_PROVIDER:-noop}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-https://siber.cloudnira.com}
       SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
       USE_CELERY_FOR_SCANS: ${USE_CELERY_FOR_SCANS:-true}
       NUCLEI_TEMPLATES: /opt/nuclei-templates
@@ -116,6 +124,8 @@ services:
       start_period: 30s
     networks:
       - siber-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   worker:
     build:
@@ -136,6 +146,14 @@ services:
       SCAN_CONCURRENCY_LIMIT: ${SCAN_CONCURRENCY_LIMIT:-1}
       SCAN_DAILY_QUOTA: ${SCAN_DAILY_QUOTA:-5}
       NOTIFICATIONS_PROVIDER: ${NOTIFICATIONS_PROVIDER:-noop}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-https://siber.cloudnira.com}
       SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
       USE_CELERY_FOR_SCANS: "true"
       NUCLEI_TEMPLATES: /opt/nuclei-templates
@@ -162,6 +180,8 @@ services:
         condition: service_healthy
     networks:
       - siber-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   mobile-worker:
     build:

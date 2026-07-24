@@ -1,6 +1,6 @@
 # Known Limitations (Closed Pilot)
 
-- Email notifications use noop provider (logged only); SMTP not wired.
+- Email notifications use noop provider unless SMTP is configured; auth emails use SMTP when `SMTP_ENABLED=true`.
 - Billing/plan enforcement is quota-based, not subscription-based.
 - Full active (ZAP active scan) limited to admin-approved domains and non-production projects.
 - Mobile APK analysis requires separate upload flow.

@@ -27,6 +27,7 @@ from app.schemas.auth import (
     normalize_login_email,
 )
 from app.services.audit_service import log_audit_event
+from app.services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,11 @@ class AuthService:
             user_agent=user_agent,
         )
 
-        logger.info("User registered: %s (verification token logged in dev)", user.email)
-        if self.settings.is_development:
+        logger.info("User registered: %s", user.email)
+        email = EmailService()
+        if email.is_configured:
+            await email.send_verification_email(user.email, verify_token)
+        elif self.settings.is_development:
             logger.info("Email verification token for %s: %s", user.email, verify_token)
 
         return tokens, AuthUserResponse.model_validate(user), verify_token
@@ -194,7 +198,10 @@ class AuthService:
         if user.is_email_verified:
             raise AppError("ALREADY_VERIFIED", "Email is already verified.", status_code=400)
         token = await self._create_email_verification_token(user.id)
-        if self.settings.is_development:
+        email = EmailService()
+        if email.is_configured:
+            await email.send_verification_email(user.email, token)
+        elif self.settings.is_development:
             logger.info("Email verification token for %s: %s", user.email, token)
         return token
 
@@ -211,7 +218,10 @@ class AuthService:
             expires_at=datetime.now(UTC) + timedelta(hours=PASSWORD_RESET_HOURS),
         )
         self.db.add(record)
-        if self.settings.is_development:
+        email = EmailService()
+        if email.is_configured:
+            await email.send_password_reset_email(user.email, token)
+        elif self.settings.is_development:
             logger.info("Password reset token for %s: %s", user.email, token)
         return token
 
