@@ -47,7 +47,19 @@ export function translate(
 }
 
 export function translateError(locale: Locale, code: string, fallback?: string): string {
-  return dictionaryFor(locale).errors[code] ?? fallback ?? code;
+  const translated = dictionaryFor(locale).errors[code];
+  if (translated) {
+    if (
+      code === "REQUEST_FAILED" &&
+      fallback &&
+      fallback !== "Request failed" &&
+      fallback !== translated
+    ) {
+      return fallback;
+    }
+    return translated;
+  }
+  return fallback ?? code;
 }
 
 export function scanProfileLabel(locale: Locale, name: string, fallback?: string): string {

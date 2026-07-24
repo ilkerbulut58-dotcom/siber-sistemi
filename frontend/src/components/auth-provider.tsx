@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getApiBase } from "@/lib/api-base";
+import { ApiError } from "@/lib/i18n";
 import {
   getAccessTokenExpiryMs,
   readStoredTokens,
@@ -40,8 +41,17 @@ async function authFetch(path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(`${getApiBase()}${path}`, init);
   } catch {
-    throw new Error("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
+    throw new ApiError("REQUEST_FAILED", "Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");
   }
+}
+
+function throwAuthApiError(
+  body: { success?: boolean; error?: { code?: string; message?: string } | null },
+  fallbackMessage: string
+): never {
+  const code = body.error?.code || "REQUEST_FAILED";
+  const message = body.error?.message || fallbackMessage;
+  throw new ApiError(code, message);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -121,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
-        throw new Error(body.error?.message || "Giriş başarısız");
+        throwAuthApiError(body, "Giriş başarısız");
       }
       persist(body.data.tokens, body.data.user);
     },
@@ -137,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
-        throw new Error(body.error?.message || "Kayıt başarısız");
+        throwAuthApiError(body, "Kayıt başarısız");
       }
       persist(body.data.tokens, body.data.user);
     },
