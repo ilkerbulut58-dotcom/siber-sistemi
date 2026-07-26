@@ -34,7 +34,7 @@ def _hosting_config_paths(domain: str) -> list[str]:
         f"[Apache] Site kökünde .htaccess veya /etc/apache2/sites-available/{domain}.conf",
         f"[cPanel/WHM] Domains → {domain} → Apache Configuration / .htaccess Editor",
         f"[Cloudflare] Dashboard → {domain} → Rules → Transform Rules → Modify response header",
-        f"[IIS] site web.config → system.webServer/httpProtocol/customHeaders",
+        "[IIS] site web.config → system.webServer/httpProtocol/customHeaders",
     ]
 
 

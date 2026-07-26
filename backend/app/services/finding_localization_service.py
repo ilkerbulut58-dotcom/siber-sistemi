@@ -48,8 +48,8 @@ def localize_raw_finding(raw: RawFinding) -> RawFinding:
         ]
         raw.config_file_paths = [
             f"[Nginx] /etc/nginx/sites-available/{domain}",
-            f"[Apache] Site kökünde .htaccess",
-            f"[Hosting paneli] Sağlayıcınızın domain/SSL ayarları (Plesk, cPanel, DirectAdmin vb.)",
+            "[Apache] Site kökünde .htaccess",
+            "[Hosting paneli] Sağlayıcınızın domain/SSL ayarları (Plesk, cPanel, DirectAdmin vb.)",
             "[Uygulama] İlgili kaynak kodu (Git/FTP)",
         ]
     else:

@@ -26,8 +26,8 @@ from app.services.audit_service import log_audit_event
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.pilot_service import PilotService
-from app.services.quota_service import QuotaService
 from app.services.project_service import ProjectService
+from app.services.quota_service import QuotaService
 
 logger = logging.getLogger(__name__)
 

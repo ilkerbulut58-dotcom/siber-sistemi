@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.dependencies import (
     get_client_ip,
@@ -26,7 +27,6 @@ from app.schemas.organization import (
     OrganizationUpdate,
 )
 from app.schemas.pilot import OnboardingStatusResponse
-from app.core.config import get_settings
 from app.services.organization_service import OrganizationService
 from app.services.pilot_service import PilotService
 from app.services.quota_service import QuotaService

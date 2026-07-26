@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
-from uuid import UUID
 
 from app.models.finding import Finding, FindingStatus
 from app.models.scan import ScanJob, ScanStatus

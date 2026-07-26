@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.data.finding_catalog_de import SEVERITY_LABEL_DE, get_catalog_entry as get_catalog_entry_de
+from app.data.finding_catalog_de import SEVERITY_LABEL_DE
+from app.data.finding_catalog_de import get_catalog_entry as get_catalog_entry_de
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
