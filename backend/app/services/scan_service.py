@@ -16,13 +16,19 @@ from app.benchmark.security import (
 )
 from app.core.config import get_settings
 from app.core.exceptions import AppError
+from app.models.domain import Domain
 from app.models.organization import Organization
 from app.models.scan import AuthorizationAcceptance, ScanJob, ScanProfile, ScanStatus
 from app.models.user import User
 from app.scanners.orchestrator import run_scan_for_profile
 from app.schemas.scan import ScanCreate
-from app.security.url_guard import UrlGuardError, validate_scan_url
+from app.security.hostname_auth import (
+    HostnameAuthorizationError,
+    to_app_error,
+    validate_scan_target_url,
+)
 from app.services.audit_service import log_audit_event
+from app.services.domain_authorization_service import assert_domain_scan_allowed
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.pilot_service import PilotService
@@ -160,35 +166,27 @@ class ScanService:
         profile = await self._resolve_profile(data.scan_profile)
         require_domain_verification = QuotaService.requires_domain_verification(actor, settings)
 
-        if require_domain_verification and not domain.is_verified:
-            active_profiles = {"deep", "code"}
-            if profile.name in active_profiles or profile.name.endswith("-active"):
-                await self._reject_scan(
-                    actor=actor,
-                    organization_id=organization_id,
-                    reason_code="DOMAIN_NOT_VERIFIED",
-                    message="Domain must be verified before active scanning.",
-                    status_code=403,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    details={"domain_id": str(domain.id), "hostname": domain.hostname},
-                )
-            await self._reject_scan(
-                actor=actor,
-                organization_id=organization_id,
-                reason_code="DOMAIN_NOT_VERIFIED",
-                message="Domain must be verified before scanning.",
-                status_code=400,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"domain_id": str(domain.id), "hostname": domain.hostname},
-            )
-
         organization = (
             await self.db.execute(select(Organization).where(Organization.id == organization_id))
         ).scalar_one_or_none()
         if organization is None:
             raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+
+        if require_domain_verification:
+            try:
+                assert_domain_scan_allowed(domain, organization, profile.name)
+            except AppError as exc:
+                await self._reject_scan(
+                    actor=actor,
+                    organization_id=organization_id,
+                    reason_code=exc.code,
+                    message=exc.message,
+                    status_code=exc.status_code,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"domain_id": str(domain.id), "hostname": domain.hostname},
+                )
+
         if not QuotaService.is_unrestricted_scan_actor(actor):
             await self._guard_pilot_scan(
                 organization,
@@ -208,25 +206,21 @@ class ScanService:
         else:
             assert_scan_profile_allowed(profile.name)
         target = str(data.target_url)
-        if require_domain_verification and domain.hostname not in target:
-            raise AppError(
-                "TARGET_MISMATCH",
-                f"Target URL must belong to verified domain {domain.hostname}.",
-                status_code=400,
-            )
-
         if (
-            not is_blocked_benchmark_profile(profile.name)
+            require_domain_verification
+            and not is_blocked_benchmark_profile(profile.name)
             and os.environ.get("BENCHMARK_LAB_ISOLATED") != "true"
         ):
-            resolve_dns = (
-                require_domain_verification
-                and settings.environment in {"production", "staging"}
-            )
+            resolve_dns = settings.environment in {"production", "staging"}
             try:
-                validate_scan_url(target, resolve_dns=resolve_dns)
-            except UrlGuardError as exc:
-                raise AppError("TARGET_BLOCKED", str(exc), status_code=400) from exc
+                validate_scan_target_url(
+                    target,
+                    domain.hostname,
+                    allow_subdomains=domain.allow_subdomains,
+                    resolve_dns=resolve_dns,
+                )
+            except HostnameAuthorizationError as exc:
+                raise to_app_error(exc) from exc
 
         if not QuotaService.is_unrestricted_scan_actor(actor):
             try:
@@ -245,19 +239,21 @@ class ScanService:
         active_profiles = {"deep", "code"}
         if (
             (profile.name in active_profiles or profile.name.endswith("-active"))
-            and not domain.active_scan_allowed
             and require_domain_verification
         ):
-            await self._reject_scan(
-                actor=actor,
-                organization_id=organization_id,
-                reason_code="ACTIVE_SCAN_NOT_ALLOWED",
-                message="Active scanning requires domain admin approval.",
-                status_code=403,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"domain_id": str(domain.id), "profile": profile.name},
-            )
+            try:
+                assert_domain_scan_allowed(domain, organization, profile.name)
+            except AppError as exc:
+                await self._reject_scan(
+                    actor=actor,
+                    organization_id=organization_id,
+                    reason_code=exc.code,
+                    message=exc.message,
+                    status_code=exc.status_code,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"domain_id": str(domain.id), "profile": profile.name},
+                )
 
         enforce_limits = QuotaService.should_enforce_scan_limits(actor, organization, settings)
         if enforce_limits:
@@ -507,8 +503,19 @@ async def run_scan_job(
             scan.status = ScanStatus.RUNNING
             await db.commit()
 
+            domain_row = None
+            if scan.domain_id:
+                domain_row = (
+                    await db.execute(select(Domain).where(Domain.id == scan.domain_id))
+                ).scalar_one_or_none()
+
             try:
-                raw_findings = await run_scan_for_profile(scan.target_url, scan.scan_profile)
+                raw_findings = await run_scan_for_profile(
+                    scan.target_url,
+                    scan.scan_profile,
+                    verified_hostname=domain_row.hostname if domain_row else None,
+                    allow_subdomains=bool(domain_row and domain_row.allow_subdomains),
+                )
             except Exception as exc:
                 await _mark_scan_failed(db, scan, str(exc))
                 return

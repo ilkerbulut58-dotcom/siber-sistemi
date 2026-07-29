@@ -42,6 +42,8 @@ class Organization(Base, TimestampMixin):
     pilot_notes: Mapped[str | None] = mapped_column(Text)
     scans_disabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     pilot_active_scan_allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    tenant_type: Mapped[str | None] = mapped_column(String(50))
+    expert_test_quota: Mapped[int | None] = mapped_column(Integer)
 
     owner: Mapped["User"] = relationship(back_populates="owned_organizations")
     members: Mapped[list["OrganizationMember"]] = relationship(

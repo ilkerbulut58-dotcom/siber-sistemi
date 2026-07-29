@@ -125,21 +125,33 @@ def _profile_timeout_seconds(profile: str) -> float:
     return float(settings.scan_timeout_safe_seconds)
 
 
-async def run_scan_for_profile(target_url: str, profile: str) -> list[RawFinding]:
+async def run_scan_for_profile(
+    target_url: str,
+    profile: str,
+    *,
+    verified_hostname: str | None = None,
+    allow_subdomains: bool = False,
+) -> list[RawFinding]:
     assert_scan_profile_allowed(profile)
     reset_scanner_stats()
     timeout = _profile_timeout_seconds(profile)
 
+    passive_kwargs = {
+        "target_url": target_url,
+        "verified_hostname": verified_hostname,
+        "allow_subdomains": allow_subdomains,
+    }
+
     if profile == "safe":
         scanners: list[tuple[str, ScannerFn, dict]] = [
-            ("passive_http", run_passive_http_scan, {"target_url": target_url}),
+            ("passive_http", run_passive_http_scan, passive_kwargs),
             ("sensitive_data", scan_sensitive_data, {"target_url": target_url}),
             ("zap", run_zap_passive_scan, {"target_url": target_url, "spider": False}),
             ("nuclei", run_nuclei_scan, {"target_url": target_url, "tags": "passive"}),
         ]
     elif profile == "deep":
         scanners = [
-            ("passive_http", run_passive_http_scan, {"target_url": target_url}),
+            ("passive_http", run_passive_http_scan, passive_kwargs),
             ("sensitive_data", scan_sensitive_data, {"target_url": target_url}),
             ("surface_crawl", run_surface_crawl_passive, {"target_url": target_url}),
             ("exposed_paths", scan_exposed_paths, {"target_url": target_url}),
@@ -156,7 +168,7 @@ async def run_scan_for_profile(target_url: str, profile: str) -> list[RawFinding
         ]
     elif profile == "code":
         scanners = [
-            ("passive_http", run_passive_http_scan, {"target_url": target_url}),
+            ("passive_http", run_passive_http_scan, passive_kwargs),
             ("sensitive_data", scan_sensitive_data, {"target_url": target_url}),
             ("exposed_paths", scan_exposed_paths, {"target_url": target_url}),
             ("secrets", scan_response_secrets, {"target_url": target_url}),
@@ -194,7 +206,7 @@ async def run_scan_for_profile(target_url: str, profile: str) -> list[RawFinding
         )
     else:
         scanners = [
-            ("passive_http", run_passive_http_scan, {"target_url": target_url}),
+            ("passive_http", run_passive_http_scan, passive_kwargs),
             ("sensitive_data", scan_sensitive_data, {"target_url": target_url}),
         ]
 

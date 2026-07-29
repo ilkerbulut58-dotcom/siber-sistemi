@@ -282,6 +282,8 @@ async def run_passive_http_scan(
     target_url: str,
     *,
     header_scope: frozenset[str] | None = None,
+    verified_hostname: str | None = None,
+    allow_subdomains: bool = False,
 ) -> list[RawFinding]:
     findings: list[RawFinding] = []
     parsed = urlparse(target_url)
@@ -299,11 +301,26 @@ async def run_passive_http_scan(
             final_url = str(response.url)
             if final_url.rstrip("/") != target_url.rstrip("/"):
                 from app.core.config import get_settings
-                from app.security.url_guard import validate_redirect_target
+                from app.security.hostname_auth import (
+                    HostnameAuthorizationError,
+                    validate_redirect_for_domain,
+                    validate_redirect_target,
+                )
 
                 settings = get_settings()
                 if settings.environment in {"production", "staging"}:
-                    validate_redirect_target(final_url, resolve_dns=True)
+                    if verified_hostname:
+                        try:
+                            validate_redirect_for_domain(
+                                final_url,
+                                verified_hostname,
+                                allow_subdomains=allow_subdomains,
+                                resolve_dns=True,
+                            )
+                        except HostnameAuthorizationError:
+                            raise
+                    else:
+                        validate_redirect_target(final_url, resolve_dns=True)
             findings.extend(await scan_security_headers(target_url, response, header_scope=header_scope))
             findings.extend(await scan_disclosure_headers(target_url, response))
             if response.status_code >= 500:

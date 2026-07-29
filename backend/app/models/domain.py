@@ -30,6 +30,11 @@ class Domain(Base, TimestampMixin):
     admin_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     admin_approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
+    verification_failure_reason: Mapped[str | None] = mapped_column(String(255))
+    allow_subdomains: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     project: Mapped["Project"] = relationship(back_populates="domains")
     verifications: Mapped[list["DomainVerification"]] = relationship(

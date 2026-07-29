@@ -21,7 +21,13 @@ from app.models.user import User
 from app.scanners.asm.discovery import discover_attack_surface
 from app.scanners.passive_http import run_passive_http_scan
 from app.schemas.asm import AsmDiscoverCreate, AttackSurfaceSummary
+from app.security.hostname_auth import (
+    HostnameAuthorizationError,
+    to_app_error,
+    validate_scan_target_url,
+)
 from app.services.audit_service import log_audit_event
+from app.services.domain_authorization_service import is_verification_valid
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.project_service import ProjectService
@@ -85,20 +91,24 @@ class AsmService:
         settings = get_settings()
         require_domain_verification = QuotaService.requires_domain_verification(actor, settings)
 
-        if require_domain_verification and not domain.is_verified:
+        if require_domain_verification and not is_verification_valid(domain):
             raise AppError(
                 "DOMAIN_NOT_VERIFIED",
-                "Domain must be verified before attack surface discovery.",
+                "Domain must be verified and within the validity window before attack surface discovery.",
                 status_code=400,
             )
 
         target = str(data.target_url)
-        if require_domain_verification and domain.hostname not in target:
-            raise AppError(
-                "TARGET_MISMATCH",
-                f"Target must belong to verified domain {domain.hostname}.",
-                status_code=400,
-            )
+        if require_domain_verification:
+            try:
+                validate_scan_target_url(
+                    target,
+                    domain.hostname,
+                    allow_subdomains=domain.allow_subdomains,
+                    resolve_dns=settings.environment in {"production", "staging"},
+                )
+            except HostnameAuthorizationError as exc:
+                raise to_app_error(exc) from exc
 
         job = AsmDiscoveryJob(
             organization_id=organization_id,

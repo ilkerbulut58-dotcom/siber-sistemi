@@ -3,7 +3,6 @@
 import re
 import socket
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlparse
 
 import httpx
 
@@ -19,13 +18,6 @@ META_PATTERN_ALT = re.compile(
     r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']siber-verification["\']',
     re.IGNORECASE,
 )
-
-
-def normalize_hostname(hostname: str) -> str:
-    value = hostname.strip().lower()
-    if value.startswith("http://") or value.startswith("https://"):
-        value = urlparse(value).netloc or value
-    return value.removeprefix("www.")
 
 
 def build_instructions(method: VerificationMethod, hostname: str, token: str) -> list[str]:

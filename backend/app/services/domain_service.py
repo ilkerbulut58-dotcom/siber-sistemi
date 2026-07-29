@@ -12,6 +12,9 @@ from app.models.domain import Domain, DomainVerification
 from app.models.user import User
 from app.schemas.domain import DomainCreate, VerificationInstructions, VerificationMethod
 from app.services.audit_service import log_audit_event
+from app.services.domain_authorization_service import (
+    verification_expires_at,
+)
 from app.services.domain_verification_service import (
     build_instructions,
     hostname_resolves,
@@ -207,8 +210,11 @@ class DomainService:
             domain.verified_at = datetime.now(UTC)
             domain.last_checked_at = datetime.now(UTC)
             domain.verification_method = method.value
+            domain.revoked_at = None
+            domain.revoked_by = None
+            domain.verification_failure_reason = None
+            domain.verification_expires_at = verification_expires_at(domain)
             verification.verified_at = datetime.now(UTC)
-            domain.active_scan_allowed = True
             message = "Domain verified successfully."
             await log_audit_event(
                 self.db,
@@ -219,20 +225,6 @@ class DomainService:
                 resource_id=domain.id,
                 ip_address=ip_address,
             )
-            await log_audit_event(
-                self.db,
-                action="domain.active_scan_approved",
-                user_id=actor.id,
-                organization_id=organization_id,
-                resource_type="domain",
-                resource_id=domain.id,
-                ip_address=ip_address,
-                details={
-                    "hostname": domain.hostname,
-                    "verification_method": method.value,
-                    "self_service": True,
-                },
-            )
         else:
             domain.last_checked_at = datetime.now(UTC)
             message = "Verification failed. Check instructions and try again."
@@ -240,6 +232,37 @@ class DomainService:
         await self.db.flush()
         await self.db.refresh(domain)
         return domain, ok, message
+
+    async def revoke_verification(
+        self,
+        organization_id: UUID,
+        project_id: UUID,
+        domain_id: UUID,
+        *,
+        actor: User,
+        reason: str = "manual_revoke",
+        ip_address: str | None = None,
+    ) -> Domain:
+        domain = await self.get(organization_id, project_id, domain_id)
+        domain.is_verified = False
+        domain.revoked_at = datetime.now(UTC)
+        domain.revoked_by = actor.id
+        domain.verification_failure_reason = reason
+        domain.active_scan_allowed = False
+        domain.verification_expires_at = None
+        await log_audit_event(
+            self.db,
+            action="domain.verification_revoked",
+            user_id=actor.id,
+            organization_id=organization_id,
+            resource_type="domain",
+            resource_id=domain.id,
+            ip_address=ip_address,
+            details={"hostname": domain.hostname, "reason": reason},
+        )
+        await self.db.flush()
+        await self.db.refresh(domain)
+        return domain
 
     async def admin_approve_active_scan(
         self,
@@ -311,6 +334,10 @@ class DomainService:
         domain.verified_at = datetime.now(UTC)
         domain.last_checked_at = datetime.now(UTC)
         domain.verification_method = "manual_admin"
+        domain.revoked_at = None
+        domain.revoked_by = None
+        domain.verification_failure_reason = None
+        domain.verification_expires_at = verification_expires_at(domain)
         domain.admin_approved_by = actor.id
         if approve_active_scan:
             domain.active_scan_allowed = True
