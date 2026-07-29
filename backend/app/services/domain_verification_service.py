@@ -10,6 +10,14 @@ from app.core.security import generate_opaque_token
 from app.schemas.domain import VerificationMethod
 from app.security.hostname_auth import normalize_hostname
 
+__all__ = [
+    "build_instructions",
+    "hostname_resolves",
+    "new_verification_token",
+    "normalize_hostname",
+    "run_verification",
+]
+
 TOKEN_TTL_HOURS = 72
 META_PATTERN = re.compile(
     r'<meta[^>]+name=["\']siber-verification["\'][^>]+content=["\']([^"\']+)["\']',
