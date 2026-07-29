@@ -16,11 +16,12 @@ from app.services.domain_authorization_service import (
     verification_expires_at,
 )
 from app.services.domain_verification_service import (
+    build_instruction_fields,
     build_instructions,
     hostname_resolves,
     new_verification_token,
     normalize_hostname,
-    run_verification,
+    run_verification_detailed,
 )
 from app.services.project_service import ProjectService
 
@@ -167,6 +168,7 @@ class DomainService:
             await self.db.flush()
 
         method = VerificationMethod(verification.method)
+        fields = build_instruction_fields(method, domain.hostname, verification.token)
         return VerificationInstructions(
             domain_id=domain.id,
             hostname=domain.hostname,
@@ -174,6 +176,13 @@ class DomainService:
             token=verification.token,
             expires_at=verification.expires_at,
             instructions=build_instructions(method, domain.hostname, verification.token),
+            dns_host=fields.get("dns_host"),
+            dns_value=fields.get("dns_value"),
+            ttl_recommendation_seconds=fields.get("ttl_recommendation_seconds"),
+            well_known_url=fields.get("well_known_url"),
+            well_known_content=fields.get("well_known_content"),
+            meta_tag_html=fields.get("meta_tag_html"),
+            verification_valid_days=self.settings.domain_verification_ttl_days,
         )
 
     async def verify(
@@ -184,8 +193,11 @@ class DomainService:
         *,
         actor: User,
         ip_address: str | None = None,
-    ) -> tuple[Domain, bool, str]:
+    ) -> tuple[Domain, bool, str, str | None]:
         domain = await self.get(organization_id, project_id, domain_id)
+
+        if domain.revoked_at is not None:
+            return domain, False, "Domain verification was revoked.", "DOMAIN_REVOKED"
 
         if self.settings.skip_domain_verification:
             domain.is_verified = True
@@ -194,16 +206,25 @@ class DomainService:
             domain.active_scan_allowed = True
             await self.db.flush()
             await self.db.refresh(domain)
-            return domain, True, "Test modu: domain otomatik doğrulandı."
+            return domain, True, "Test modu: domain otomatik doğrulandı.", None
 
         verification = await self._active_verification(domain.id)
         if verification is None:
             raise AppError("NO_VERIFICATION", "No active verification token.", status_code=400)
 
+        if verification.expires_at is not None:
+            expires_at = verification.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if expires_at < datetime.now(UTC):
+                return domain, False, "Verification token expired.", "VERIFICATION_EXPIRED"
+
         verification.attempt_count += 1
         verification.last_attempt_at = datetime.now(UTC)
         method = VerificationMethod(verification.method)
-        ok = await run_verification(method, domain.hostname, verification.token)
+        ok, failure_code = await run_verification_detailed(
+            method, domain.hostname, verification.token
+        )
 
         if ok:
             domain.is_verified = True
@@ -216,6 +237,7 @@ class DomainService:
             domain.verification_expires_at = verification_expires_at(domain)
             verification.verified_at = datetime.now(UTC)
             message = "Domain verified successfully."
+            failure_code = None
             await log_audit_event(
                 self.db,
                 action="domain.verified",
@@ -227,11 +249,12 @@ class DomainService:
             )
         else:
             domain.last_checked_at = datetime.now(UTC)
-            message = "Verification failed. Check instructions and try again."
+            message = "Verification failed."
+            failure_code = failure_code or "VERIFICATION_FAILED"
 
         await self.db.flush()
         await self.db.refresh(domain)
-        return domain, ok, message
+        return domain, ok, message, failure_code
 
     async def revoke_verification(
         self,

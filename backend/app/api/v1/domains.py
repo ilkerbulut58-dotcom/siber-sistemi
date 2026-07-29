@@ -39,7 +39,7 @@ async def add_domain(
     data: DomainCreate,
     request: Request,
     user: User = Depends(get_current_user),
-    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.ADMIN)),
+    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.SECURITY_ANALYST)),
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[DomainResponse]:
     service = DomainService(db)
@@ -119,11 +119,11 @@ async def verify_domain(
     domain_id: UUID,
     request: Request,
     user: User = Depends(get_current_user),
-    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.ADMIN)),
+    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.SECURITY_ANALYST)),
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[DomainVerifyResponse]:
     service = DomainService(db)
-    domain, verified, message = await service.verify(
+    domain, verified, message, failure_code = await service.verify(
         org_id, project_id, domain_id, actor=user, ip_address=get_client_ip(request)
     )
     return APIResponse(
@@ -131,6 +131,7 @@ async def verify_domain(
             domain=DomainResponse.model_validate(domain),
             verified=verified,
             message=message,
+            failure_code=failure_code,
         ),
         meta=_meta(request),
     )

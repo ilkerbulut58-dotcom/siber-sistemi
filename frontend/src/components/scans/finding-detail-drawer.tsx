@@ -37,6 +37,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { conceptTooltip } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const WORKFLOW_STATUSES = [
@@ -45,6 +46,9 @@ const WORKFLOW_STATUSES = [
   "accepted_risk",
   "false_positive",
   "resolved",
+  "needs_help",
+  "duplicate",
+  "not_applicable",
 ] as const;
 
 function useIsMobile(breakpoint = 640): boolean {
@@ -455,21 +459,28 @@ export function FindingDetailDrawer({
             <header className="sticky top-0 z-10 shrink-0 border-b border-border/60 bg-background/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
               <SheetHeader className="space-y-3 text-left">
                 <div className="flex flex-wrap items-start gap-2 pr-8">
-                  <SeverityBadge severity={f.severity} />
+                  <span title={conceptTooltip(locale, "severity")}>
+                    <SeverityBadge severity={f.severity} />
+                  </span>
                   {f.risk_score != null && (
                     <Badge variant="outline" aria-label={`${t("findingDrawer.riskScore")} ${Math.round(f.risk_score)}`}>
                       {t("findingDrawer.riskScore")} {Math.round(f.risk_score)}
                     </Badge>
                   )}
+                  {f.cvss_score != null && (
+                    <Badge variant="outline">CVSS {f.cvss_score}</Badge>
+                  )}
                   {f.confidence && (
-                    <Badge variant="muted">{t("findingDrawer.confidence")}: {confidenceLabel(f.confidence)}</Badge>
+                    <Badge variant="muted" title={conceptTooltip(locale, "confidence")}>
+                      {t("findingDrawer.confidence")}: {confidenceLabel(f.confidence)}
+                    </Badge>
                   )}
                   {f.verification_status && (
                     <Badge variant="secondary">
                       {verificationStatusLabel(f.verification_status)}
                     </Badge>
                   )}
-                  <Badge variant="outline">
+                  <Badge variant="outline" title={conceptTooltip(locale, "status")}>
                     {findingWorkflowLabel(f.status)}
                   </Badge>
                 </div>
@@ -706,6 +717,7 @@ export function FindingDetailDrawer({
                     disabled={retestLoading}
                     onClick={() => void handleRetest()}
                     className="gap-2"
+                    title={conceptTooltip(locale, "retestScope")}
                   >
                     {retestLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

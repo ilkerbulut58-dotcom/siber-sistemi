@@ -43,6 +43,8 @@ export interface Dictionary {
   nav: {
     overview: string;
     scans: string;
+    domains: string;
+    findings: string;
     settings: string;
     fullAssessment: string;
     mobileApk: string;

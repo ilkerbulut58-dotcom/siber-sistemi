@@ -99,6 +99,16 @@ export function findingWorkflowLabel(locale: Locale, status: string): string {
   return dictionaries[locale].findingWorkflow[status] ?? status;
 }
 
+export function verificationFailureLabel(locale: Locale, code: string | null | undefined): string {
+  if (!code) return "";
+  return translateError(locale, code, code);
+}
+
+export function conceptTooltip(locale: Locale, key: string): string {
+  const tips = dictionaries[locale].conceptTooltips as Record<string, string> | undefined;
+  return tips?.[key] ?? "";
+}
+
 export function verificationStatusLabel(locale: Locale, status: string): string {
   return dictionaries[locale].verificationStatus[status] ?? status;
 }

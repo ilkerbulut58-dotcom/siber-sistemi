@@ -51,7 +51,7 @@ async def test_add_domain_and_instructions(_mock: AsyncMock, client: AsyncClient
 
 
 @pytest.mark.asyncio
-@patch("app.services.domain_service.run_verification", new_callable=AsyncMock, return_value=True)
+@patch("app.services.domain_service.run_verification_detailed", new_callable=AsyncMock, return_value=(True, None))
 @patch("app.services.domain_service.hostname_resolves", return_value=True)
 async def test_verify_domain(
     _resolve: AsyncMock,

@@ -40,7 +40,7 @@ import { StatusSummaryCard } from "@/components/scan-results/status-summary-card
 import { SiteProfileCard } from "@/components/scan-results/site-profile-card";
 import { FindingDetailDrawer } from "@/components/scans/finding-detail-drawer";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { sanitizeScanError } from "@/lib/scan-error-sanitizer";
 import { useTranslation } from "@/components/locale-provider";
 
 type OrganizationMember = { user_id: string; role: string };
@@ -365,7 +365,12 @@ function ScanDetailPageContent() {
           {scan?.status === "failed" && scan.error_log && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
               <p className="font-medium">{t("scanResults.scanFailed")}</p>
-              <p className="mt-1 text-xs">{scan.error_log}</p>
+              <p className="mt-1 text-xs">
+                {t(sanitizeScanError(scan.error_log).detailKey as "scanResults.errorGeneric")}
+              </p>
+              <p className="mt-2 text-xs text-red-200/80">
+                {t("scanResults.scanIdLabel")}: {scan.id}
+              </p>
             </div>
           )}
 

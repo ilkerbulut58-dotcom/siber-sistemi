@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
 from app.models.organization import Organization
-from app.models.scan import ScanJob
+from app.models.scan import ScanJob, ScanStatus
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
@@ -21,13 +21,27 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(UTC)
 
 
+def _next_quota_reset() -> datetime:
+    now = datetime.now(UTC)
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return tomorrow
+
+
 class PilotService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     @staticmethod
+    def is_expert_tenant(organization: Organization) -> bool:
+        return organization.tenant_type == "expert_security_test"
+
+    @staticmethod
+    def show_onboarding_checklist(organization: Organization) -> bool:
+        return organization.is_pilot or PilotService.is_expert_tenant(organization)
+
+    @staticmethod
     def assert_can_scan(organization: Organization) -> None:
-        if not organization.is_pilot:
+        if not organization.is_pilot and not PilotService.is_expert_tenant(organization):
             return
         if not organization.is_active:
             raise AppError(
@@ -69,7 +83,7 @@ class PilotService:
     def assert_active_scan_allowed(organization: Organization, profile_name: str) -> None:
         active_profiles = {"deep", "code"}
         if (
-            organization.is_pilot
+            (organization.is_pilot or PilotService.is_expert_tenant(organization))
             and profile_name in active_profiles
             and not organization.pilot_active_scan_allowed
         ):
@@ -96,33 +110,74 @@ class PilotService:
         organization: Organization,
         *,
         owner_email_verified: bool,
+        domain_count: int,
         verified_domain_count: int,
         authorization_accepted: bool,
+        completed_scan_count: int = 0,
+        feedback_count: int = 0,
+        first_project_id: UUID | None = None,
+        pending_domain_id: UUID | None = None,
+        latest_completed_scan_id: UUID | None = None,
+        scan_concurrency_limit: int = 1,
     ) -> dict:
-        steps = [
-            {"step_id": "account_created", "label": "Create account", "completed": True},
-            {
-                "step_id": "email_verified",
-                "label": "Verify email",
-                "completed": owner_email_verified,
-            },
-            {
-                "step_id": "domain_added",
-                "label": "Add domain",
-                "completed": verified_domain_count > 0 or not organization.is_pilot,
-            },
-            {
-                "step_id": "domain_verified",
-                "label": "Verify domain ownership",
-                "completed": verified_domain_count > 0,
-            },
-            {
-                "step_id": "authorization_accepted",
-                "label": "Accept scan authorization",
-                "completed": authorization_accepted or not organization.is_pilot,
-            },
-        ]
-        ready = all(step["completed"] for step in steps)
+        expert = self.is_expert_tenant(organization)
+        show_checklist = self.show_onboarding_checklist(organization)
+
+        if expert:
+            steps = [
+                {
+                    "step_id": "domain_added",
+                    "label": "Add domain",
+                    "completed": domain_count > 0,
+                },
+                {
+                    "step_id": "domain_verified",
+                    "label": "Verify domain ownership",
+                    "completed": verified_domain_count > 0,
+                },
+                {
+                    "step_id": "safe_scan_started",
+                    "label": "Start safe scan",
+                    "completed": completed_scan_count > 0,
+                },
+                {
+                    "step_id": "findings_reviewed",
+                    "label": "Review findings and report",
+                    "completed": completed_scan_count > 0,
+                },
+                {
+                    "step_id": "feedback_or_retest",
+                    "label": "Send feedback or retest",
+                    "completed": feedback_count > 0,
+                },
+            ]
+            ready = verified_domain_count > 0 and authorization_accepted
+        else:
+            steps = [
+                {"step_id": "account_created", "label": "Create account", "completed": True},
+                {
+                    "step_id": "email_verified",
+                    "label": "Verify email",
+                    "completed": owner_email_verified,
+                },
+                {
+                    "step_id": "domain_added",
+                    "label": "Add domain",
+                    "completed": domain_count > 0,
+                },
+                {
+                    "step_id": "domain_verified",
+                    "label": "Verify domain ownership",
+                    "completed": verified_domain_count > 0,
+                },
+                {
+                    "step_id": "authorization_accepted",
+                    "label": "Accept scan authorization",
+                    "completed": authorization_accepted,
+                },
+            ]
+            ready = all(step["completed"] for step in steps)
+
         return {
             "organization_id": organization.id,
             "is_pilot": organization.is_pilot,
@@ -130,4 +185,11 @@ class PilotService:
             "ready_to_scan": ready,
             "pilot_ends_at": organization.pilot_ends_at,
             "pilot_active_scan_allowed": organization.pilot_active_scan_allowed,
+            "show_onboarding_checklist": show_checklist,
+            "tenant_type": organization.tenant_type,
+            "scan_concurrency_limit": scan_concurrency_limit,
+            "quota_resets_at": _next_quota_reset(),
+            "first_project_id": first_project_id,
+            "pending_domain_id": pending_domain_id,
+            "latest_completed_scan_id": latest_completed_scan_id,
         }

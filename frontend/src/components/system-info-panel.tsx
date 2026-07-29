@@ -17,6 +17,7 @@ type SystemInfo = {
   full_active_enabled: boolean;
   scan_notifications: string;
   public_registration_enabled: boolean;
+  support_contact_email: string;
 };
 
 export function SystemInfoPanel() {
@@ -45,6 +46,7 @@ export function SystemInfoPanel() {
     [t("settings.systemProfiles"), info.allowed_profiles.join(", ")],
     [t("settings.systemNotifications"), info.scan_notifications],
     [t("settings.systemRegistration"), info.public_registration_enabled ? t("common.yes") : t("common.no")],
+    [t("settings.supportEmail"), info.support_contact_email || t("settings.supportEmailMissing")],
   ];
 
   return (

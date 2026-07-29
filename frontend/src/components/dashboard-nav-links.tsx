@@ -63,7 +63,9 @@ export function DashboardNavLinks({ mobile = false }: { mobile?: boolean }) {
 
   const navItems = [
     { href: "/dashboard", label: t("nav.overview"), icon: LayoutDashboard },
+    { href: "/dashboard/domains", label: t("nav.domains"), icon: ScanSearch },
     { href: "/dashboard/scan", label: t("nav.scans"), icon: ScanSearch, highlight: true },
+    { href: "/dashboard/findings", label: t("nav.findings"), icon: ScanSearch },
     { href: "/dashboard/settings", label: t("nav.settings"), icon: Settings },
   ] as const;
 

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SystemInfoPanel } from "@/components/system-info-panel";
+import { TenantQuotaPanel } from "@/components/tenant-quota-panel";
 
 export default function SettingsPage() {
   const { getAccessToken, user, refreshUser } = useAuth();
@@ -174,6 +175,27 @@ export default function SettingsPage() {
               <li>• {t("settings.mailFlowForgot")}</li>
               <li>• {t("settings.mailFlowReset")}</li>
             </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.supportTitle")}</CardTitle>
+            <CardDescription>{t("settings.supportDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>{t("settings.supportCritical")}</p>
+            <p>{t("settings.supportStuckScan")}</p>
+            <p>{t("settings.supportEmergency")}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.tenantQuotaTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TenantQuotaPanel />
           </CardContent>
         </Card>
 

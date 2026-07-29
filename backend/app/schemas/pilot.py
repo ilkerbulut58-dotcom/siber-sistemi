@@ -49,3 +49,10 @@ class OnboardingStatusResponse(BaseModel):
     daily_scan_quota: int | None = None
     pilot_ends_at: datetime | None = None
     pilot_active_scan_allowed: bool | None = None
+    show_onboarding_checklist: bool = False
+    tenant_type: str | None = None
+    scan_concurrency_limit: int = 1
+    quota_resets_at: datetime | None = None
+    first_project_id: UUID | None = None
+    pending_domain_id: UUID | None = None
+    latest_completed_scan_id: UUID | None = None

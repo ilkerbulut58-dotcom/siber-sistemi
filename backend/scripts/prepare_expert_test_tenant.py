@@ -14,14 +14,17 @@ EXPERT_TENANT_TEMPLATE = {
     "pilot_scan_quota": None,
     "scans_disabled": False,
     "recommended_role": "security_analyst",
+    "organization_membership_role": "security_analyst",
     "allowed_profiles": ["safe"],
     "deep_enabled": False,
     "code_enabled": False,
     "full_active_enabled": False,
     "domain_verification_required": True,
     "platform_admin": False,
+    "scan_concurrency_limit": 1,
     "notes": (
-        "Expert verifies own domain via DNS/file/meta. Deep/code/full_active disabled unless "
+        "Expert (security_analyst org role) can add/verify own domains via self-service API. "
+        "Manual active-scan approval remains admin-only. Deep/code/full_active disabled unless "
         "operator sets pilot_active_scan_allowed after written approval."
     ),
 }

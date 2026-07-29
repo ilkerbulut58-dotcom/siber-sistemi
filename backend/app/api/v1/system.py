@@ -42,6 +42,7 @@ async def system_info(request: Request) -> APIResponse[SystemInfo]:
             full_active_enabled=False,
             scan_notifications=notifications,
             public_registration_enabled=settings.public_registration_enabled,
+            support_contact_email=settings.support_contact_email or "",
         ),
         meta=_meta(request),
     )

@@ -102,9 +102,16 @@ async def get_onboarding_status(
     _ = org_id
     from sqlalchemy import func, select
 
-    from app.models.domain import Domain
-    from app.models.scan import AuthorizationAcceptance
+    settings = get_settings()
 
+    from app.models.domain import Domain
+    from app.models.finding import Finding
+    from app.models.project import Project
+    from app.models.scan import AuthorizationAcceptance, ScanJob, ScanStatus
+
+    domain_count_result = await db.execute(
+        select(func.count()).select_from(Domain).where(Domain.organization_id == organization.id)
+    )
     verified_domains = await db.execute(
         select(func.count())
         .select_from(Domain)
@@ -115,14 +122,57 @@ async def get_onboarding_status(
         .select_from(AuthorizationAcceptance)
         .where(AuthorizationAcceptance.organization_id == organization.id)
     )
+    completed_scans = await db.execute(
+        select(func.count())
+        .select_from(ScanJob)
+        .where(
+            ScanJob.organization_id == organization.id,
+            ScanJob.status == ScanStatus.COMPLETED,
+        )
+    )
+    feedback_count_result = await db.execute(
+        select(func.count())
+        .select_from(Finding)
+        .where(
+            Finding.organization_id == organization.id,
+            Finding.status.not_in(["open"]),
+        )
+    )
+    first_project = await db.execute(
+        select(Project.id)
+        .where(Project.organization_id == organization.id)
+        .order_by(Project.created_at)
+        .limit(1)
+    )
+    pending_domain = await db.execute(
+        select(Domain.id)
+        .where(Domain.organization_id == organization.id, Domain.is_verified.is_(False))
+        .order_by(Domain.created_at.desc())
+        .limit(1)
+    )
+    latest_scan = await db.execute(
+        select(ScanJob.id)
+        .where(
+            ScanJob.organization_id == organization.id,
+            ScanJob.status == ScanStatus.COMPLETED,
+        )
+        .order_by(ScanJob.completed_at.desc())
+        .limit(1)
+    )
     pilot = PilotService(db)
     status = await pilot.get_onboarding_status(
         organization,
         owner_email_verified=user.is_email_verified,
+        domain_count=int(domain_count_result.scalar_one()),
         verified_domain_count=int(verified_domains.scalar_one()),
         authorization_accepted=int(auth_count.scalar_one()) > 0,
+        completed_scan_count=int(completed_scans.scalar_one()),
+        feedback_count=int(feedback_count_result.scalar_one()),
+        first_project_id=first_project.scalar_one_or_none(),
+        pending_domain_id=pending_domain.scalar_one_or_none(),
+        latest_completed_scan_id=latest_scan.scalar_one_or_none(),
+        scan_concurrency_limit=settings.scan_concurrency_limit,
     )
-    settings = get_settings()
     status["daily_scan_count"] = await pilot.daily_scan_count(organization.id)
     status["daily_scan_quota"] = QuotaService.effective_daily_quota(
         user,

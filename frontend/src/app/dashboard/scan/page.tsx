@@ -100,7 +100,12 @@ export default function QuickScanPage() {
       });
       router.push(`/dashboard/${result.organization_id}/scans/${result.scan.id}`);
     } catch (err) {
-      setError(formatApiError(err));
+      const msg = formatApiError(err);
+      if (/DOMAIN_NOT_VERIFIED|domain.*doğrul|verifizier/i.test(msg)) {
+        router.push("/dashboard/domains");
+        return;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -201,7 +206,7 @@ export default function QuickScanPage() {
                   </button>
                 </div>
                 {deepDisabled && (
-                  <p className="text-xs text-orange-400">{t("project.profileDisabled")}</p>
+                  <p className="text-xs text-orange-400">{t("scanPage.profileDisabledReason")}</p>
                 )}
               </div>
 

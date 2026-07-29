@@ -42,9 +42,17 @@ class VerificationInstructions(BaseModel):
     token: str
     expires_at: datetime
     instructions: list[str]
+    dns_host: str | None = None
+    dns_value: str | None = None
+    ttl_recommendation_seconds: int | None = None
+    well_known_url: str | None = None
+    well_known_content: str | None = None
+    meta_tag_html: str | None = None
+    verification_valid_days: int = 30
 
 
 class DomainVerifyResponse(BaseModel):
     domain: DomainResponse
     verified: bool
     message: str
+    failure_code: str | None = None

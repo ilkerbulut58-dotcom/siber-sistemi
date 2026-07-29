@@ -172,6 +172,36 @@ export interface OnboardingStatus {
   daily_scan_quota?: number | null;
   pilot_ends_at?: string | null;
   pilot_active_scan_allowed?: boolean | null;
+  show_onboarding_checklist?: boolean;
+  tenant_type?: string | null;
+  scan_concurrency_limit?: number;
+  quota_resets_at?: string | null;
+  first_project_id?: string | null;
+  pending_domain_id?: string | null;
+  latest_completed_scan_id?: string | null;
+}
+
+export interface VerificationInstructions {
+  domain_id: string;
+  hostname: string;
+  method: string;
+  token: string;
+  expires_at: string;
+  instructions: string[];
+  dns_host?: string | null;
+  dns_value?: string | null;
+  ttl_recommendation_seconds?: number | null;
+  well_known_url?: string | null;
+  well_known_content?: string | null;
+  meta_tag_html?: string | null;
+  verification_valid_days?: number;
+}
+
+export interface DomainVerifyResult {
+  domain: Domain;
+  verified: boolean;
+  message: string;
+  failure_code?: string | null;
 }
 
 export interface PilotTenant {
@@ -187,15 +217,6 @@ export interface PilotTenant {
   scans_disabled: boolean;
   pilot_active_scan_allowed: boolean;
   created_at: string;
-}
-
-export interface VerificationInstructions {
-  domain_id: string;
-  hostname: string;
-  method: string;
-  token: string;
-  expires_at: string;
-  instructions: string[];
 }
 
 export interface ScanProfile {

@@ -22,8 +22,8 @@ const archiveName = 'siber-deploy.tgz';
 const archivePath = path.join(projectRoot, archiveName);
 const deploySha = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf8' }).trim();
 const shortDeploySha = deploySha.slice(0, 12);
-const releaseTag = process.env.RELEASE_TAG || 'v0.9.0-rc3-expert';
-const appVersion = process.env.APP_VERSION || '0.9.0-rc3-expert';
+const releaseTag = process.env.RELEASE_TAG || 'v0.9.0-rc6-expert';
+const appVersion = process.env.APP_VERSION || '0.9.0-rc6-expert';
 const buildTimestamp = new Date().toISOString();
 
 function assertCleanGit() {
@@ -177,6 +177,7 @@ if [ -f ${remoteRoot}/.env ]; then
   initialPlatformAdminPassword="\${INITIAL_PLATFORM_ADMIN_PASSWORD:-}"
   openAiKey="\${OPENAI_API_KEY:-}"
   aiEnabled="\${AI_ENABLED:-false}"
+  supportContactEmail="\${SUPPORT_CONTACT_EMAIL:-support@cloudnira.com}"
   echo "Reusing existing production secrets"
 else
   echo "ERROR: ${remoteRoot}/.env missing — create from deploy/production.env.example first"
@@ -230,6 +231,7 @@ MOBILE_ANALYSIS_CPUS=1.0
 MOBILE_ANALYSIS_PIDS_LIMIT=128
 INITIAL_PLATFORM_ADMIN_EMAIL=\${initialPlatformAdminEmail}
 INITIAL_PLATFORM_ADMIN_PASSWORD=\${initialPlatformAdminPassword}
+SUPPORT_CONTACT_EMAIL=\${supportContactEmail}
 ENVEOF
 chmod 600 ${remoteRoot}/.env
 

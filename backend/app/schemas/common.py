@@ -49,6 +49,7 @@ class SystemInfo(BaseModel):
     full_active_enabled: bool = False
     scan_notifications: str
     public_registration_enabled: bool
+    support_contact_email: str = ""
 
 
 class ReadinessStatus(BaseModel):

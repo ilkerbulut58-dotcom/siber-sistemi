@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, description="Use STARTTLS (587) or SSL (465)")
     smtp_timeout_seconds: int = Field(default=30, ge=5, le=120)
     email_from: str = Field(default="", description="From header, e.g. noreply@cloudnira.com")
+    support_contact_email: str = Field(
+        default="",
+        description="Public support contact shown in UI (e.g. support@cloudnira.com)",
+    )
     frontend_public_url: str = Field(
         default="http://localhost:3000",
         description="Public frontend base URL for links in emails",

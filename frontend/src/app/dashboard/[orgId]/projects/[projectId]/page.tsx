@@ -19,13 +19,15 @@ import { getApiBase } from "@/lib/api-base";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DomainVerificationPanel } from "@/components/domains/domain-verification-panel";
+import type { DomainVerifyResult } from "@/lib/api-types";
+import { verificationFailureLabel } from "@/lib/i18n";
 
 export default function ProjectPage() {
   const params = useParams<{ orgId: string; projectId: string }>();
   const { orgId, projectId } = params;
-  const { getAccessToken } = useAuth();
-  const { t, formatApiError, scanProfileLabel, scanProfileDescription, scanStatusLabel } =
+  const { getAccessToken, user } = useAuth();
+  const { t, formatApiError, scanProfileLabel, scanProfileDescription, scanStatusLabel, locale } =
     useTranslation();
 
   const [project, setProject] = useState<Project | null>(null);
@@ -37,6 +39,7 @@ export default function ProjectPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [testMode, setTestMode] = useState(false);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [memberRole, setMemberRole] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -44,7 +47,8 @@ export default function ProjectPage() {
       const healthBody = await healthRes.json();
       setTestMode(Boolean(healthBody?.data?.skip_domain_verification));
 
-      const [projectData, domainData, scanData, profileData, onboardingData] = await Promise.all([
+      const [projectData, domainData, scanData, profileData, onboardingData, members] =
+        await Promise.all([
         apiFetch<Project>(`/api/v1/organizations/${orgId}/projects/${projectId}`, {
           token: getAccessToken(),
         }),
@@ -59,18 +63,24 @@ export default function ProjectPage() {
         apiFetch<OnboardingStatus>(`/api/v1/organizations/${orgId}/onboarding-status`, {
           token: getAccessToken(),
         }).catch(() => null),
+        apiFetch<{ user_id: string; role: string }[]>(
+          `/api/v1/organizations/${orgId}/members`,
+          { token: getAccessToken() }
+        ).catch(() => []),
       ]);
       setProject(projectData);
       setDomains(domainData);
       setScans(scanData.filter((s) => s.project_id === projectId));
       setProfiles(profileData);
       setOnboarding(onboardingData ?? null);
+      const own = members.find((m) => m.user_id === user?.id);
+      setMemberRole(own?.role ?? null);
       setError(null);
     } catch (err) {
       const msg = formatApiError(err);
       if (!/token|INVALID_TOKEN/i.test(msg)) setError(msg);
     }
-  }, [formatApiError, getAccessToken, orgId, projectId]);
+  }, [formatApiError, getAccessToken, orgId, projectId, user?.id]);
 
   useEffect(() => {
     load();
@@ -117,11 +127,18 @@ export default function ProjectPage() {
 
   async function verifyDomain(domainId: string) {
     try {
-      const data = await apiFetch<{ message: string; verified: boolean }>(
+      const data = await apiFetch<DomainVerifyResult>(
         `/api/v1/organizations/${orgId}/projects/${projectId}/domains/${domainId}/verify`,
         { method: "POST", token: getAccessToken() }
       );
-      setMessage(data.verified ? t("project.verifySuccess") : data.message);
+      if (data.verified) {
+        setMessage(t("project.verifySuccess"));
+      } else {
+        const failureMsg = data.failure_code
+          ? verificationFailureLabel(locale, data.failure_code)
+          : t("project.verifyFailed");
+        setError(failureMsg);
+      }
       await load();
     } catch (err) {
       setError(formatApiError(err));
@@ -164,6 +181,7 @@ export default function ProjectPage() {
     }
   }
 
+  const isOrgAdmin = memberRole === "admin" || memberRole === "owner";
   const activeScanAllowed = onboarding?.pilot_active_scan_allowed !== false;
   const verifiedDomains = testMode ? domains : domains.filter((d) => d.is_verified);
   const isRestrictedProfile = (name: string) =>
@@ -271,7 +289,7 @@ export default function ProjectPage() {
                         <Button type="button" size="sm" onClick={() => verifyDomain(domain.id)}>
                           {t("project.verify")}
                         </Button>
-                        {domain.is_verified && (
+                        {domain.is_verified && isOrgAdmin && (
                           <>
                             {!domain.active_scan_allowed ? (
                               <Button
@@ -300,17 +318,9 @@ export default function ProjectPage() {
                 ))}
               </ul>
 
-              {!testMode && instructions && (
-                <div className="mt-4 rounded-md bg-muted/30 p-4 text-sm">
-                  <p className="mb-2 font-medium">
-                    {instructions.hostname} — {instructions.method}
-                  </p>
-                  <ol className="list-decimal space-y-1 pl-5">
-                    {instructions.instructions.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
+              {!testMode && instructions && <DomainVerificationPanel instructions={instructions} />}
+              {!testMode && !isOrgAdmin && (
+                <p className="mt-3 text-xs text-muted-foreground">{t("project.adminOnlyApproval")}</p>
               )}
             </CardContent>
           </Card>

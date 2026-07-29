@@ -101,15 +101,20 @@ export default function OrgDashboardPage() {
   }
 
   const stepHref = (stepId: string): string | null => {
+    const projectId = onboarding?.first_project_id ?? projects[0]?.id;
     if (stepId === "email_verified") return "/dashboard/settings";
-    if (stepId === "domain_added" && projects[0]) {
-      return `/dashboard/${orgId}/projects/${projects[0].id}`;
+    if ((stepId === "domain_added" || stepId === "domain_verified") && projectId) {
+      return `/dashboard/${orgId}/projects/${projectId}`;
     }
-    if (stepId === "domain_verified" && projects[0]) {
-      return `/dashboard/${orgId}/projects/${projects[0].id}`;
+    if (stepId === "safe_scan_started") return "/dashboard/scan";
+    if (stepId === "findings_reviewed" && onboarding?.latest_completed_scan_id) {
+      return `/dashboard/${orgId}/scans/${onboarding.latest_completed_scan_id}#section-all-findings`;
     }
-    if (stepId === "authorization_accepted" && projects[0]) {
-      return `/dashboard/${orgId}/projects/${projects[0].id}`;
+    if (stepId === "feedback_or_retest" && onboarding?.latest_completed_scan_id) {
+      return `/dashboard/${orgId}/scans/${onboarding.latest_completed_scan_id}#section-all-findings`;
+    }
+    if (stepId === "authorization_accepted" && projectId) {
+      return `/dashboard/${orgId}/projects/${projectId}`;
     }
     return null;
   };
@@ -151,7 +156,7 @@ export default function OrgDashboardPage() {
         )}
 
         <div className="mb-6 grid gap-4 md:grid-cols-2">
-          {onboarding?.is_pilot && (
+          {onboarding?.show_onboarding_checklist && (
             <Card>
               <CardHeader>
                 <CardTitle>{t("org.onboarding")}</CardTitle>
