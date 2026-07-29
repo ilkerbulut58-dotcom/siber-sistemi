@@ -15,4 +15,4 @@ except Exception:
     sys.exit(1)
 PY
 
-celery -A app.tasks.celery_app inspect ping --timeout=5 2>/dev/null | grep -q '"ok"'
+celery -A app.tasks.celery_app inspect ping --timeout=5 2>/dev/null | grep -qiE 'ok|pong'

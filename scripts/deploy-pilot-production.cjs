@@ -200,7 +200,7 @@ DOMAIN_MANUAL_VERIFICATION_TTL_DAYS=90
 GIT_COMMIT=${deploySha}
 RELEASE_TAG=${releaseTag}
 BUILD_TIMESTAMP=${buildTimestamp}
-APP_VERSION=0.9.0-rc3-expert
+APP_VERSION=${appVersion}
 CORS_ORIGINS=https://${domain}
 NEXT_PUBLIC_API_URL=https://${domain}
 SKIP_DOMAIN_VERIFICATION=false
@@ -245,7 +245,7 @@ docker compose -f docker-compose.prod.yml build \\
   --build-arg GIT_COMMIT=${deploySha} \\
   --build-arg RELEASE_TAG=${releaseTag} \\
   --build-arg BUILD_TIMESTAMP=${buildTimestamp} \\
-  --build-arg NEXT_PUBLIC_APP_VERSION=0.9.0-rc3-expert \\
+  --build-arg NEXT_PUBLIC_APP_VERSION=${appVersion} \\
   --build-arg NEXT_PUBLIC_GIT_COMMIT=${deploySha} \\
   --build-arg NEXT_PUBLIC_RELEASE_TAG=${releaseTag}
 docker compose -f docker-compose.prod.yml up -d
