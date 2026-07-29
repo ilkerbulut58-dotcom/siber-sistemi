@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.analysis.types import AnalyzedFinding, CorrelatedFinding
+from app.utils.url_canonicalization import canonicalize_url
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +95,14 @@ async def _verify_one(
 
 
 async def _get_response(url: str, cached_holder: dict) -> httpx.Response | None:
-    if cached_holder.get("response") is not None:
-        return cached_holder["response"]
+    canonical = canonicalize_url(url)
+    responses: dict[str, httpx.Response] = cached_holder.setdefault("responses", {})
+    if canonical in responses:
+        return responses[canonical]
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
             response = await client.get(url)
-            cached_holder["response"] = response
+            responses[canonical] = response
             return response
     except httpx.HTTPError:
         return None

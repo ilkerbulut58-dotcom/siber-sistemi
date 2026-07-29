@@ -96,7 +96,10 @@ def collapse_groups_by_plugin_id(groups: list[GroupedZapAlert]) -> list[GroupedZ
         for url in group.child_endpoints:
             if url and url not in existing.child_endpoints:
                 existing.child_endpoints.append(url)
-    return list(by_plugin.values())
+    return sorted(
+        by_plugin.values(),
+        key=lambda group: str(group.primary_alert.get("pluginId") or group.primary_alert.get("pluginid") or ""),
+    )
 
 
 def group_zap_alerts(alerts: list[dict[str, Any]]) -> list[GroupedZapAlert]:
@@ -117,7 +120,7 @@ def group_zap_alerts(alerts: list[dict[str, Any]]) -> list[GroupedZapAlert]:
         existing.instance_count += 1
         if url and url not in existing.child_endpoints:
             existing.child_endpoints.append(url)
-    return list(buckets.values())
+    return sorted(buckets.values(), key=lambda group: group.fingerprint)
 
 
 def grouped_alerts_to_raw_findings(

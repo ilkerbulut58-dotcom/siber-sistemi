@@ -70,6 +70,9 @@ SECRET_CORRELATION_KEYS = frozenset(SENSITIVE_DATA_RULE_MAP.values())
 def resolve_correlation_key(source_tool: str, source_rule_id: str, title: str) -> str:
     rule = source_rule_id.lower().strip()
 
+    if rule.startswith("missing-header-"):
+        return rule
+
     if rule.startswith("zap-"):
         plugin = rule.removeprefix("zap-")
         if plugin in ZAP_RULE_MAP:

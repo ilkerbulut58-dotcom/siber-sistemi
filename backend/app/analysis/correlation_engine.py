@@ -30,12 +30,19 @@ def correlate_findings(raw_findings: list[RawFinding]) -> list[CorrelatedFinding
         groups[_grouping_key(raw)].append(raw)
 
     correlated: list[CorrelatedFinding] = []
-    for (correlation_key, _group_token), items in groups.items():
-        primary_url = normalize_url(items[0].affected_url)
+    for group_key in sorted(groups):
+        items = groups[group_key]
+        correlation_key, _group_token = group_key
+        primary_url = _canonical_group_url(items)
         correlated.append(_merge_group(correlation_key, primary_url, items))
 
     correlated.sort(key=lambda f: (-SEVERITY_RANK.get(f.severity, 0), f.correlation_key))
     return correlated
+
+
+def _canonical_group_url(items: list[RawFinding]) -> str:
+    urls = sorted({normalize_url(item.affected_url) for item in items if item.affected_url})
+    return urls[0] if urls else normalize_url(items[0].affected_url)
 
 
 def _merge_group(correlation_key: str, url: str, items: list[RawFinding]) -> CorrelatedFinding:
