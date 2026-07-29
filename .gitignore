@@ -43,7 +43,8 @@ frontend/next-env.d.ts
 
 # Scan outputs (Phase 5+)
 scan_outputs/
-reports/
+/reports/
+!docs/reports/
 benchmarks/reports/
 benchmarks/baselines/*
 !benchmarks/baselines/smoke-v1.1.0.json
