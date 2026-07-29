@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from app.core.config import get_settings
+
 
 async def _register(client: AsyncClient, email: str, password: str = "SecurePass123!") -> dict:
     response = await client.post(
@@ -11,6 +13,20 @@ async def _register(client: AsyncClient, email: str, password: str = "SecurePass
     )
     assert response.status_code == 201
     return response.json()["data"]
+
+
+@pytest.mark.asyncio
+async def test_register_disabled_when_public_registration_off(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PUBLIC_REGISTRATION_ENABLED", "false")
+    get_settings.cache_clear()
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "closed@example.com", "password": "SecurePass123!", "full_name": "X"},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "REGISTRATION_DISABLED"
 
 
 @pytest.mark.asyncio
@@ -63,6 +79,29 @@ async def test_refresh_token(client: AsyncClient) -> None:
     response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
     assert response.status_code == 200
     assert response.json()["data"]["access_token"]
+
+
+@pytest.mark.asyncio
+async def test_password_change_revokes_refresh_tokens(client: AsyncClient) -> None:
+    reg = await _register(client, "pwdchange@example.com")
+    headers = {"Authorization": f"Bearer {reg['tokens']['access_token']}"}
+    refresh = reg["tokens"]["refresh_token"]
+
+    change = await client.patch(
+        "/api/v1/users/me/password",
+        json={"current_password": "SecurePass123!", "new_password": "NewSecurePass456!"},
+        headers=headers,
+    )
+    assert change.status_code == 200
+
+    reuse = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert reuse.status_code == 401
+
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "pwdchange@example.com", "password": "NewSecurePass456!"},
+    )
+    assert login.status_code == 200
 
 
 @pytest.mark.asyncio

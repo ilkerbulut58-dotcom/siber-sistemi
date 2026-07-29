@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_client_ip, get_current_user
+from app.core.exceptions import AppError
 from app.core.logging import request_id_ctx
 from app.models.user import User
 from app.schemas.auth import (
@@ -35,6 +36,15 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[dict]:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    if not settings.public_registration_enabled:
+        raise AppError(
+            "REGISTRATION_DISABLED",
+            "Public registration is disabled for this environment.",
+            status_code=403,
+        )
     service = AuthService(db)
     tokens, user, verify_token = await service.register(
         data,

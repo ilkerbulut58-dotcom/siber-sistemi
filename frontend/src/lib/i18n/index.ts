@@ -137,12 +137,16 @@ export function parseApiError(err: unknown): { code: string; message: string } {
 }
 
 export class ApiError extends Error {
+  retryAfterSeconds?: number;
+
   constructor(
     public code: string,
-    message: string
+    message: string,
+    retryAfterSeconds?: number
   ) {
     super(message);
     this.name = "ApiError";
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

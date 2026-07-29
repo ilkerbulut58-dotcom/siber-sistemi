@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { useTranslation } from "@/components/locale-provider";
 import { Navbar } from "@/components/navbar";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fetchPublicSystemInfo } from "@/lib/system-info";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -18,6 +19,13 @@ export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetchPublicSystemInfo()
+      .then((info) => setRegistrationOpen(info.public_registration_enabled))
+      .catch(() => setRegistrationOpen(false));
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,13 +50,22 @@ export default function RegisterPage() {
     <>
       <RedirectIfAuthed />
       <Navbar />
-      <main className="container mx-auto flex min-h-[80vh] items-center justify-center px-4">
-        <Card className="w-full max-w-md">
+      <main className="container mx-auto flex min-h-[80vh] items-center justify-center px-4 py-12">
+        <Card className="glass-card w-full max-w-md border-white/10">
           <CardHeader>
             <CardTitle>{t("auth.registerTitle")}</CardTitle>
-            <CardDescription>{t("auth.registerDesc")}</CardDescription>
+            <CardDescription>
+              {registrationOpen === false ? t("auth.registerClosed") : t("auth.registerDesc")}
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            {registrationOpen === false ? (
+              <p className="text-center text-sm text-muted-foreground">
+                <Link href="/login" className="text-primary underline">
+                  {t("common.login")}
+                </Link>
+              </p>
+            ) : (
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="full_name">{t("auth.fullName")}</Label>
@@ -67,12 +84,15 @@ export default function RegisterPage() {
                 {loading ? t("auth.saving") : t("auth.registerTitle")}
               </Button>
             </form>
+            )}
+            {registrationOpen !== false && (
             <p className="mt-4 text-center text-sm text-muted-foreground">
               {t("auth.hasAccount")}{" "}
               <Link href="/login" className="text-primary underline">
                 {t("common.login")}
               </Link>
             </p>
+            )}
           </CardContent>
         </Card>
       </main>

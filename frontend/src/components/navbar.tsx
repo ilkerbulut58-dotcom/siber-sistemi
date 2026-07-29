@@ -8,10 +8,12 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslation } from "@/components/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { usePublicRegistrationEnabled } from "@/lib/system-info";
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
+  const registrationOpen = usePublicRegistrationEnabled();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
@@ -31,9 +33,6 @@ export function Navbar() {
                 {t("admin.badge")}
               </Badge>
             )}
-            <Link href="/dashboard/settings" className="hidden text-sm text-muted-foreground hover:text-foreground md:inline">
-              {t("scanResults.settings")}
-            </Link>
             <span className="hidden max-w-[160px] truncate text-sm text-muted-foreground lg:inline">
               {user.email}
             </span>
@@ -49,9 +48,11 @@ export function Navbar() {
                 {t("common.login")}
               </Button>
             </Link>
-            <Link href="/register">
-              <Button size="sm">{t("common.register")}</Button>
-            </Link>
+            {registrationOpen !== false && (
+              <Link href="/register">
+                <Button size="sm">{t("common.register")}</Button>
+              </Link>
+            )}
           </nav>
         )}
       </div>

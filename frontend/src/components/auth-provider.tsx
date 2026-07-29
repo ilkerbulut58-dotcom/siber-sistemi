@@ -102,9 +102,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const delay = Math.max(5_000, expMs - Date.now() - 2 * 60 * 1000);
       timer = setTimeout(async () => {
         if (cancelled) return;
-        await refreshAccessToken();
-        const updated = readStoredTokens();
-        if (updated) setTokens(updated);
+        try {
+          await refreshAccessToken();
+          const updated = readStoredTokens();
+          if (updated) setTokens(updated);
+        } catch (err) {
+          if (err instanceof ApiError && err.code === "RATE_LIMITED") {
+            const waitSec = Math.min(Math.max(err.retryAfterSeconds ?? 30, 5), 120);
+            timer = setTimeout(() => schedule(), waitSec * 1000);
+            return;
+          }
+        }
         schedule();
       }, delay);
     };

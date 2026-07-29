@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePublicRegistrationEnabled } from "@/lib/system-info";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const { t, formatApiError } = useTranslation();
+  const registrationOpen = usePublicRegistrationEnabled();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,8 +40,8 @@ export default function LoginPage() {
     <>
       <RedirectIfAuthed />
       <Navbar />
-      <main className="container mx-auto flex min-h-[80vh] items-center justify-center px-4">
-        <Card className="w-full max-w-md">
+      <main className="container mx-auto flex min-h-[80vh] items-center justify-center px-4 py-12">
+        <Card className="glass-card w-full max-w-md border-white/10">
           <CardHeader>
             <CardTitle>{t("auth.loginTitle")}</CardTitle>
             <CardDescription>{t("auth.loginDesc")}</CardDescription>
@@ -71,10 +73,14 @@ export default function LoginPage() {
               </Button>
             </form>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              {t("auth.noAccount")}{" "}
-              <Link href="/register" className="text-primary underline">
-                {t("common.register")}
-              </Link>
+              {registrationOpen !== false && (
+                <>
+                  {t("auth.noAccount")}{" "}
+                  <Link href="/register" className="text-primary underline">
+                    {t("common.register")}
+                  </Link>
+                </>
+              )}
             </p>
           </CardContent>
         </Card>

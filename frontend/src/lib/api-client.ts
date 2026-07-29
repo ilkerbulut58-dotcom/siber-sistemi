@@ -79,11 +79,23 @@ export async function apiFetch<T>(
   let { res, body } = await performFetch(path, token, rest);
 
   if (isAuthError(res.status, body)) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      token = refreshed;
-      ({ res, body } = await performFetch(path, token, rest));
+    try {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        token = refreshed;
+        ({ res, body } = await performFetch(path, token, rest));
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "RATE_LIMITED") {
+        throw err;
+      }
     }
+  }
+
+  if (res.status === 429) {
+    const code = body.error?.code || "RATE_LIMITED";
+    const message = body.error?.message || "Too many requests.";
+    throw new ApiError(code, message, Number(res.headers.get("Retry-After") || undefined));
   }
 
   if (!res.ok || !body.success || body.data === null) {
