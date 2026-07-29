@@ -8,6 +8,7 @@ import httpx
 
 from app.core.security import generate_opaque_token
 from app.schemas.domain import VerificationMethod
+from app.security.hostname_auth import normalize_hostname
 
 TOKEN_TTL_HOURS = 72
 META_PATTERN = re.compile(

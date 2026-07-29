@@ -27,7 +27,7 @@ const appVersion = process.env.APP_VERSION || '0.9.0-rc3-expert';
 const buildTimestamp = new Date().toISOString();
 
 function assertCleanGit() {
-  const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
+  const status = execSync('git status --porcelain --untracked-files=no', { cwd: projectRoot, encoding: 'utf8' }).trim();
   if (status) {
     console.error('ERROR: Git working tree is dirty. Commit, tag, and push before deploy.');
     console.error(status);
