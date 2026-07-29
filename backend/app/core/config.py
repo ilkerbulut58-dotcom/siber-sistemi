@@ -19,9 +19,18 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "SIBER"
-    app_version: str = "0.1.0"
+    app_version: str = "0.9.0-rc3-expert"
+    git_commit: str = Field(default="", description="Full git commit SHA at build time")
+    release_tag: str = Field(default="", description="Release tag at build time")
+    build_timestamp: str = Field(default="", description="UTC ISO build timestamp")
     environment: Literal["development", "staging", "production"] = "development"
     debug: bool = False
+    public_registration_enabled: bool = Field(
+        default=True,
+        description="Allow open self-service registration via /auth/register",
+    )
+    domain_verification_ttl_days: int = Field(default=30, ge=1, le=365)
+    domain_manual_verification_ttl_days: int = Field(default=90, ge=1, le=365)
     api_prefix: str = "/api/v1"
 
     # Server
@@ -43,10 +52,11 @@ class Settings(BaseSettings):
     trusted_proxy_ips: Annotated[list[str], NoDecode] = Field(default=[])
     # Security (Phase 2+)
     secret_key: str = Field(default="change-me-in-production-use-openssl-rand")
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
     rate_limit_enabled: bool = False
     auth_rate_limit_per_minute: int = Field(default=10, ge=1, le=1_000)
+    auth_refresh_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
     upload_rate_limit_per_hour: int = Field(default=20, ge=1, le=10_000)
     retest_rate_limit_per_hour: int = Field(default=30, ge=1, le=10_000)
     scan_rate_limit_per_hour: int = Field(default=20, ge=1, le=10_000)

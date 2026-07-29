@@ -1,9 +1,13 @@
 """Celery application configuration (Phase 4+)."""
 
+import logging
+
 from celery import Celery
+from celery.signals import worker_ready
 
 from app.core.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 celery_app = Celery(
@@ -48,3 +52,16 @@ celery_app.conf.update(
         },
     },
 )
+
+
+@worker_ready.connect
+def _log_worker_build_metadata(**_kwargs) -> None:
+    s = get_settings()
+    logger.info(
+        "SIBER worker ready version=%s commit=%s tag=%s built=%s env=%s",
+        s.app_version,
+        (s.git_commit or "")[:12],
+        s.release_tag or "none",
+        s.build_timestamp or "unknown",
+        s.environment,
+    )

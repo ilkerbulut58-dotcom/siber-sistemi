@@ -21,6 +21,10 @@ def _meta(request: Request) -> ResponseMeta:
     )
 
 
+def _short_commit(full: str) -> str:
+    return full[:12] if full else ""
+
+
 @router.get("/health", response_model=APIResponse[HealthStatus])
 async def health_check(request: Request) -> APIResponse[HealthStatus]:
     settings = get_settings()
@@ -28,8 +32,8 @@ async def health_check(request: Request) -> APIResponse[HealthStatus]:
         data=HealthStatus(
             status="healthy",
             version=settings.app_version,
+            git_commit=_short_commit(settings.git_commit),
             environment=settings.environment,
-            skip_domain_verification=settings.skip_domain_verification,
         ),
         meta=_meta(request),
     )
@@ -42,8 +46,8 @@ async def liveness_probe(request: Request) -> APIResponse[HealthStatus]:
         data=HealthStatus(
             status="alive",
             version=settings.app_version,
+            git_commit=_short_commit(settings.git_commit),
             environment=settings.environment,
-            skip_domain_verification=settings.skip_domain_verification,
         ),
         meta=_meta(request),
     )

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Globe, Radar, ShieldCheck, Smartphone } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronRight,
+  Globe,
+  Radar,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { EmailVerificationBanner } from "@/components/email-verification-banner";
 import { useAuth } from "@/components/auth-provider";
@@ -25,22 +32,16 @@ export default function DashboardPage() {
   const [supportGrants, setSupportGrants] = useState<SupportGrant[]>([]);
   const [recentScans, setRecentScans] = useState<ScanJob[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showWorkspaces, setShowWorkspaces] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const quickActions = [
+  const moreTools = [
     {
       href: "/dashboard/assessment",
       title: t("dashboard.quickFullAssessment"),
       description: t("dashboard.quickFullAssessmentDesc"),
       icon: ShieldCheck,
-      primary: true,
-    },
-    {
-      href: "/dashboard/scan",
-      title: t("dashboard.quickWebScan"),
-      description: t("dashboard.quickWebScanDesc"),
-      icon: Globe,
     },
     {
       href: "/dashboard/mobile",
@@ -174,83 +175,79 @@ export default function DashboardPage() {
       <Navbar />
       <main className="container mx-auto space-y-8 px-4 py-8">
         <div>
-          <h1 className="text-3xl font-bold">{t("dashboard.title")}</h1>
-          <p className="mt-2 text-muted-foreground">{welcomeText}</p>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{t("dashboard.title")}</h1>
+          <p className="mt-1 text-muted-foreground">{welcomeText}</p>
         </div>
 
         {error && <p className="text-destructive">{error}</p>}
 
         <EmailVerificationBanner />
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quickActions.map(({ href, title, description, icon: Icon, ...rest }) => (
-            <Link key={href} href={href}>
-              <Card
-                className={`h-full transition-colors hover:border-primary/40 hover:bg-muted/20 ${
-                  "primary" in rest && rest.primary
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border/60 bg-card/80"
-                }`}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Icon className="h-5 w-5 text-primary" />
-                    {title}
-                  </CardTitle>
-                  <CardDescription>{description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
-        </section>
-
-        {orgs[0] && (
-          <Card className="border-border/60 bg-card/80">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Radar className="h-5 w-5 text-primary" />
-                  {t("dashboard.attackSurface")}
-                </CardTitle>
-                <CardDescription>{t("dashboard.attackSurfaceDesc")}</CardDescription>
-              </div>
-              <Link href={`/dashboard/${orgs[0].id}`}>
-                <Button variant="outline" size="sm">
-                  {t("common.projects")} →
+        <Card className="glass-card overflow-hidden border-primary/25 glow-primary">
+          <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+            <div className="max-w-xl">
+              <h2 className="text-xl font-semibold md:text-2xl">{t("dashboard.heroTitle")}</h2>
+              <p className="mt-2 text-muted-foreground">{t("dashboard.heroSubtitle")}</p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+              <Link href="/dashboard/scan">
+                <Button size="lg" className="w-full sm:w-auto">
+                  <Globe className="mr-2 h-4 w-4" />
+                  {t("dashboard.heroCta")}
                 </Button>
               </Link>
-            </CardHeader>
-          </Card>
-        )}
+              {recentScans.length > 0 && (
+                <Link href="/dashboard/scan">
+                  <Button size="lg" variant="outline" className="w-full border-white/15 sm:w-auto">
+                    {t("dashboard.heroSecondary")}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("dashboard.recentScans")}</CardTitle>
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <Card className="border-border/60">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">{t("dashboard.recentScans")}</CardTitle>
+              {recentScans.length > 0 && (
+                <Link
+                  href="/dashboard/scan"
+                  className="flex items-center text-sm text-primary hover:underline"
+                >
+                  {t("dashboard.viewAllScans")}
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              )}
             </CardHeader>
             <CardContent>
               {loading ? (
                 <p className="text-muted-foreground">{t("common.loading")}</p>
               ) : recentScans.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("dashboard.noScans")}{" "}
-                  <Link href="/dashboard/scan" className="underline">
-                    {t("dashboard.startFirstScan")}
+                <div className="rounded-lg border border-dashed border-border/80 py-12 text-center">
+                  <Globe className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground">{t("dashboard.noScans")}</p>
+                  <Link href="/dashboard/scan" className="mt-4 inline-block">
+                    <Button size="sm">{t("dashboard.startFirstScan")}</Button>
                   </Link>
-                </p>
+                </div>
               ) : (
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2">
                   {recentScans.map((scan) => (
                     <li key={scan.id}>
                       <Link
                         href={`/dashboard/${scan.organization_id}/scans/${scan.id}`}
-                        className="block rounded-md border border-border px-3 py-2 hover:bg-muted/40"
+                        className="group flex items-center justify-between rounded-lg border border-border/60 px-4 py-3 transition-colors hover:border-primary/30 hover:bg-muted/20"
                       >
-                        <p className="truncate font-medium">{scan.target_url}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {scanStatusLabel(scan.status)} · {scan.findings_count}{" "}
-                          {t("common.findings")}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{scan.target_url}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {scanStatusLabel(scan.status)} · {scan.findings_count}{" "}
+                            {t("common.findings")}
+                          </p>
+                        </div>
+                        <ArrowRight className="ml-3 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                       </Link>
                     </li>
                   ))}
@@ -259,32 +256,80 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("dashboard.organizations")}</CardTitle>
-              <form onSubmit={createOrg} className="flex gap-2">
+          <div className="space-y-6">
+            {orgs[0] && (
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Radar className="h-5 w-5 text-primary" />
+                    {t("dashboard.attackSurface")}
+                  </CardTitle>
+                  <CardDescription>{t("dashboard.attackSurfaceDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href={`/dashboard/${orgs[0].id}`}>
+                    <Button variant="outline" className="w-full">
+                      {t("common.projects")} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="text-lg">{t("dashboard.moreTools")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {moreTools.map(({ href, title, description, icon: Icon }) => (
+                  <Link key={href} href={href}>
+                    <div className="flex items-start gap-3 rounded-lg border border-border/60 p-3 transition-colors hover:border-primary/30 hover:bg-muted/20">
+                      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{title}</p>
+                        <p className="text-xs text-muted-foreground">{description}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <Card className="border-border/60">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">{t("dashboard.organizations")}</CardTitle>
+              <CardDescription className="sr-only">{t("dashboard.organizations")}</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowWorkspaces((v) => !v)}>
+              {showWorkspaces ? t("common.hide") : t("common.show")}
+            </Button>
+          </CardHeader>
+          {showWorkspaces && (
+            <CardContent>
+              <form onSubmit={createOrg} className="mb-4 flex gap-2">
                 <Input
                   name="name"
                   required
                   placeholder={t("dashboard.newOrgPlaceholder")}
-                  className="h-9 w-40"
+                  className="max-w-xs"
                 />
                 <Button type="submit" size="sm">
                   {t("common.add")}
                 </Button>
               </form>
-            </CardHeader>
-            <CardContent>
               {loading ? (
                 <p className="text-muted-foreground">{t("common.loading")}</p>
               ) : orgs.length === 0 ? (
-                <p className="text-muted-foreground">{t("dashboard.noOrgs")}</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.noOrgs")}</p>
               ) : (
                 <ul className="space-y-2">
                   {orgs.map((org) => (
                     <li
                       key={org.id}
-                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                      className="flex items-center justify-between rounded-lg border border-border/60 px-4 py-3"
                     >
                       <div>
                         <p className="font-medium">{org.name}</p>
@@ -292,25 +337,18 @@ export default function DashboardPage() {
                           {org.is_managed_workspace ? t("dashboard.managedWorkspace") : org.slug}
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Link href={`/dashboard/${org.id}/mobile`}>
-                          <Button variant="outline" size="sm">
-                            {t("common.mobile")}
-                          </Button>
-                        </Link>
-                        <Link href={`/dashboard/${org.id}`}>
-                          <Button variant="outline" size="sm">
-                            {t("common.open")}
-                          </Button>
-                        </Link>
-                      </div>
+                      <Link href={`/dashboard/${org.id}`}>
+                        <Button variant="outline" size="sm">
+                          {t("common.open")}
+                        </Button>
+                      </Link>
                     </li>
                   ))}
                 </ul>
               )}
             </CardContent>
-          </Card>
-        </div>
+          )}
+        </Card>
 
         {user?.is_platform_admin && (
           <Card className="border-amber-500/20 bg-amber-500/5">

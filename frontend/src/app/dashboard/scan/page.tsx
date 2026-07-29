@@ -3,25 +3,35 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { ArrowRight, Globe, Shield, Zap } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/components/auth-provider";
 import { useTranslation } from "@/components/locale-provider";
-import { apiFetch, type OnboardingStatus, type QuickScanResult, type ScanJob, type ScanProfile } from "@/lib/api-client";
+import {
+  apiFetch,
+  type OnboardingStatus,
+  type QuickScanResult,
+  type ScanJob,
+  type ScanProfile,
+} from "@/lib/api-client";
 import { getApiBase } from "@/lib/api-base";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+
+type ProfileMode = "safe" | "deep";
 
 export default function QuickScanPage() {
   const router = useRouter();
   const { getAccessToken, user } = useAuth();
-  const { t, formatApiError, scanProfileLabel, scanProfileDescription, scanStatusLabel } =
-    useTranslation();
+  const { t, formatApiError, scanStatusLabel } = useTranslation();
   const [profiles, setProfiles] = useState<ScanProfile[]>([]);
   const [recentScans, setRecentScans] = useState<ScanJob[]>([]);
-  const [testMode, setTestMode] = useState(true);
+  const [testMode, setTestMode] = useState(false);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [profileMode, setProfileMode] = useState<ProfileMode>("safe");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -66,8 +76,12 @@ export default function QuickScanPage() {
   const quotaExceeded =
     !quotaUnlimited && effectiveQuota !== null && todayCount >= effectiveQuota;
   const activeScanAllowed = onboarding?.pilot_active_scan_allowed !== false;
-  const isRestrictedProfile = (name: string) =>
-    !activeScanAllowed && (name === "deep" || name === "code");
+  const deepDisabled = !activeScanAllowed;
+
+  const resolvedProfile =
+    profileMode === "deep"
+      ? profiles.find((p) => p.name === "deep")?.name ?? "deep"
+      : profiles.find((p) => p.name === "safe")?.name ?? "safe";
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,7 +94,7 @@ export default function QuickScanPage() {
         token: getAccessToken(),
         body: JSON.stringify({
           target_url: form.get("target_url"),
-          scan_profile: form.get("scan_profile") || "safe",
+          scan_profile: resolvedProfile,
           authorization_accepted: form.get("authorization") === "on",
         }),
       });
@@ -96,89 +110,140 @@ export default function QuickScanPage() {
     <>
       <Navbar />
       <main className="container mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-2 text-3xl font-bold">{t("scanPage.title")}</h1>
-        <p className="mb-6 text-muted-foreground">{t("scanPage.subtitle")}</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{t("scanPage.title")}</h1>
+          <p className="mt-2 text-muted-foreground">{t("scanPage.subtitle")}</p>
+        </div>
 
         {testMode && (
-          <p className="mb-4 rounded-md border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm text-green-200">
+          <p className="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm text-green-200">
             {t("scanPage.testBanner")}
           </p>
         )}
 
-        {error && <p className="mb-4 text-destructive">{error}</p>}
+        {error && (
+          <p className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
         {effectiveQuota != null && (
-          <p className={`mb-4 text-sm ${quotaExceeded ? "text-orange-400" : "text-muted-foreground"}`}>
+          <p
+            className={cn(
+              "mb-4 text-sm",
+              quotaExceeded ? "text-orange-400" : "text-muted-foreground"
+            )}
+          >
             {t("scanPage.quotaToday", { count: todayCount, quota: effectiveQuota })}
             {quotaExceeded && ` — ${t("scanPage.quotaExceededHint")}`}
           </p>
         )}
 
-        <Card>
+        <Card className="glass-card border-primary/20">
           <CardHeader>
-            <CardTitle>{t("assessment.targetSite")}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              {t("assessment.targetSite")}
+            </CardTitle>
             <CardDescription>{t("assessment.targetSiteDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="target_url">{t("assessment.siteUrl")}</Label>
                 <Input
                   id="target_url"
                   name="target_url"
                   type="url"
-                  placeholder={t("project.targetUrlPlaceholder")}
+                  placeholder="https://example.com"
                   required
                   autoFocus
+                  className="h-11 text-base"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="scan_profile">{t("scanPage.scanProfile")}</Label>
-                {!activeScanAllowed && (
+
+              <div className="space-y-3">
+                <Label>{t("scanPage.scanProfile")}</Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setProfileMode("safe")}
+                    className={cn(
+                      "rounded-lg border p-4 text-left transition-all",
+                      profileMode === "safe"
+                        ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{t("scanPage.profileQuick")}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("scanPage.profileQuickDesc")}</p>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deepDisabled}
+                    onClick={() => !deepDisabled && setProfileMode("deep")}
+                    className={cn(
+                      "rounded-lg border p-4 text-left transition-all",
+                      deepDisabled && "cursor-not-allowed opacity-50",
+                      profileMode === "deep" && !deepDisabled
+                        ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-orange-400" />
+                      <span className="font-medium">{t("scanPage.profileDeep")}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("scanPage.profileDeepDesc")}</p>
+                  </button>
+                </div>
+                {deepDisabled && (
                   <p className="text-xs text-orange-400">{t("project.profileDisabled")}</p>
                 )}
-                <select
-                  id="scan_profile"
-                  name="scan_profile"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  defaultValue="safe"
-                >
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.name} disabled={isRestrictedProfile(p.name)}>
-                      {scanProfileLabel(p.name, p.display_name)} —{" "}
-                      {scanProfileDescription(p.name, p.description ?? "")}
-                    </option>
-                  ))}
-                </select>
               </div>
-              <label className="flex items-start gap-2 text-sm">
+
+              <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/10 p-4 text-sm">
                 <input type="checkbox" name="authorization" className="mt-1" required defaultChecked />
                 <span>{t("scanPage.authorization")}</span>
               </label>
-              <Button type="submit" className="w-full" disabled={loading || quotaExceeded}>
+
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={loading || quotaExceeded}
+              >
                 {loading ? t("scanPage.starting") : quotaExceeded ? t("scanPage.scanDisabledQuota") : t("scanPage.start")}
+                {!loading && !quotaExceeded && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </form>
           </CardContent>
         </Card>
 
         {recentScans.length > 0 && (
-          <Card className="mt-6">
+          <Card className="mt-6 border-border/60">
             <CardHeader>
-              <CardTitle>{t("scanPage.recentScans")}</CardTitle>
+              <CardTitle className="text-lg">{t("scanPage.recentScans")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2">
                 {recentScans.map((scan) => (
                   <li key={scan.id}>
                     <Link
                       href={`/dashboard/${scan.organization_id}/scans/${scan.id}`}
-                      className="block rounded-md border border-border px-4 py-3 hover:bg-muted/40"
+                      className="group flex items-center justify-between rounded-lg border border-border/60 px-4 py-3 transition-colors hover:border-primary/30 hover:bg-muted/20"
                     >
-                      <div className="font-medium">{scan.target_url}</div>
-                      <div className="text-muted-foreground">
-                        {scanStatusLabel(scan.status)} · {scan.findings_count}{" "}
-                        {t("common.findings")}
+                      <div>
+                        <div className="font-medium">{scan.target_url}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {scanStatusLabel(scan.status)} · {scan.findings_count}{" "}
+                          {t("common.findings")}
+                        </div>
                       </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     </Link>
                   </li>
                 ))}
@@ -186,12 +251,6 @@ export default function QuickScanPage() {
             </CardContent>
           </Card>
         )}
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          <Link href="/dashboard" className="underline hover:text-foreground">
-            ← {t("assessment.backToDashboard")}
-          </Link>
-        </p>
       </main>
     </>
   );

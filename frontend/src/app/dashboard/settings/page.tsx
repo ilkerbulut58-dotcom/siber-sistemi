@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SystemInfoPanel } from "@/components/system-info-panel";
 
 export default function SettingsPage() {
   const { getAccessToken, user, refreshUser } = useAuth();
@@ -173,6 +174,16 @@ export default function SettingsPage() {
               <li>• {t("settings.mailFlowForgot")}</li>
               <li>• {t("settings.mailFlowReset")}</li>
             </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.systemInfoTitle")}</CardTitle>
+            <CardDescription>{t("settings.systemInfoDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SystemInfoPanel />
           </CardContent>
         </Card>
 

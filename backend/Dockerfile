@@ -45,10 +45,23 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 
 FROM base AS production
 
+ARG GIT_COMMIT=""
+ARG RELEASE_TAG=""
+ARG BUILD_TIMESTAMP=""
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.version="${RELEASE_TAG}" \
+      org.opencontainers.image.created="${BUILD_TIMESTAMP}"
+
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY . .
+
+RUN chmod +x scripts/celery_worker_healthcheck.sh scripts/celery_mobile_worker_healthcheck.sh
+
+ENV GIT_COMMIT=${GIT_COMMIT} \
+    RELEASE_TAG=${RELEASE_TAG} \
+    BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 RUN useradd --create-home --shell /bin/bash appuser \
     && mkdir -p /var/siber/mobile \
@@ -57,7 +70,6 @@ USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+# HEALTHCHECK is defined per-service in docker-compose (api vs celery workers).
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

@@ -32,8 +32,23 @@ class APIResponse[T](BaseModel):
 class HealthStatus(BaseModel):
     status: str
     version: str
+    git_commit: str = ""
+    environment: str = ""
+
+
+class SystemInfo(BaseModel):
+    product: str = "SIBER Security Analysis Platform"
     environment: str
-    skip_domain_verification: bool = False
+    version: str
+    git_commit: str
+    release_tag: str
+    domain_verification_required: bool
+    scan_daily_quota: int
+    scan_concurrency_limit: int
+    allowed_profiles: list[str]
+    full_active_enabled: bool = False
+    scan_notifications: str
+    public_registration_enabled: bool
 
 
 class ReadinessStatus(BaseModel):

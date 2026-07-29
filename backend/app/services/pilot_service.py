@@ -59,6 +59,8 @@ class PilotService:
 
     @staticmethod
     def effective_daily_quota(organization: Organization, default_quota: int) -> int:
+        if organization.tenant_type == "expert_security_test" and organization.expert_test_quota is not None:
+            return organization.expert_test_quota
         if organization.is_pilot and organization.pilot_scan_quota is not None:
             return organization.pilot_scan_quota
         return default_quota

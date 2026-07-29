@@ -21,6 +21,45 @@ const remoteRoot = '/opt/siber';
 const archiveName = 'siber-deploy.tgz';
 const archivePath = path.join(projectRoot, archiveName);
 const deploySha = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf8' }).trim();
+const shortDeploySha = deploySha.slice(0, 12);
+const releaseTag = process.env.RELEASE_TAG || 'v0.9.0-rc3-expert';
+const appVersion = process.env.APP_VERSION || '0.9.0-rc3-expert';
+const buildTimestamp = new Date().toISOString();
+
+function assertCleanGit() {
+  const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
+  if (status) {
+    console.error('ERROR: Git working tree is dirty. Commit, tag, and push before deploy.');
+    console.error(status);
+    process.exit(1);
+  }
+  execSync('git fetch origin main', { cwd: projectRoot, stdio: 'inherit' });
+  const localHead = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf8' }).trim();
+  const remoteHead = execSync('git rev-parse origin/main', { cwd: projectRoot, encoding: 'utf8' }).trim();
+  if (localHead !== remoteHead) {
+    console.error(`ERROR: HEAD (${localHead}) != origin/main (${remoteHead})`);
+    process.exit(1);
+  }
+  if (!deploySha || !shortDeploySha) {
+    console.error('ERROR: build metadata git commit is empty');
+    process.exit(1);
+  }
+  if (!releaseTag) {
+    console.error('ERROR: RELEASE_TAG is required');
+    process.exit(1);
+  }
+  try {
+    const tagSha = execSync(`git rev-list -n 1 ${releaseTag}`, { cwd: projectRoot, encoding: 'utf8' }).trim();
+    if (tagSha !== localHead) {
+      console.error(`ERROR: tag ${releaseTag} (${tagSha}) does not point to HEAD (${localHead})`);
+      process.exit(1);
+    }
+  } catch {
+    console.error(`ERROR: release tag ${releaseTag} not found — create with git tag ${releaseTag}`);
+    process.exit(1);
+  }
+  console.log('Git preflight OK:', localHead, releaseTag);
+}
 
 const nginxConf = `location /api/v1/ {
 \tproxy_pass http://127.0.0.1:8010/api/v1/;
@@ -83,6 +122,7 @@ async function main() {
     process.exit(1);
   }
 
+  assertCleanGit();
   buildArchive();
 
   const remoteCmd = `
@@ -152,8 +192,15 @@ POSTGRES_USER=siber
 POSTGRES_PASSWORD=\${pgPass}
 POSTGRES_DB=siber
 SECRET_KEY=\${secretKey}
-ACCESS_TOKEN_EXPIRE_MINUTES=15
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=7
+PUBLIC_REGISTRATION_ENABLED=false
+DOMAIN_VERIFICATION_TTL_DAYS=30
+DOMAIN_MANUAL_VERIFICATION_TTL_DAYS=90
+GIT_COMMIT=${deploySha}
+RELEASE_TAG=${releaseTag}
+BUILD_TIMESTAMP=${buildTimestamp}
+APP_VERSION=0.9.0-rc3-expert
 CORS_ORIGINS=https://${domain}
 NEXT_PUBLIC_API_URL=https://${domain}
 SKIP_DOMAIN_VERIFICATION=false
@@ -168,10 +215,11 @@ AI_BASE_URL=https://api.openai.com/v1
 AI_TIMEOUT_SECONDS=30
 TRUSTED_PROXY_IPS=127.0.0.1
 RATE_LIMIT_ENABLED=true
-AUTH_RATE_LIMIT_PER_MINUTE=10
+AUTH_RATE_LIMIT_PER_MINUTE=30
+AUTH_REFRESH_RATE_LIMIT_PER_MINUTE=120
 UPLOAD_RATE_LIMIT_PER_HOUR=20
 RETEST_RATE_LIMIT_PER_HOUR=30
-SCAN_RATE_LIMIT_PER_HOUR=10
+SCAN_RATE_LIMIT_PER_HOUR=20
 SCAN_CONCURRENCY_LIMIT=1
 SCAN_DAILY_QUOTA=5
 NOTIFICATIONS_PROVIDER=noop
@@ -187,7 +235,20 @@ chmod 600 ${remoteRoot}/.env
 
 echo "=== DOCKER BUILD & ROLLING START ==="
 cd ${remoteRoot}
-docker compose -f docker-compose.prod.yml up -d --build
+export GIT_COMMIT=${deploySha}
+export RELEASE_TAG=${releaseTag}
+export BUILD_TIMESTAMP=${buildTimestamp}
+export NEXT_PUBLIC_APP_VERSION=${appVersion}
+export NEXT_PUBLIC_GIT_COMMIT=${deploySha}
+export NEXT_PUBLIC_RELEASE_TAG=${releaseTag}
+docker compose -f docker-compose.prod.yml build \\
+  --build-arg GIT_COMMIT=${deploySha} \\
+  --build-arg RELEASE_TAG=${releaseTag} \\
+  --build-arg BUILD_TIMESTAMP=${buildTimestamp} \\
+  --build-arg NEXT_PUBLIC_APP_VERSION=0.9.0-rc3-expert \\
+  --build-arg NEXT_PUBLIC_GIT_COMMIT=${deploySha} \\
+  --build-arg NEXT_PUBLIC_RELEASE_TAG=${releaseTag}
+docker compose -f docker-compose.prod.yml up -d
 
 echo "=== WAIT FOR API ==="
 for i in $(seq 1 90); do
@@ -216,6 +277,12 @@ else
   echo "Skipped admin bootstrap — credentials not in .env"
 fi
 
+echo "=== CLEAR RATE LIMIT COUNTERS ==="
+docker compose -f docker-compose.prod.yml exec -T redis redis-cli --scan --pattern 'siber:rate:*' | while read -r key; do
+  docker compose -f docker-compose.prod.yml exec -T redis redis-cli DEL "$key" >/dev/null || true
+done
+echo "rate limit keys cleared"
+
 echo "=== NGINX / APACHE PROXY ==="
 cat > /var/www/vhosts/system/${domain}/conf/vhost_nginx.conf << 'NGXEOF'
 ${nginxConf}
@@ -238,8 +305,31 @@ ProxyPass / http://127.0.0.1:3011/
 ProxyPassReverse / http://127.0.0.1:3011/
 </IfModule>
 APACHEEOF
-/usr/local/psa/admin/sbin/httpdmng --reconfigure-domain ${domain} || true
-nginx -t && systemctl reload nginx
+if [ -x /opt/siber/scripts/server/safe-vhost-reload.sh ]; then
+  /opt/siber/scripts/server/safe-vhost-reload.sh ${domain}
+else
+  /usr/local/psa/admin/sbin/httpdmng --reconfigure-domain ${domain} || true
+  nginx -t && systemctl reload nginx
+fi
+
+echo "=== ENSURE GUARDRAILS ==="
+if [ ! -x /opt/siber/scripts/server/web-stack-healthcheck.sh ]; then
+  echo "WARN: server guardrails not installed — run node scripts/install-server-guardrails.cjs"
+else
+  /opt/siber/scripts/server/web-stack-healthcheck.sh || true
+fi
+
+echo "=== DISABLE DEFAULT ADMIN IF PRESENT ==="
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U siber -d siber -c \\
+  "UPDATE users SET is_active=false WHERE email='admin@admin.com';" || true
+
+echo "=== POST-DEPLOY VERSION CHECK ==="
+HEALTH_COMMIT=$(curl -sf http://127.0.0.1:8010/api/v1/health | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('git_commit',''))")
+echo "health_git_commit=$HEALTH_COMMIT expected_prefix=${shortDeploySha}"
+if [ -n "$HEALTH_COMMIT" ] && [ "$HEALTH_COMMIT" != "${shortDeploySha}" ]; then
+  echo "ERROR: health commit mismatch"
+  exit 1
+fi
 
 echo "=== POST-DEPLOY SMOKE ==="
 curl -sS http://127.0.0.1:8010/api/v1/health | head -c 300; echo
@@ -250,6 +340,7 @@ docker compose -f docker-compose.prod.yml ps
 
 echo "BACKUP_DIR=\$BACKUP_DIR"
 echo "DEPLOY_SHA=${deploySha}"
+echo "RELEASE_TAG=${releaseTag}"
 echo PILOT_PRODUCTION_DEPLOY_OK
 `;
 

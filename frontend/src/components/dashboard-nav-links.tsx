@@ -4,11 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-  Globe,
   LayoutDashboard,
   Menu,
-  ShieldCheck,
-  Smartphone,
+  ScanSearch,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/components/locale-provider";
@@ -26,11 +25,13 @@ function NavLink({
   label,
   icon: Icon,
   onClick,
+  highlight,
 }: {
   href: string;
   label: string;
   icon: LucideIcon;
   onClick?: () => void;
+  highlight?: boolean;
 }) {
   const pathname = usePathname();
   const active =
@@ -45,7 +46,9 @@ function NavLink({
       className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
         active
           ? "bg-primary/15 font-medium text-primary"
-          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          : highlight
+            ? "text-foreground hover:bg-primary/10 hover:text-primary"
+            : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
       }`}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -59,10 +62,9 @@ export function DashboardNavLinks({ mobile = false }: { mobile?: boolean }) {
   const { t } = useTranslation();
 
   const navItems = [
-    { href: "/dashboard", label: t("nav.panel"), icon: LayoutDashboard },
-    { href: "/dashboard/assessment", label: t("nav.fullAssessment"), icon: ShieldCheck },
-    { href: "/dashboard/scan", label: t("nav.webScan"), icon: Globe },
-    { href: "/dashboard/mobile", label: t("nav.mobileApk"), icon: Smartphone },
+    { href: "/dashboard", label: t("nav.overview"), icon: LayoutDashboard },
+    { href: "/dashboard/scan", label: t("nav.scans"), icon: ScanSearch, highlight: true },
+    { href: "/dashboard/settings", label: t("nav.settings"), icon: Settings },
   ] as const;
 
   if (mobile) {

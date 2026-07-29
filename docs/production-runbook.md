@@ -39,4 +39,10 @@ Use `deploy/staging.env.example` with same compose file; separate database and C
 - Liveness: `/api/v1/health/live`
 - Readiness: `/api/v1/health/ready` (503 when DB/Redis down)
 
+## Single-server guardrails (Plesk host)
+
+If all domains return 502 after restart or SSH work, see **`docs/ops/single-server-quick-fix.md`**.
+
+Install/update guardrails: `node scripts/install-server-guardrails.cjs` (requires `DEPLOY_SSH_PASSWORD`).
+
 No automated production deploy from CI in this release.

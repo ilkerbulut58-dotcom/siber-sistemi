@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from app.core.config import get_settings
+
 
 @pytest.mark.asyncio
 async def test_health_check(client: AsyncClient) -> None:
@@ -11,7 +13,8 @@ async def test_health_check(client: AsyncClient) -> None:
     body = response.json()
     assert body["success"] is True
     assert body["data"]["status"] == "healthy"
-    assert body["data"]["version"] == "0.1.0"
+    assert body["data"]["version"] == get_settings().app_version
+    assert "git_commit" in body["data"]
     assert "request_id" in body["meta"] or "request_id" in str(body.get("meta", {}))
 
 

@@ -30,6 +30,27 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .hero-gradient {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 91% 60% / 0.18), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, hsl(262 83% 58% / 0.08), transparent),
+      hsl(var(--background));
+  }
+
+  .glass-card {
+    @apply border border-white/10 bg-card/60 backdrop-blur-md;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-400 via-indigo-300 to-violet-400 bg-clip-text text-transparent;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 40px -10px hsl(217 91% 60% / 0.35);
   }
 }

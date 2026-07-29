@@ -25,10 +25,11 @@ def _rule_for_request(request: Request) -> tuple[str, int, int] | None:
     path = request.url.path
     settings = get_settings()
 
+    if path == "/api/v1/auth/refresh":
+        return ("auth_refresh", settings.auth_refresh_rate_limit_per_minute, 60)
     if path in {
         "/api/v1/auth/login",
         "/api/v1/auth/register",
-        "/api/v1/auth/refresh",
         "/api/v1/auth/forgot-password",
         "/api/v1/auth/reset-password",
     }:

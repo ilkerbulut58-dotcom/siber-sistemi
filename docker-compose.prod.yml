@@ -64,6 +64,10 @@ services:
     build:
       context: ./backend
       target: production
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
+        RELEASE_TAG: ${RELEASE_TAG:-}
+        BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
     container_name: siber-api
     restart: unless-stopped
     environment:
@@ -78,6 +82,7 @@ services:
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      AUTH_REFRESH_RATE_LIMIT_PER_MINUTE: ${AUTH_REFRESH_RATE_LIMIT_PER_MINUTE:-120}
       UPLOAD_RATE_LIMIT_PER_HOUR: ${UPLOAD_RATE_LIMIT_PER_HOUR:-20}
       RETEST_RATE_LIMIT_PER_HOUR: ${RETEST_RATE_LIMIT_PER_HOUR:-30}
       SCAN_RATE_LIMIT_PER_HOUR: ${SCAN_RATE_LIMIT_PER_HOUR:-10}
@@ -95,8 +100,15 @@ services:
       SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
       USE_CELERY_FOR_SCANS: ${USE_CELERY_FOR_SCANS:-true}
       NUCLEI_TEMPLATES: /opt/nuclei-templates
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      PUBLIC_REGISTRATION_ENABLED: ${PUBLIC_REGISTRATION_ENABLED:-false}
+      DOMAIN_VERIFICATION_TTL_DAYS: ${DOMAIN_VERIFICATION_TTL_DAYS:-30}
+      DOMAIN_MANUAL_VERIFICATION_TTL_DAYS: ${DOMAIN_MANUAL_VERIFICATION_TTL_DAYS:-90}
+      GIT_COMMIT: ${GIT_COMMIT:-}
+      RELEASE_TAG: ${RELEASE_TAG:-}
+      BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
+      APP_VERSION: ${APP_VERSION:-0.9.0-rc3-expert}
       ZAP_API_URL: http://zap:8080
       ZAP_ENABLED: ${ZAP_ENABLED:-true}
       AI_ENABLED: ${AI_ENABLED:-false}
@@ -131,6 +143,10 @@ services:
     build:
       context: ./backend
       target: production
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
+        RELEASE_TAG: ${RELEASE_TAG:-}
+        BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
     container_name: siber-worker
     restart: unless-stopped
     command: celery -A app.tasks.celery_app worker --beat --loglevel=info -Q scans,monitoring --concurrency=2
@@ -157,6 +173,10 @@ services:
       SKIP_DOMAIN_VERIFICATION: ${SKIP_DOMAIN_VERIFICATION:-false}
       USE_CELERY_FOR_SCANS: "true"
       NUCLEI_TEMPLATES: /opt/nuclei-templates
+      GIT_COMMIT: ${GIT_COMMIT:-}
+      RELEASE_TAG: ${RELEASE_TAG:-}
+      BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
+      APP_VERSION: ${APP_VERSION:-0.9.0-rc3-expert}
       ZAP_API_URL: http://zap:8080
       ZAP_ENABLED: "true"
       AI_ENABLED: ${AI_ENABLED:-false}
@@ -178,6 +198,12 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "scripts/celery_worker_healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
     networks:
       - siber-network
     extra_hosts:
@@ -218,6 +244,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "scripts/celery_mobile_worker_healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
     networks:
       - mobile-analysis-network
 
@@ -227,6 +259,9 @@ services:
       target: production
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.9.0-rc3-expert}
+        NEXT_PUBLIC_GIT_COMMIT: ${GIT_COMMIT:-}
+        NEXT_PUBLIC_RELEASE_TAG: ${RELEASE_TAG:-}
     container_name: siber-frontend
     restart: unless-stopped
     environment:
