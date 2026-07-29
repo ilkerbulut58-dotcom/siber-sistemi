@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.domain import Domain
-from app.models.organization import Organization
+from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
 from app.schemas.domain import DomainCreate, VerificationMethod
 from app.schemas.organization import OrganizationCreate
@@ -93,6 +93,20 @@ class QuickScanService:
         org = result.scalars().first()
         if org is not None:
             return org
+
+        membership_result = await self.db.execute(
+            select(Organization)
+            .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+            .where(
+                OrganizationMember.user_id == actor.id,
+                Organization.is_active.is_(True),
+            )
+            .order_by(Organization.created_at)
+        )
+        org = membership_result.scalars().first()
+        if org is not None:
+            return org
+
         return await org_service.create(
             actor,
             OrganizationCreate(name=self.WORKSPACE_NAME),
