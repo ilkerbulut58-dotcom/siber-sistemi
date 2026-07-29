@@ -71,10 +71,11 @@ async def _verify_one(
 ) -> tuple[str, str, str | None]:
     key = finding.correlation_key
     url = finding.affected_url or target_url
+    verify_url = target_url if key in HEADER_CHECKS else url
 
     try:
         if key in HEADER_CHECKS:
-            return await _verify_missing_header(url, key, cached_holder, finding)
+            return await _verify_missing_header(verify_url, key, cached_holder, finding)
 
         if key == "no-http-redirect" or key == "weak-http-redirect":
             return await _verify_http_redirect(url)

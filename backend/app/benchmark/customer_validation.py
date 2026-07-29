@@ -194,11 +194,13 @@ def _group_findings_for_validation(raw_findings: list[RawFinding]) -> list[tuple
 
 def _group_has_passive_http_header_confirmation(items: list[RawFinding]) -> bool:
     return any(
-        item.source_tool == "passive_http"
-        and item.source_rule_id.lower().startswith("missing-header-")
-        and _normalized_confidence(item) in {"high", "medium"}
+        item.source_tool == "passive_http" and item.source_rule_id.lower().startswith("missing-header-")
         for item in items
     )
+
+
+def _group_has_header_evidence(items: list[RawFinding]) -> bool:
+    return any(_has_header_evidence(item) for item in items)
 
 
 def validate_raw_finding(raw: RawFinding, *, group_members: list[RawFinding] | None = None) -> ValidationDecision:
@@ -211,6 +213,7 @@ def validate_raw_finding(raw: RawFinding, *, group_members: list[RawFinding] | N
 
     if rule.startswith("missing-header-") and (
         _has_header_evidence(raw)
+        or _group_has_header_evidence(members)
         or (raw.source_tool == "passive_http" and confidence in {"high", "medium"})
         or passive_http_header_confirmed
     ):

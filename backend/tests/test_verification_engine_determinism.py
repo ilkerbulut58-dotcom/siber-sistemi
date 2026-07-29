@@ -39,7 +39,7 @@ def _header_finding(url: str) -> CorrelatedFinding:
 
 
 @pytest.mark.asyncio
-async def test_verify_findings_uses_distinct_cached_responses_per_url(monkeypatch):
+async def test_site_wide_header_verification_uses_scan_target_root(monkeypatch):
     requested_urls: list[str] = []
 
     class FakeResponse:
@@ -51,22 +51,31 @@ async def test_verify_findings_uses_distinct_cached_responses_per_url(monkeypatc
         responses = cached_holder.setdefault("responses", {})
         canonical = verification_engine.canonicalize_url(url)
         if canonical not in responses:
-            if canonical.endswith("/robots.txt"):
-                responses[canonical] = FakeResponse({"content-security-policy": "default-src 'self'"})
-            else:
-                responses[canonical] = FakeResponse({})
+            responses[canonical] = FakeResponse({})
         return responses[canonical]
 
     monkeypatch.setattr(verification_engine, "_get_response", fake_get_response)
 
     root = _PROXY
     robots = f"{_PROXY}robots.txt"
-    analyzed = await verification_engine.verify_findings(
-        root,
+    permutations = [
         [_header_finding(robots), _header_finding(root)],
-    )
+        [_header_finding(root), _header_finding(robots)],
+    ]
 
-    assert requested_urls == [robots, root]
-    by_url = {item.affected_url: item.verified_confidence for item in analyzed}
-    assert by_url[root] in {"medium", "high"}
-    assert by_url[robots] == "low"
+    snapshots: list[tuple[tuple[str, str, str], ...]] = []
+    for correlated in permutations:
+        analyzed = await verification_engine.verify_findings(root, correlated)
+        snapshots.append(
+            tuple(
+                sorted(
+                    (item.affected_url, item.verified_confidence, item.verification_status)
+                    for item in analyzed
+                )
+            )
+        )
+
+    assert snapshots[0] == snapshots[1]
+    assert requested_urls
+    assert all(url == root for url in requested_urls)
+    assert all(item.verified_confidence in {"medium", "high"} for item in analyzed)
