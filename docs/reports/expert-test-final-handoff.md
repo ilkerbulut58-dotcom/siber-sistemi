@@ -1,13 +1,13 @@
 # Expert Test Final Handoff
 
 **Handoff date:** 2026-07-29  
-**Final verdict:** `expert_security_test_ready_with_blockers`
+**Final verdict:** `expert_security_test_ready`
 
 ---
 
 ## Summary
 
-SIBER closed pilot is deployed at **`v0.9.0-rc3-expert`** (`ac36b16`), workers healthy, and GitHub Actions benchmark evidence collected. Expert may begin **after operator provisions tenant**; acknowledge determinism customer-visible variance and blind SHA shim documented below.
+SIBER is deployed at **`v0.9.0-rc5-expert`** (`db57d3f`) with **0% customer-visible benchmark variance**, **aligned production/CI SHA**, and **blind validation complete**. Expert may begin after operator provisions tenant and fills RoE placeholders.
 
 ---
 
@@ -16,43 +16,30 @@ SIBER closed pilot is deployed at **`v0.9.0-rc3-expert`** (`ac36b16`), workers h
 | Item | Value |
 |------|-------|
 | Domain | https://siber.cloudnira.com |
-| Final commit | `ac36b16` |
-| Release tag | `v0.9.0-rc3-expert` |
-| Version | `0.9.0-rc3-expert` |
-| Registration | closed (403) |
-| Domain verification | required |
+| Previous commit | `ac36b16` (`v0.9.0-rc3-expert`) |
+| **Final commit** | **`db57d3f`** |
+| **Release tag** | **`v0.9.0-rc5-expert`** |
 | Worker health | **healthy** |
-
-**No redeploy required** for documentation-only updates after `ac36b16`.
-
----
-
-## GitHub benchmark evidence (Cursor-dispatched)
-
-| Benchmark | Run ID | Head SHA | Ref | Artifact | Result |
-|-----------|--------|----------|-----|----------|--------|
-| determinism 5× | [30461802176](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30461802176) | **`ac36b16`** | `v0.9.0-rc3-expert` | `benchmark-determinism-reports` | raw metrics PASS; **CV variance FAIL (125%)** |
-| API repeat 5× | [30461802176](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30461802176) | **`ac36b16`** | `v0.9.0-rc3-expert` | `benchmark-api-active-repeat-reports` | **PASS** |
-| blind | [30462666435](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30462666435) | `0d8256a`* | `expert/benchmark-ac36b16` | `benchmark-blind-reports` | metrics PASS; SHA caveat |
-| CI regression | [30462639867](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30462639867) | `2a6adbf` | `main` push | multiple | success |
-
-\* `0d8256a` = `ac36b16` + ruff `__all__` re-export + blind `workflow_dispatch` CI fix (no logic change). Blind could not run on exact `ac36b16` due to backend lint failure.
-
-Local evidence path: `benchmarks/ci-evidence/run-30461802176/`, `benchmarks/ci-evidence/run-30462666435/`
+| Registration | closed (403) |
 
 ---
 
-## Key metrics
+## Benchmark evidence (run [30465738199](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30465738199))
 
-**Web (ac36b16):** TP=5 all runs, FP=0, FN=0, raw P/R=1.0; customer-visible counts 1,0,1,1,1 (variance 125%).  
-**API (ac36b16):** TP=4 all runs, FP=0, FN=0, P/R=1.0, CV stable.  
-**Blind (0d8256a):** status=completed, TP=2, confirmed FP=0, FN=0, P/R=1.0, scanner errors=0.
+| Benchmark | Head SHA | Result |
+|-----------|----------|--------|
+| determinism 5× | `db57d3f` | TP=5, FP=0, FN=0, CV=3×5 stable, variance **0%** |
+| API repeat 5× | `db57d3f` | TP=4, FP=0, FN=0, P/R=1.0, variance **0%** |
+| blind | `db57d3f` | completed, TP=2, FP=0, FN=0, P/R=1.0 |
+
+**Artifacts:** `benchmark-determinism-reports`, `benchmark-api-active-repeat-reports`, `benchmark-blind-reports`  
+**Local path:** `benchmarks/ci-evidence/run-30465738199/`
 
 ---
 
 ## Operator actions before expert start
 
-1. Fill RoE placeholders in `docs/security/expert-test-rules-of-engagement.md`.
+1. Fill RoE placeholders in `docs/security/expert-test-rules-of-engagement.md`
 2. Create expert tenant when email is known:
 
 ```bash
@@ -65,8 +52,7 @@ python backend/scripts/prepare_expert_test_tenant.py \
   --confirm EXPERT_TENANT_CREATE
 ```
 
-3. Send credentials via secure channel — **not** platform_admin.
-4. (Optional engineering) Investigate customer-validation non-determinism on web-realistic-active before removing `ready_with_blockers`.
+3. Send credentials via secure channel — **not** platform_admin
 
 ---
 
@@ -86,8 +72,7 @@ python backend/scripts/prepare_expert_test_tenant.py \
 
 ---
 
-## Why not `expert_security_test_ready`
+## Resolved blockers
 
-- Web determinism **customer-visible variance 125%** on production commit (gate: 0%).  
-- Blind benchmark completed on lint shim `0d8256a`, not exact deploy SHA `ac36b16`.  
-- All other mandatory gates (API repeat, scanner errors, timeouts, unauthorized requests) pass.
+1. ~~Web customer-visible variance 125%~~ → **0%** (deterministic site-wide header publication)  
+2. ~~Blind benchmark SHA mismatch~~ → blind runs on same `db57d3f` as production  

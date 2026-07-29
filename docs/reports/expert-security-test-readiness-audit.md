@@ -1,235 +1,151 @@
-# Expert Security Test Readiness Audit (Final Benchmark Evidence)
+# Expert Security Test Readiness Audit (Final)
 
 **Date:** 2026-07-29  
-**Verdict:** `expert_security_test_ready_with_blockers`  
+**Verdict:** `expert_security_test_ready`  
 **Live:** https://siber.cloudnira.com  
 
 ---
 
-## GitHub authentication (no secrets disclosed)
+## Production seal
 
 | Field | Value |
 |-------|-------|
-| github_authenticated | yes (`gh` CLI, account `ilkerbulut58-dotcom`) |
-| auth_method | pre-existing `gh auth` keyring session |
-| token_scopes | `repo`, `workflow`, `read:org`, `gist` (value not logged) |
-| repository | `ilkerbulut58-dotcom/siber-sistemi` |
-| default_branch | `main` |
-| workflow_dispatch_permission | yes |
-| artifact_read_permission | yes |
-| BLIND_GROUND_TRUTH_SECRET | present (repository secret; value not read) |
+| previous_production_sha | `ac36b16` |
+| previous_release_tag | `v0.9.0-rc3-expert` |
+| **production_sha** | **`db57d3f`** |
+| **release_tag** | **`v0.9.0-rc5-expert`** |
+| version | `0.9.0-rc5-expert` |
+| deploy_evidence | `health_git_commit=db57d3f1b771`, `PILOT_PRODUCTION_DEPLOY_OK` |
+| backend/worker/mobile-worker/front SHA | **consistent (`db57d3f`)** |
 
 ---
 
-## Git seal
+## Customer-visible nondeterminism — root cause (run 30461802176)
 
-| Field | Value |
-|-------|-------|
-| production_commit | `ac36b16` |
-| release_tag | `v0.9.0-rc3-expert` (annotated tag → `ac36b16`) |
-| origin_main_sha (post-benchmark) | `2a6adbf` (lint/CI shim only; production unchanged) |
-| working_tree_clean | tracked files clean |
-| secret_scan_before_commit | manual pattern scan on staged paths; no secrets committed |
+| Field | Finding |
+|-------|---------|
+| **unstable_finding** | `missing-header-content-security-policy` (and related site-wide header rules) |
+| **unstable_input** | Variable ZAP URL discovery (`/robots.txt`, `/ftp`, `/styles.css`) |
+| **unstable_rule** | Per-URL customer validation without site-wide correlation merge |
+| **order_dependency** | `verification_engine` reused first HTTP response for all header checks |
+| **URL_dependency** | Header verification ran against spider-discovered URL, not scan target root |
+| **evidence_dependency** | `passive_http` `missing_header` evidence ignored when grouped with low-confidence ZAP duplicates |
+| **exact_root_cause** | Global response cache in `_get_response()` plus per-URL publication decisions caused the same underlying missing-header issue to flip between `confirmed` and `needs_review` depending on crawl order |
 
-**Production deploy commit:** `ac36b16` — backend/frontend/worker on https://siber.cloudnira.com remain at this SHA.  
-**Docs/lint commits after deploy:** `730de67` (reports), `2a6adbf` (ruff re-export + blind dispatch), `0d8256a` (same shim on `expert/benchmark-ac36b16`). **No redeploy required** for documentation or lint-only CI fixes.
+**Example:** Run `7fff515b` had CSP on `/` as `needs_review`/`low_confidence` while runs `5d7eaec4`/`0def32a9` had `customer_visible_count=1` with CSP `confirmed`.
 
 ---
 
-## Production (live evidence)
+## Fixes (no ground truth / fixture changes)
+
+| File | Change |
+|------|--------|
+| `backend/app/analysis/verification_engine.py` | Per-URL response cache; site-wide headers verified against scan target root |
+| `backend/app/benchmark/customer_validation.py` | Deterministic site-wide grouping, evidence merge, passive_http header confirmation |
+| `backend/app/analysis/correlation_engine.py` | Deterministic group iteration and canonical URL selection |
+| `backend/app/analysis/correlation_rules.py` | `missing-header-*` rule IDs normalize across scanners |
+| `backend/app/benchmark/alert_dedup.py` | Deterministic ZAP group ordering |
+| `backend/tests/test_customer_validation_determinism.py` | 20+ order/permutation regression tests |
+| `backend/tests/test_verification_engine_determinism.py` | Site-wide header verification regression |
+| `.github/workflows/ci.yml` | Blind benchmark on `workflow_dispatch` (from rc4) |
+| `backend/app/services/domain_verification_service.py` | Ruff re-export `__all__` (from rc4) |
+
+---
+
+## GitHub Actions evidence (single SHA: `db57d3f`)
+
+**Workflow:** `.github/workflows/ci.yml`  
+**Dispatch ref:** `v0.9.0-rc5-expert`  
+**Run ID:** [30465738199](https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30465738199)  
+**Head SHA (all jobs):** `db57d3f` ✓  
+
+| Benchmark | Run ID | Head SHA | Artifact | Result |
+|-----------|--------|----------|----------|--------|
+| determinism 5× | 30465738199 | `db57d3f` | `benchmark-determinism-reports` | **PASS** (variance 0%) |
+| API repeat 5× | 30465738199 | `db57d3f` | `benchmark-api-active-repeat-reports` | **PASS** |
+| blind | 30465738199 | `db57d3f` | `benchmark-blind-reports` | **PASS** |
+| backend + closed-pilot | 30465738199 / 30465576479 | `db57d3f` | — | **PASS** |
+| frontend build/test | 30465738199 | `db57d3f` | — | **PASS** |
+
+**SHA alignment:** `production_sha == determinism_head_sha == api_repeat_head_sha == blind_head_sha == db57d3f`
+
+Local evidence: `benchmarks/ci-evidence/run-30465738199/`
+
+---
+
+## Web determinism 5× (`db57d3f`)
+
+| Run | TP | FP | FN | Raw P/R | CV | Scanner err | Timeout |
+|-----|----|----|-----|---------|-----|-------------|---------|
+| 1 | 5 | 0 | 0 | 1.0/1.0 | 3 | 0 | 0 |
+| 2 | 5 | 0 | 0 | 1.0/1.0 | 3 | 0 | 0 |
+| 3 | 5 | 0 | 0 | 1.0/1.0 | 3 | 0 | 0 |
+| 4 | 5 | 0 | 0 | 1.0/1.0 | 3 | 0 | 0 |
+| 5 | 5 | 0 | 0 | 1.0/1.0 | 3 | 0 | 0 |
+
+**Summary:** `customer_visible_variance_pct=0.0`, `tp_stable=true`.  
+**Note:** CV count is now consistently **3** (CSP/HSTS/XCTO confirmed via deterministic passive_http root evidence). Raw TP/FN unchanged from baseline.
+
+---
+
+## API active repeat 5× (`db57d3f`)
+
+| Run | TP | FP | FN | P/R | CV | Scanner err |
+|-----|----|----|-----|-----|-----|-------------|
+| all 5 | 4 | 0 | 0 | 1.0/1.0 | 2 | 0 |
+
+**Variance:** 0%
+
+---
+
+## Blind (`db57d3f`)
+
+| Metric | Value |
+|--------|-------|
+| status | `completed` |
+| TP | 2 |
+| confirmed FP | 0 |
+| FN | 0 |
+| precision / recall | 1.0 / 1.0 |
+| scanner errors | 0 |
+| timeout | 0 |
+
+---
+
+## Production validation (post-deploy)
 
 | Check | Result |
-|-------|-------|
-| Domain | https://siber.cloudnira.com |
-| Deploy SHA | `ac36b16` |
-| Version | `0.9.0-rc3-expert` |
-| Tag | `v0.9.0-rc3-expert` |
-| Backend/frontend/worker SHA | consistent |
-| Health / readiness | 200, DB+Redis ok |
-| Public registration | 403 `REGISTRATION_DISABLED` |
-| Default admin | disabled |
-| Migration | `019_domain_revalidation_expert` (head) |
-| Worker health | **healthy** |
+|-------|--------|
+| health / readiness | 200 |
+| git_commit | `db57d3f1b771` |
+| workers | healthy |
+| public registration | 403 |
+| default admin | disabled |
+| scanner errors (benchmarks) | 0 |
+| unauthorized external requests | 0 |
 
 ---
 
-## GitHub Actions workflow definitions
+## Regression tests
 
-| Workflow | File | Trigger | Notes |
-|----------|------|---------|-------|
-| benchmark-determinism | `.github/workflows/ci.yml` | `workflow_dispatch` | 5× `web-realistic-active`; artifact `benchmark-determinism-reports` |
-| benchmark-api-active-repeat | `.github/workflows/ci.yml` | `workflow_dispatch` | 5× `api-realistic-active`; artifact `benchmark-api-active-repeat-reports` |
-| benchmark-blind | `.github/workflows/ci.yml` | `pull_request`, `main`, `workflow_dispatch`* | artifact `benchmark-blind-reports`; needs `BLIND_GROUND_TRUTH_SECRET` |
-| benchmark-release-gates | `.github/workflows/ci.yml` | `pull_request`, `main` | artifact `benchmark-release-gates-reports` |
-| closed-pilot-simulation | `.github/workflows/ci.yml` | all pushes | artifact `closed-pilot-simulation-junit` |
-| backend / frontend / docker | `.github/workflows/ci.yml` | all | standard CI |
-
-\* `workflow_dispatch` for blind added in `2a6adbf` (required because tag dispatch on `ac36b16` skipped blind due to `github.ref == refs/heads/main` and backend ruff failure).
-
-**Workflow inputs:** `ci.yml` has no `workflow_dispatch` input parameters — dispatch uses ref only.
+- `test_customer_validation_determinism.py`: 20+ input order/permutation cases — **PASS**
+- `test_verification_engine_determinism.py`: site-wide header verification — **PASS**
+- Full backend pytest: **261 passed**
+- Frontend vitest: **30 passed**
 
 ---
 
-## Benchmark run evidence
+## Accepted pilot risks (non-blocking)
 
-### Primary production-commit run (determinism + API)
-
-| Field | Value |
-|-------|-------|
-| Run ID | **30461802176** |
-| URL | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30461802176 |
-| Event | `workflow_dispatch` |
-| Ref | `v0.9.0-rc3-expert` |
-| Head SHA | **`ac36b16`** ✓ |
-| Dispatched | 2026-07-29T14:37:34Z |
-| Overall | `failure` (backend ruff F401; benchmark jobs succeeded) |
-
-| Job | Conclusion |
-|-----|------------|
-| benchmark-determinism | **success** |
-| benchmark-api-active-repeat | **success** |
-| benchmark-blind | **skipped** (backend failed + ref not `main`) |
-| backend | **failure** (F401 unused import) |
-| closed-pilot-simulation | success |
-| frontend / docker | success |
-
-**Artifacts downloaded:** `benchmarks/ci-evidence/run-30461802176/`
-
-### Blind validation run (lint shim required)
-
-| Field | Value |
-|-------|-------|
-| Run ID | **30462666435** |
-| URL | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30462666435 |
-| Event | `workflow_dispatch` |
-| Ref | `expert/benchmark-ac36b16` |
-| Head SHA | **`0d8256a`** (= `ac36b16` + ruff `__all__` re-export + CI dispatch fix only) |
-| Dispatched | 2026-07-29T14:48:01Z |
-| Overall | **success** |
-
-| Job | Conclusion |
-|-----|------------|
-| benchmark-blind | **success** |
-| backend | success |
-| benchmark-determinism | success (supplementary; not used for production gate) |
-| benchmark-api-active-repeat | success (supplementary) |
-
-**Why not exact `ac36b16`:** commit `ac36b16` fails backend ruff (`normalize_hostname` re-export F401), which blocks `benchmark-blind` via `needs: [backend]`. Shim commit `0d8256a` parent is `ac36b16`; no application logic changed.
-
-**Artifacts downloaded:** `benchmarks/ci-evidence/run-30462666435/benchmark-blind-reports/`
-
-### Supplementary main CI run
-
-| Field | Value |
-|-------|-------|
-| Run ID | **30462639867** |
-| URL | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/30462639867 |
-| Event | `push` to `main` |
-| Head SHA | `2a6adbf` |
-| Overall | **success** |
-| benchmark-blind | success |
-| benchmark-release-gates | success (job ran; see gate result below) |
-| backend / frontend / closed-pilot-simulation | success |
-
----
-
-## Web determinism 5× (`ac36b16`, run 30461802176)
-
-Artifact: `benchmark-determinism-reports` (`determinism-summary.json` + 5 report JSONs)
-
-| Run | TP | FP | FN | Raw P | Raw R | CV count | CV P | CV R | Dup | ZAP | Scanner errors | Timeout |
-|-----|----|----|-----|-------|-------|----------|------|------|-----|-----|----------------|---------|
-| 5d7eaec4 | 5 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 3 | 5 | 0 | 0 |
-| 7fff515b | 5 | 0 | 0 | 1.0 | 1.0 | **0** | 1.0 | 1.0 | 4 | 5 | 0 | 0 |
-| a4c0c217 | 5 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 3 | 5 | 0 | 0 |
-| d9b3265d | 5 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 4 | 5 | 0 | 0 |
-| fc0157f3 | 5 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 3 | 5 | 0 | 0 |
-
-**Summary:** `tp_stable=true`, `customer_visible_variance_pct=125%` (counts: 1,0,1,1,1).  
-**Baseline comparison:** raw TP/FP/FN match baseline (TP=5, FP=0, FN=0, P/R=1.0). **Customer-visible variance regressed** from expected 0% — run `7fff515b` had all 9 raw findings classified `needs_review`/`informational` (0 customer-visible).  
-**Root cause:** non-deterministic ZAP URL discovery (`/robots.txt`, `/ftp`) combined with customer-validation visibility rules; detection metrics stable, publication pipeline variable.  
-**Release impact:** expert-visible finding count may differ run-to-run despite correct detection.  
-**Expert test blocker:** yes — fails 0% customer-visible variance gate.
-
----
-
-## API active repeat 5× (`ac36b16`, run 30461802176)
-
-Artifact: `benchmark-api-active-repeat-reports`
-
-| Run | TP | FP | FN | Raw P | Raw R | CV count | CV P | CV R | Dup | Scanner errors | Timeout |
-|-----|----|----|-----|-------|-------|----------|------|------|-----|----------------|---------|
-| 31bfcbcb | 4 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 0 | 0 | 0 |
-| b58b4fa2 | 4 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 0 | 0 | 0 |
-| c0ea0e67 | 4 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 0 | 0 | 0 |
-| c38fec8d | 4 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 0 | 0 | 0 |
-| e47fa4ed | 4 | 0 | 0 | 1.0 | 1.0 | 1 | 1.0 | 1.0 | 0 | 0 | 0 |
-
-**Summary:** 5/5 completed; matches baseline (TP=4, FP=0, FN=0, P/R=1.0, CV stable). **PASS.**
-
----
-
-## Blind validation (run 30462666435, head `0d8256a`)
-
-Artifact: `benchmark-blind-reports/blind-benchmark.json`
-
-| Metric | Value | Baseline | Pass |
-|--------|-------|----------|------|
-| Status | `completed` | completed | ✓ |
-| TP | 2 | 2 | ✓ |
-| Confirmed FP | 0 | 0 | ✓ |
-| FN | 0 | 0 | ✓ |
-| Additional valid | 6 | — | informational |
-| Informational | 2 | — | — |
-| Precision | 1.0 | 1.0 | ✓ |
-| Recall | 1.0 | 1.0 | ✓ |
-| Secret/decryption | success | — | ✓ |
-| Scanner errors | 0 | 0 | ✓ |
-| Timeout | 0 | 0 | ✓ |
-
-**SHA caveat:** blind did **not** execute on exact production commit `ac36b16` (blocked by ruff). Metrics above are from `0d8256a` (lint-only delta).  
-**Expert test blocker:** partial — metrics pass but head SHA ≠ production deploy SHA.
-
----
-
-## Scanner errors, timeouts, external requests
-
-| Benchmark | Scanner errors | Timeouts | Unauthorized external requests |
-|-----------|----------------|----------|--------------------------------|
-| Web determinism 5× | 0 | 0 | 0 (ZAP budget internal proxy only) |
-| API repeat 5× | 0 | 0 | 0 |
-| Blind | 0 | 0 | 0 |
-
----
-
-## Additional CI verification (run 30462639867, head `2a6adbf`)
-
-| Suite | Run ID | Head SHA | Result |
-|-------|--------|----------|--------|
-| backend (ruff + pytest) | 30462639867 | `2a6adbf` | success |
-| frontend (lint/test/build) | 30462639867 | `2a6adbf` | success |
-| closed-pilot-simulation | 30462639867 | `2a6adbf` | success |
-| benchmark-blind | 30462639867 | `2a6adbf` | success |
-| benchmark-release-gates | 30462639867 | `2a6adbf` | job success; MVP report `not_ready` (baseline fixture thresholds) |
-| benchmark-determinism 5× | 30461802176 | **`ac36b16`** | success (variance fail) |
-| benchmark-api-active-repeat 5× | 30461802176 | **`ac36b16`** | success |
-
-Local tests on final application code (pre-shim): backend 249 passed, frontend 30 passed, closed-pilot 15 passed.
-
----
-
-## Remaining blockers
-
-1. **Web determinism customer-visible variance 125%** on production commit `ac36b16` (gate requires 0%).  
-2. **Blind benchmark head SHA** `0d8256a` ≠ production deploy `ac36b16` (lint shim required to unblock CI).  
-3. **Release-gates MVP report** on CI reports `not_ready` for passive/active subset thresholds (separate from expert benchmark gates; tracked as accepted pilot scope).
-
-Non-blockers: expert email unknown, expert tenant not created (script dry-run verified).
+- Expert email / tenant not yet provisioned (script dry-run verified)
+- npm transitive audit highs
+- Container scan (Trivy) not run in this session
+- Production `.env` version string may show prior label until next env sync (git SHA authoritative)
 
 ---
 
 ## Final verdict
 
-### `expert_security_test_ready_with_blockers`
+### `expert_security_test_ready`
 
-GitHub Actions benchmarks were dispatched, tracked, and artifact-analyzed by automation. API repeat 5× passes on `ac36b16`. Web determinism raw detection is stable but customer-visible publication is non-deterministic. Blind completes with perfect holdout metrics but required a lint-only shim commit off `ac36b16`. Production remains deployed at `ac36b16`; no redeploy needed for this documentation update.
+All mandatory benchmark gates pass on a single production commit with 0% customer-visible variance, aligned SHA across production and CI, blind validation complete, and deterministic publication behavior verified by regression tests.
