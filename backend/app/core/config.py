@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "SIBER"
-    app_version: str = "0.9.0-rc4-expert"
+    app_version: str = "0.9.0-rc5-expert"
     git_commit: str = Field(default="", description="Full git commit SHA at build time")
     release_tag: str = Field(default="", description="Release tag at build time")
     build_timestamp: str = Field(default="", description="UTC ISO build timestamp")
