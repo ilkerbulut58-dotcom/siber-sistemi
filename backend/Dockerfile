@@ -57,7 +57,8 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-RUN chmod +x scripts/celery_worker_healthcheck.sh scripts/celery_mobile_worker_healthcheck.sh
+RUN sed -i 's/\r$//' scripts/celery_worker_healthcheck.sh scripts/celery_mobile_worker_healthcheck.sh \
+    && chmod +x scripts/celery_worker_healthcheck.sh scripts/celery_mobile_worker_healthcheck.sh
 
 ENV GIT_COMMIT=${GIT_COMMIT} \
     RELEASE_TAG=${RELEASE_TAG} \
