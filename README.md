@@ -2,7 +2,11 @@
 
 Yetkilendirilmiş web uygulamaları ve API'ler için yapay zekâ destekli güvenlik analiz SaaS platformu.
 
-**Production:** [https://siber.cloudnira.com](https://siber.cloudnira.com)
+**Production closed pilot:** [https://siber.cloudnira.com](https://siber.cloudnira.com)
+
+> Bu ortam **public commercial production-ready** değildir. Kontrollü kapalı pilot — yalnızca operatör tarafından oluşturulan tenant hesapları ve doğrulanmış domainler üzerinde güvenli tarama.
+
+**Canlı sürüm (hedef):** `v0.9.0-rc3-expert` — deploy sonrası `/api/v1/health` ve Ayarlar → Sistem bilgisi ile doğrulanır.
 
 ---
 
@@ -25,8 +29,8 @@ Yetkilendirilmiş web uygulamaları ve API'ler için yapay zekâ destekli güven
 | Profil | Ad | Ne yapar | Ortam |
 |--------|-----|----------|-------|
 | `safe` | Güvenli Tarama | Pasif HTTP/TLS + ZAP pasif + Nuclei (passive) | Production OK |
-| `deep` | Derin Tarama | Safe + yüzey taraması + ZAP spider (pasif) + Nuclei | Staging (test modunda serbest) |
-| `code` | Kod / Dosya Taraması | Pasif HTTP + hassas dosya + kaynak sızıntı desenleri | Staging (test modunda serbest) |
+| `deep` | Derin Tarama | Safe + yüzey taraması + ZAP spider (pasif) + Nuclei | Kapalı pilot: yalnız operatör onayı |
+| `code` | Web Exposure / Exposed Paths | Pasif HTTP + hassas dosya yolu + kaynak sızıntı desenleri (**Semgrep/SAST değil**) | Kapalı pilot: kapalı |
 
 - Tüm profiller **pasif ve güvenli** — form göndermez, brute-force yapmaz
 - Deep/code için Quick Scan otomatik **staging** projesi kullanır
@@ -58,7 +62,7 @@ Yetkilendirilmiş web uygulamaları ve API'ler için yapay zekâ destekli güven
 - Türkçe rapor şablonu, önem derecesi özeti
 
 ### ZAP Pasif Analiz (Faz 7C)
-- OWASP ZAP daemon — yalnızca **pasif** kurallar (aktif saldırı/ascan yok)
+- OWASP ZAP daemon — yalnızca **pasif** kurallar (**ZAP active scan production'da kapalı**)
 - **Safe:** hedef URL pasif analiz
 - **Deep:** sınırlı spider + pasif analiz (max 8 alt sayfa, aynı site)
 - ZAP erişilemezse veya zaman aşımına uğrarsa tarama **atlanır** — diğer tarayıcılar sonucu tamamlar
@@ -154,12 +158,12 @@ node scripts/deploy-pilot-production.cjs
 | PostgreSQL | internal | Kalıcı volume |
 | Redis | internal | Celery broker |
 
-### Varsayılan Admin
+### Production Admin (Kapalı Pilot)
 
-| Alan | Değer |
-|------|-------|
-| E-posta | `admin@admin.com` |
-| Şifre | `admin` |
+- **Açık kayıt kapalı:** `PUBLIC_REGISTRATION_ENABLED=false` — `/api/v1/auth/register` 403 döner
+- Varsayılan `admin@admin.com` / `admin` **production'da kullanılmaz** — deploy scripti bu hesabı devre dışı bırakır
+- Platform admin yalnızca `.env` içindeki `INITIAL_PLATFORM_ADMIN_EMAIL` / `INITIAL_PLATFORM_ADMIN_PASSWORD` ile bootstrap edilir (secret yoksa oluşturulmaz)
+- Auth e-postaları (doğrulama, şifre sıfırlama) ayrı SMTP kanalı; **tarama bildirimleri** `NOTIFICATIONS_PROVIDER=noop` (kapalı)
 
 ---
 
@@ -294,7 +298,11 @@ cd frontend && npm test
 | 7D | ✅ | Correlation + Verification + Risk motorları, sürekli izleme |
 | 8 | ✅ | Gerçek LLM AI analizi (OpenAI uyumlu), AI özet kartı |
 | 9 | ✅ | Attack Surface Management (ASM) — pasif keşif, varlık envanteri |
-| 10 | 🔜 | Semgrep kod taraması, billing |
+| 10 | 🔜 | Billing, Semgrep kaynak kod analizi, ticari genişleme |
+| 11 | ✅ | Kapalı pilot tenant modeli, kota, kill switch |
+| 12 | ✅ | Domain tarama yetkilendirme, scan auth declaration |
+| 13 | ✅ | Pilot operasyonları, rollback, guardrails |
+| 14 | ✅ | Expert test hazırlığı — hostname exact-match, revalidation, auth hardening |
 
 ---
 
@@ -321,7 +329,9 @@ cd frontend && npm test
 | `AI_MODEL` | LLM model adı | `gpt-4o-mini` |
 | `AI_BASE_URL` | OpenAI uyumlu API URL | `https://api.openai.com/v1` |
 | `CORS_ORIGINS` | İzin verilen origin'ler | `http://localhost:3000` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token süresi | `15` (prod: `480`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token süresi | `15` (prod pilot: `60`) |
+| `PUBLIC_REGISTRATION_ENABLED` | Açık kayıt | `true` (prod pilot: `false`) |
+| `NOTIFICATIONS_PROVIDER` | Tarama bildirimleri | `noop` (prod pilot) |
 
 ---
 
