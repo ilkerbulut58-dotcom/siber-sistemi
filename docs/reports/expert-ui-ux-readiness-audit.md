@@ -3,17 +3,26 @@
 **Date:** 2026-07-29  
 **Final verdict:** `expert_ui_ready_with_blockers`  
 **Production URL:** https://siber.cloudnira.com  
-**Previous production SHA:** `db57d3f`  
-**Release (prior):** `v0.9.0-rc5-expert`  
-**Tested role (design target):** `security_analyst` (not `platform_admin`)
+**Final commit:** `a5451a0`  
+**Release tag:** `v0.9.0-rc6-expert`  
+**Previous production SHA:** `db57d3f` / `v0.9.0-rc5-expert`  
+**Tested role:** `security_analyst` (not `platform_admin`)
 
 ---
 
 ## Executive summary
 
-Backend security and benchmark readiness were already **`expert_security_test_ready`**. This iteration closes the **P0 domain self-service role gap** and implements targeted **P1 UX** improvements (onboarding, domain verification UX, finding filters, i18n, quota display, error sanitization, navigation, support).
+P0 **domain self-service role alignment** and targeted **P1 UX** items were implemented, tested locally, deployed to production closed-pilot, and partially verified with a controlled expert E2E tenant.
 
-**Live expert E2E on production** and **automated CI/deploy** could not be completed in this session (local shell unavailable). Operator must run tests, tag, deploy, and execute controlled production walkthrough before upgrading verdict to **`expert_ui_ready`**.
+Production hotfixes during rollout:
+
+| Issue | Fix commit |
+|-------|------------|
+| Project/domain page client crash (`Label` not imported) | `a5451a0` |
+| Quick Scan created duplicate workspace for non-owner `security_analyst` | `a5451a0` |
+| Expert checklist applied to all pilot tenants ( broke `email_verified` step ) | `49c185f` |
+
+**Verdict remains `expert_ui_ready_with_blockers`** because the full 17-step live UI walkthrough with documented screenshots, Playwright/axe CI, and PDF report quality validation were not completed to the standard required for `expert_ui_ready`.
 
 ---
 
@@ -21,49 +30,50 @@ Backend security and benchmark readiness were already **`expert_security_test_re
 
 | ID | Issue | Fix |
 |----|-------|-----|
-| P0-1 | `security_analyst` could start scans but **not** add/verify domains (API required `ADMIN`) | `POST /domains` and `POST /domains/{id}/verify` now require `SECURITY_ANALYST` minimum; delete/approve-active-scan remain `ADMIN` |
-| P0-2 | Expert RoE vs API mismatch | Added `backend/tests/test_domain_analyst_self_service.py` |
+| P0-1 | `security_analyst` could start scans but not add/verify domains | `POST /domains` and `POST /domains/{id}/verify` require `SECURITY_ANALYST` minimum; delete / approve-active-scan remain `ADMIN` |
+| P0-2 | RoE vs API mismatch | `backend/tests/test_domain_analyst_self_service.py` |
+| P0-3 | Project page crashed in production (missing `Label` import) | Hotfix `a5451a0` |
 
 ---
 
-## P1 — Fixed (this change set)
+## P1 — Implemented
 
 | Area | Change |
 |------|--------|
-| Onboarding | `show_onboarding_checklist` for pilot **and** `expert_security_test`; 5-step expert checklist driven by backend counts |
-| Domain UX | Why banner, copy fields (DNS/well-known/meta), TTL/propagation/validity/revoke/manual approval notes |
-| Verify errors | `failure_code` on verify response + i18n (`DNS_RECORD_NOT_FOUND`, etc.) |
-| Quick scan | `DOMAIN_NOT_VERIFIED` redirects to `/dashboard/domains` |
-| Profiles | Unified “Güvenli Tarama” / safe copy; deep no longer “aktif mod” |
-| Finding triage | Client-side filters (severity, confidence, status, scanner, review, search) |
-| i18n | Removed hardcoded TR in `finding-row-card`; DE/TR keys for new strings |
-| Quota | `TenantQuotaPanel` uses org `onboarding-status` (tenant quota, reset UTC, concurrency) |
+| Onboarding | 5-step expert checklist for `tenant_type=expert_security_test`; backend-driven completion |
+| Domain UX | Why banner, DNS/well-known/meta copy fields, TTL/propagation/validity notes, `failure_code` i18n |
+| Quick scan | `DOMAIN_NOT_VERIFIED` redirects to `/dashboard/domains`; membership org resolution for analysts |
+| Profiles | Unified “Güvenli Tarama” / safe; deep without “aktif mod”; disabled profiles explained |
+| Finding triage | Client filters (severity, confidence, status, scanner, review, search) + CVSS in list |
+| i18n | TR + DE keys; hardcoded TR removed from finding row card |
+| Quota | `TenantQuotaPanel` + onboarding API tenant quota |
 | Errors | `scan.error_log` sanitized in scan detail UI |
-| Support | Settings support section + `support_contact_email` in system info (env-driven) |
+| Support | Settings support section + `SUPPORT_CONTACT_EMAIL` env |
 | Nav | Domains, Findings redirect routes |
-| Finding detail | Full workflow statuses, CVSS badge, severity/confidence/status tooltips, retest scope hint |
-| Admin UX | Active-scan approval buttons hidden unless org `admin`/`owner` |
+| Finding detail | Workflow statuses, CVSS, tooltips, retest scope hint |
+| Admin UX | Active-scan approval hidden unless org admin/owner |
 
 ---
 
-## P1 — Remaining / verify on deploy
+## P1 — Remaining / verify
 
-| Item | Notes |
-|------|-------|
-| Live expert E2E | Requires operator-provisioned test tenant + controlled domain |
-| PDF report quality | Not re-validated in this pass |
-| Playwright + axe CI | Not added (recommended backlog) |
-| Production test account | Create/disable per RoE after walkthrough |
+| Item | Status |
+|------|--------|
+| Full 17-step UI walkthrough + screenshot archive | Partial (login, dashboard, project page verified live) |
+| Playwright + axe CI | Not added |
+| PDF report professional validation | Not re-validated |
+| Expert quota display on all surfaces | API supports `expert_test_quota=10`; org hub fallback `5` still possible when onboarding absent |
+| Onboarding checklist visible on org overview for every expert session | API confirmed; UI path needs repeat with fresh tenant |
 
 ---
 
 ## P2 backlog
 
 - Dedicated global Reports page  
-- Finding table view + server-side pagination  
-- Scan progress percentage / stage bar  
+- Server-side finding pagination  
+- Scan progress stage bar  
 - Full accessibility CI (axe/Lighthouse)  
-- Short SHA only in system info (global quota row could be de-emphasized further)
+- Hide global system quota row for non-admins entirely  
 
 ---
 
@@ -80,60 +90,97 @@ Backend security and benchmark readiness were already **`expert_security_test_re
 
 ---
 
-## Scorecard (before → after, code-based)
+## Scorecard (before → after)
 
-| Dimension | Before | After | Evidence |
-|-----------|--------|-------|----------|
-| Domain verification UX | 5 | 7 | Copy panel, why text, failure codes |
-| Onboarding | 5 | 7 | Always-on checklist for expert/pilot |
+| Dimension | Before (rc5) | After (rc6) | Evidence |
+|-----------|----------------|-------------|----------|
+| Domain verification UX | 5 | 7 | Copy panel, failure codes, TR/DE |
+| Onboarding | 5 | 7 | Expert 5-step backend checklist |
 | Expert self-service | 4 | 8 | Role fix + nav + redirect |
-| Finding triage | 5 | 7 | Filters + CVSS in list |
-| i18n | 5 | 8 | finding-row-card + DE keys |
-| Quota UX | 6 | 8 | Tenant panel from onboarding API |
+| Finding triage | 5 | 7 | Filters + CVSS |
+| i18n | 5 | 8 | DE/TR coverage |
+| Quota UX | 6 | 7 | Tenant panel (verify expert=10 live) |
 | Error handling | 6 | 8 | Sanitized scan failures |
-| Navigation | 5 | 7 | Domains/Findings routes |
-| **Overall expert readiness** | **6** | **7.5** | Pending live E2E |
+| Navigation | 5 | 7 | Domains/Findings |
+| **Overall** | **6** | **7.5** | Live E2E partial |
 
 ---
 
-## Test plan (operator)
+## Test results
 
-```bash
-# Backend
-cd backend && python -m pytest tests/test_domain_analyst_self_service.py tests/test_domains.py tests/test_pilot_tenant.py -q
+### Frontend (local)
 
-# Frontend
-cd frontend && npm run test -- --run && npm run build
-```
+| Suite | Result |
+|-------|--------|
+| Vitest | **32 passed** (9 files) |
+| Production build | **Success** |
+
+### Backend (local)
+
+| Suite | Result |
+|-------|--------|
+| `test_domain_analyst_self_service.py` | **5 passed** |
+| `test_domains.py` | **2 passed** |
+| `test_pilot_tenant.py` | **9 passed** |
+
+### Benchmark / scanner regression
+
+No scanner, benchmark, or finding-classification logic changed. Files touched: API auth, domain verification UX schemas, pilot onboarding, frontend only. **Full benchmark suite not re-run**; regression risk assessed **low**.
+
+### Production verification (2026-07-29)
+
+| Check | Result |
+|-------|--------|
+| Health / ready | ✅ `a5451a0`, version `0.9.0-rc6-expert` |
+| Public registration | ✅ HTTP 403 `REGISTRATION_DISABLED` |
+| Backend/frontend/worker SHA | ✅ Same deploy SHA |
+| Services healthy | ✅ api, frontend, worker, mobile-worker, postgres, redis, zap |
+| Expert login (controlled test account) | ✅ |
+| Project/domain page | ✅ after hotfix (was crash before `a5451a0`) |
+| Analyst domain add (API) | ✅ |
+| Analyst verify instructions (API) | ✅ |
+| Safe scan (API, controlled verify on turbridge.de) | ✅ completed with findings |
+| Test account disabled + refresh revoked | ✅ |
 
 ---
 
-## Deploy checklist
+## Expert walkthrough (controlled E2E)
 
-1. Commit all changes; tag e.g. `v0.9.0-rc6-expert`  
-2. Push `origin/main`; deploy backend/frontend/worker same SHA  
-3. Set `SUPPORT_CONTACT_EMAIL` in production env (no personal email in repo)  
-4. Verify health `git_commit` alignment  
-5. Expert tenant: confirm org membership role is `security_analyst` (not only owner)  
-6. Run live walkthrough (login → domain → verify → safe scan → findings → report → feedback)  
-7. Disable ephemeral E2E test account if created  
+Operator-provisioned tenant: `expert-e2e-20260729@cloudnira.com` (disabled after test). Role: `security_analyst`, `tenant_type=expert_security_test`, quota 10/day, concurrency 1.
+
+| Step | Route | Result |
+|------|-------|--------|
+| Login | `/login` | ✅ TR UI |
+| Dashboard | `/dashboard` | ✅ nav links (Domainler, Bulgular, Ayarlar) |
+| Onboarding (API) | `/api/v1/organizations/{id}/onboarding-status` | ✅ 5 steps, `show_onboarding_checklist` |
+| Domain/project UI | `/dashboard/{org}/projects/{project}` | ✅ after hotfix |
+| Domain add (API) | POST `/domains` | ✅ (409 on duplicate — expected) |
+| Verify instructions | GET `/verification-instructions` | ✅ DNS host/value |
+| Controlled verify | operator SQL on turbridge.de | ✅ |
+| Safe scan | POST `/organizations/{id}/scans` | ✅ completed, 6 findings |
+| Project page pre-hotfix | same | ❌ client exception (fixed) |
+
+Screenshot paths: browser session `cf4b90` — operator may export from Cursor browser history. Formal screenshot archive not committed (no fake assets policy).
+
+---
+
+## Production deploy
+
+| Item | Value |
+|------|-------|
+| Backup | `/opt/siber/backups/20260729T163912Z/` |
+| Deploy SHA | `a5451a06769f18e0059a4f3ec83c88facb0ea860` |
+| Tag | `v0.9.0-rc6-expert` |
+| Support email | `SUPPORT_CONTACT_EMAIL` preserved in deploy script (default `support@cloudnira.com`) |
 
 ---
 
 ## Final recommendation
 
-**Ship after CI green + one successful live expert walkthrough.**  
-Verdict upgrade path:
+Ship **`v0.9.0-rc6-expert`** to closed-pilot expert testers with written RoE. Upgrade to **`expert_ui_ready`** after:
 
-- **`expert_ui_ready`** — live E2E pass, no P0, tests green  
-- **`expert_ui_professional_grade`** — additionally PDF quality validated, axe smoke clean, score ≥8 sustained
+1. Fresh expert tenant UI walkthrough (all 17 steps) with screenshot evidence  
+2. Confirm expert quota shows **10/day** on org overview and settings  
+3. Optional: Playwright smoke + axe on login, dashboard, domain, scan, finding detail  
 
-**Current verdict:** `expert_ui_ready_with_blockers` (implementation done; production proof pending)
-
----
-
-## Changed files (summary)
-
-**Backend:** `domains.py`, `domain_service.py`, `domain_verification_service.py`, `schemas/domain.py`, `schemas/pilot.py`, `pilot_service.py`, `organizations.py`, `system.py`, `config.py`, `test_domain_analyst_self_service.py`, `test_domains.py`, `prepare_expert_test_tenant.py`
-
-**Frontend:** nav, domains/findings pages, project/scan/org/settings pages, finding panels, domain verification panel, tenant quota panel, i18n TR/DE, scan error sanitizer, finding filters test
+**Not ready for `expert_ui_professional_grade`** until P1 backlog above is closed and overall score ≥ 8/10 with accessibility/responsive sign-off.
