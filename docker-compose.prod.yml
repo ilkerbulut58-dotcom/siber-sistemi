@@ -108,7 +108,7 @@ services:
       GIT_COMMIT: ${GIT_COMMIT:-}
       RELEASE_TAG: ${RELEASE_TAG:-}
       BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
-      APP_VERSION: ${APP_VERSION:-0.9.0-rc3-expert}
+      APP_VERSION: ${APP_VERSION:-0.9.0-rc4-expert}
       ZAP_API_URL: http://zap:8080
       ZAP_ENABLED: ${ZAP_ENABLED:-true}
       AI_ENABLED: ${AI_ENABLED:-false}
@@ -176,7 +176,7 @@ services:
       GIT_COMMIT: ${GIT_COMMIT:-}
       RELEASE_TAG: ${RELEASE_TAG:-}
       BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
-      APP_VERSION: ${APP_VERSION:-0.9.0-rc3-expert}
+      APP_VERSION: ${APP_VERSION:-0.9.0-rc4-expert}
       ZAP_API_URL: http://zap:8080
       ZAP_ENABLED: "true"
       AI_ENABLED: ${AI_ENABLED:-false}
@@ -259,7 +259,7 @@ services:
       target: production
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.9.0-rc3-expert}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.9.0-rc4-expert}
         NEXT_PUBLIC_GIT_COMMIT: ${GIT_COMMIT:-}
         NEXT_PUBLIC_RELEASE_TAG: ${RELEASE_TAG:-}
     container_name: siber-frontend
