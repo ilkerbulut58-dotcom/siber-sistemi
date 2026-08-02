@@ -128,9 +128,8 @@ async def verify_well_known_detailed(hostname: str, token: str) -> tuple[bool, s
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(url)
             saw_response = True
-            if response.status_code == 200:
-                if expected in response.text.strip():
-                    return True, None
+            if response.status_code == 200 and expected in response.text.strip():
+                return True, None
     except Exception:
         if not saw_response:
             pass
@@ -138,11 +137,11 @@ async def verify_well_known_detailed(hostname: str, token: str) -> tuple[bool, s
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(url_http)
-            if response.status_code == 200:
-                if expected in response.text.strip():
-                    return True, None
-                return False, "WELL_KNOWN_CONTENT_MISMATCH"
-            return False, "WELL_KNOWN_FILE_NOT_FOUND"
+            if response.status_code != 200:
+                return False, "WELL_KNOWN_FILE_NOT_FOUND"
+            if expected in response.text.strip():
+                return True, None
+            return False, "WELL_KNOWN_CONTENT_MISMATCH"
     except Exception:
         return False, "NETWORK_ERROR"
 

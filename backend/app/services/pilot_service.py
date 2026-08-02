@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
 from app.models.organization import Organization
-from app.models.scan import ScanJob, ScanStatus
+from app.models.scan import ScanJob
 
 
 def _as_utc(value: datetime | None) -> datetime | None:

@@ -32,7 +32,11 @@ async def _verified_domain(client: AsyncClient, email: str = "scan@example.com")
             )
         ).json()["data"]
 
-    with patch("app.services.domain_service.run_verification", new_callable=AsyncMock, return_value=True):
+    with patch(
+        "app.services.domain_service.run_verification_detailed",
+        new_callable=AsyncMock,
+        return_value=(True, None),
+    ):
         await client.post(
             f"/api/v1/organizations/{org['id']}/projects/{project['id']}/domains/{domain['id']}/verify",
             headers=headers,

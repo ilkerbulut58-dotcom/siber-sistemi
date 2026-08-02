@@ -193,6 +193,10 @@ export interface Dictionary {
     pilotExpires: string;
     pilotExpired: string;
     completeStep: string;
+    ctaAddDomain: string;
+    ctaVerifyDomain: string;
+    ctaStartScan: string;
+    ctaReviewFindings: string;
   };
   onboarding: {
     account_created: string;
@@ -200,6 +204,9 @@ export interface Dictionary {
     domain_added: string;
     domain_verified: string;
     authorization_accepted: string;
+    safe_scan_started: string;
+    findings_reviewed: string;
+    feedback_or_retest: string;
   };
   project: {
     attackSurface: string;
@@ -246,6 +253,19 @@ export interface Dictionary {
     testModeBanner: string;
     loadFailed: string;
     profileDisabled: string;
+    verificationWhy: string;
+    dnsHost: string;
+    dnsValue: string;
+    ttlRecommendation: string;
+    wellKnownUrl: string;
+    wellKnownContent: string;
+    metaTagHtml: string;
+    propagationNote: string;
+    validityNote: string;
+    revokeNote: string;
+    manualApprovalNote: string;
+    adminOnlyApproval: string;
+    domainNotVerifiedRedirect: string;
   };
   scanPage: {
     title: string;
@@ -269,6 +289,9 @@ export interface Dictionary {
     quotaToday: string;
     quotaExceededHint: string;
     scanDisabledQuota: string;
+    profileDisabledReason: string;
+    domainVerifyRequired: string;
+    goToDomainVerification: string;
   };
   assessment: {
     title: string;
@@ -554,6 +577,21 @@ export interface Dictionary {
     systemProfiles: string;
     systemNotifications: string;
     systemRegistration: string;
+    supportTitle: string;
+    supportDesc: string;
+    supportEmail: string;
+    supportEmailMissing: string;
+    supportCritical: string;
+    supportStuckScan: string;
+    supportEmergency: string;
+    tenantQuotaTitle: string;
+    tenantQuotaUsed: string;
+    tenantQuotaRemaining: string;
+    tenantQuotaTotal: string;
+    tenantQuotaReset: string;
+    tenantConcurrency: string;
+    tenantQuotaIncludesFailed: string;
+    tenantQuotaActiveScan: string;
   };
   monitoring: {
     title: string;
@@ -689,6 +727,31 @@ export interface Dictionary {
     cancelScanSuccess: string;
     cancelScanFailed: string;
     scoreDelta: string;
+    errorGeneric: string;
+    errorInternal: string;
+    errorTimeout: string;
+    errorQuota: string;
+    errorDomain: string;
+    scanIdLabel: string;
+  };
+  findingFilters: {
+    searchPlaceholder: string;
+    severity: string;
+    confidence: string;
+    status: string;
+    scanner: string;
+    review: string;
+    allSeverities: string;
+    allConfidence: string;
+    allStatuses: string;
+    allScanners: string;
+    allReview: string;
+    confirmed: string;
+    needsReview: string;
+    informational: string;
+    clearFilters: string;
+    filteredFrom: string;
+    detail: string;
   };
   mobile: {
     title: string;
@@ -717,4 +780,10 @@ export interface Dictionary {
   securityLevel: Record<string, string>;
   sourceTool: Record<string, string>;
   assetType: Record<string, string>;
+  conceptTooltips: {
+    severity: string;
+    confidence: string;
+    status: string;
+    retestScope: string;
+  };
 }

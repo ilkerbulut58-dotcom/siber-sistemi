@@ -41,6 +41,7 @@ import { SiteProfileCard } from "@/components/scan-results/site-profile-card";
 import { FindingDetailDrawer } from "@/components/scans/finding-detail-drawer";
 import { Button } from "@/components/ui/button";
 import { sanitizeScanError } from "@/lib/scan-error-sanitizer";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "@/components/locale-provider";
 
 type OrganizationMember = { user_id: string; role: string };
