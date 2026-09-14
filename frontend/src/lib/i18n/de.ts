@@ -276,6 +276,12 @@ export const de: Dictionary = {
     domainAddedTest: "Domain hinzugefügt (Testmodus — automatisch verifiziert).",
     domainAddFailed: "Domain konnte nicht hinzugefügt werden",
     verified: "Verifiziert",
+    verificationDnsVerified: "DNS verifiziert",
+    verificationAdminAssignment: "Admin-Testfreigabe (kein DNS nötig)",
+    verificationAdminDnsExempt: "Admin-DNS-Ausnahme",
+    assignedTestTargets: "Zugewiesene Testziele",
+    assignedTestTargetsHint:
+      "Hostname exakt zum Projekt hinzufügen — kein DNS TXT nötig. Weitere Domains erfordern DNS-Verifizierung.",
     pending: "Ausstehend",
     activeScanOn: "Aktives Scannen: an",
     activeScanOff: "Aktives Scannen: aus",
@@ -745,6 +751,8 @@ export const de: Dictionary = {
   },
   platform: {
     qualityOnlyAdmin: "Dieser Bereich ist nur für Plattform-Administratoren.",
+    testTargetsTitle: "Vordefinierte Testziele",
+    testTargetsNav: "Testziele",
   },
   scanResults: {
     overview: "Übersicht",

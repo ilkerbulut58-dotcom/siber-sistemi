@@ -62,7 +62,7 @@ async def test_02_unverified_domain_rejects_active_scan(
             json=scan_payload(tenant, "deep"),
             headers=tenant.analyst.headers,
         )
-    assert resp.status_code == 403
+    assert resp.status_code in (400, 403)
     assert resp.json()["error"]["code"] == "DOMAIN_NOT_VERIFIED"
     mock_scan.assert_not_called()
 

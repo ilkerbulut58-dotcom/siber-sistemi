@@ -17,6 +17,7 @@ from app.models.monitoring import MonitoringEvent, ScanSchedule
 from app.models.organization import Organization, OrganizationMember
 from app.models.project import Project
 from app.models.scan import AuthorizationAcceptance, ScanJob, ScanProfile
+from app.models.scan_target import PredefinedScanTarget, ScanTargetAssignment
 from app.models.site_profile import TargetSiteProfile
 from app.models.support_grant import OrganizationSupportGrant
 from app.models.user import EmailVerificationToken, PasswordResetToken, RefreshToken, User
@@ -47,6 +48,8 @@ __all__ = [
     "RefreshToken",
     "ScanJob",
     "ScanProfile",
+    "PredefinedScanTarget",
+    "ScanTargetAssignment",
     "TargetSiteProfile",
     "User",
 ]

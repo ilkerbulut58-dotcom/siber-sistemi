@@ -114,7 +114,7 @@ async def _make_platform_admin(client: AsyncClient, headers: dict) -> None:
 
 
 @pytest.mark.asyncio
-async def test_platform_admin_scans_unverified_domain(client: AsyncClient) -> None:
+async def test_platform_admin_cannot_scan_unverified_domain(client: AsyncClient) -> None:
     reg = await client.post(
         "/api/v1/auth/register",
         json={"email": "admin-scan@example.com", "password": "SecurePass123!", "full_name": "Admin"},
@@ -155,5 +155,5 @@ async def test_platform_admin_scans_unverified_domain(client: AsyncClient) -> No
             },
             headers=headers,
         )
-    assert response.status_code == 201
-    assert response.json()["data"]["scan_profile"] == "deep"
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "DOMAIN_NOT_VERIFIED"

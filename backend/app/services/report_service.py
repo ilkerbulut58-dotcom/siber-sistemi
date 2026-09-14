@@ -90,6 +90,7 @@ class ReportService:
 
         template = self._jinja.get_template("scan_report.html")
         status_key = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
+        scope_summary = self._scope_summary_lines(scan, locale)
         return template.render(
             locale=locale,
             labels=SCAN_REPORT_LABELS[locale],
@@ -101,6 +102,7 @@ class ReportService:
             status_labels=FINDING_STATUS_LABELS[locale],
             severity_counts=severity_counts,
             risk_summary=scan_risk_summary(locale, severity_counts),
+            scope_summary=scope_summary,
             completed_at=(
                 scan.completed_at.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC")
                 if scan.completed_at
@@ -108,6 +110,52 @@ class ReportService:
             ),
             generated_at=datetime.now(UTC).strftime("%d.%m.%Y %H:%M UTC"),
         )
+
+    @staticmethod
+    def _scope_summary_lines(scan: ScanJob, locale: Locale) -> list[str]:
+        cfg = scan.scope_config or {}
+        planned = cfg.get("planned_scope") or {}
+        executed = cfg.get("executed_telemetry") or {}
+        legacy = cfg.get("report_scope") or {}
+        auth = planned.get("authorization_source") or legacy.get("authorization_source") or scan.authorization_source
+        labels = SCAN_REPORT_LABELS[locale]
+        profile_label = PROFILE_LABELS[locale].get(scan.scan_profile, scan.scan_profile)
+        lines: list[str] = []
+        if locale == "de":
+            lines.append(f"Geplant — Profil: {profile_label}")
+            if auth:
+                lines.append(f"Geplant — {labels['auth_source']}: {auth}")
+            lines.append("Ausgeführt — Scanner-Läufe abgeschlossen: " + str(executed.get("scanner_runs_completed", "—")))
+            failed = executed.get("scanner_runs_failed_or_timed_out")
+            if failed is not None:
+                lines.append(f"Ausgeführt — fehlgeschlagen/Timeout: {failed}")
+            urls = executed.get("unique_urls_scanned_sum")
+            if urls is None:
+                lines.append("Ausgeführt — URL-Anzahl: nicht gemessen")
+            else:
+                lines.append(f"Ausgeführt — URL-Summe (Scanner): {urls}")
+            if executed.get("findings_persisted") is not None:
+                lines.append(f"Ausgeführt — gespeicherte Befunde: {executed['findings_persisted']}")
+        else:
+            lines.append(f"Planlanan — Profil: {profile_label}")
+            if auth:
+                lines.append(f"Planlanan — {labels['auth_source']}: {auth}")
+            lines.append(
+                "Gerçekleşen — tamamlanan scanner çalışması: "
+                + str(executed.get("scanner_runs_completed", "—"))
+            )
+            failed = executed.get("scanner_runs_failed_or_timed_out")
+            if failed is not None:
+                lines.append(f"Gerçekleşen — başarısız/zaman aşımı: {failed}")
+            urls = executed.get("unique_urls_scanned_sum")
+            if urls is None:
+                lines.append("Gerçekleşen — URL sayısı: ölçülmedi")
+            else:
+                lines.append(f"Gerçekleşen — URL toplamı (scanner): {urls}")
+            fp = executed.get("findings_persisted") or legacy.get("findings_persisted")
+            if fp is not None:
+                lines.append(f"Gerçekleşen — kaydedilen bulgu: {fp}")
+        return lines
 
     def _build_json(
         self,
@@ -158,9 +206,12 @@ class ReportService:
                     "ai_summary": f.ai_summary,
                     "ai_remediation": f.ai_remediation,
                     "ai_confidence_label": f.ai_confidence_label,
+                    "evidence_text": getattr(f, "evidence_text", None),
+                    "confidence": getattr(f, "confidence", None),
                 }
                 for f in findings
             ],
+            "scope": ReportService._scope_summary_lines(scan, locale),
         }
         content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         return content, "application/json; charset=utf-8", self._filename(scan, "json")

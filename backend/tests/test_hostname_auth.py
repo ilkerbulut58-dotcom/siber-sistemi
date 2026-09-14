@@ -27,6 +27,14 @@ def test_suffix_attack_blocked():
     assert not hostname_matches_verified_domain("verified.com.evil.tld", "verified.com")
 
 
+def test_turbridge_suffix_attack_blocked():
+    assert not hostname_matches_verified_domain("turbridge.de.attacker.example", "turbridge.de")
+
+
+def test_wolkeshopping_subdomain_blocked_by_default():
+    assert not hostname_matches_verified_domain("shop.wolkeshopping.de", "wolkeshopping.de")
+
+
 def test_prefix_attack_blocked():
     assert not hostname_matches_verified_domain("evil-verified.com", "verified.com")
 

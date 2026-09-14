@@ -36,6 +36,15 @@ class PilotService:
         return organization.tenant_type == "expert_security_test"
 
     @staticmethod
+    def relaxes_domain_verification(organization: Organization) -> bool:
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        if settings.is_production_like:
+            return False
+        return bool(settings.skip_domain_verification)
+
+    @staticmethod
     def show_onboarding_checklist(organization: Organization) -> bool:
         return organization.is_pilot or PilotService.is_expert_tenant(organization)
 
@@ -43,6 +52,8 @@ class PilotService:
     def assert_can_scan(organization: Organization) -> None:
         if not organization.is_pilot and not PilotService.is_expert_tenant(organization):
             return
+        from app.core.config import get_settings
+
         if not organization.is_active:
             raise AppError(
                 "PILOT_SUSPENDED",
@@ -82,6 +93,8 @@ class PilotService:
     @staticmethod
     def assert_active_scan_allowed(organization: Organization, profile_name: str) -> None:
         active_profiles = {"deep", "code"}
+        if PilotService.relaxes_domain_verification(organization):
+            return
         if (
             (organization.is_pilot or PilotService.is_expert_tenant(organization))
             and profile_name in active_profiles

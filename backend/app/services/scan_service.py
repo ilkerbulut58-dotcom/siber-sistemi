@@ -28,7 +28,7 @@ from app.security.hostname_auth import (
     validate_scan_target_url,
 )
 from app.services.audit_service import log_audit_event
-from app.services.domain_authorization_service import assert_domain_scan_allowed
+from app.services.scan_authorization_service import ScanAuthorization, ScanAuthorizationService
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.pilot_service import PilotService
@@ -172,9 +172,15 @@ class ScanService:
         if organization is None:
             raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
 
+        scan_auth: ScanAuthorization | None = None
         if require_domain_verification:
             try:
-                assert_domain_scan_allowed(domain, organization, profile.name)
+                scan_auth = await ScanAuthorizationService(self.db).assert_scan_authorized(
+                    actor=actor,
+                    organization=organization,
+                    domain=domain,
+                    profile_name=profile.name,
+                )
             except AppError as exc:
                 await self._reject_scan(
                     actor=actor,
@@ -236,25 +242,6 @@ class ScanService:
                     user_agent=user_agent,
                     details={"profile": profile.name},
                 )
-        active_profiles = {"deep", "code"}
-        if (
-            (profile.name in active_profiles or profile.name.endswith("-active"))
-            and require_domain_verification
-        ):
-            try:
-                assert_domain_scan_allowed(domain, organization, profile.name)
-            except AppError as exc:
-                await self._reject_scan(
-                    actor=actor,
-                    organization_id=organization_id,
-                    reason_code=exc.code,
-                    message=exc.message,
-                    status_code=exc.status_code,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    details={"domain_id": str(domain.id), "profile": profile.name},
-                )
-
         enforce_limits = QuotaService.should_enforce_scan_limits(actor, organization, settings)
         if enforce_limits:
             running = await self.db.execute(
@@ -316,6 +303,7 @@ class ScanService:
             target_url=target,
             status=ScanStatus.QUEUED,
             scope_config=data.scope_config,
+            authorization_source=scan_auth.source if scan_auth else None,
         )
         self.db.add(scan)
         await self.db.flush()
@@ -340,7 +328,11 @@ class ScanService:
             resource_type="scan_job",
             resource_id=scan.id,
             ip_address=ip_address,
-            details={"target": target, "profile": profile.name},
+            details={
+                "target": target,
+                "profile": profile.name,
+                "authorization_source": scan.authorization_source,
+            },
         )
         await self.db.flush()
         return scan
@@ -504,10 +496,36 @@ async def run_scan_job(
             await db.commit()
 
             domain_row = None
+            organization_row = None
+            actor_row = None
             if scan.domain_id:
                 domain_row = (
                     await db.execute(select(Domain).where(Domain.id == scan.domain_id))
                 ).scalar_one_or_none()
+            organization_row = (
+                await db.execute(select(Organization).where(Organization.id == scan.organization_id))
+            ).scalar_one_or_none()
+            actor_row = (
+                await db.execute(select(User).where(User.id == scan.initiated_by))
+            ).scalar_one_or_none()
+
+            settings = get_settings()
+            if (
+                domain_row
+                and organization_row
+                and actor_row
+                and QuotaService.requires_domain_verification(actor_row, settings)
+            ):
+                try:
+                    await ScanAuthorizationService(db).assert_scan_authorized(
+                        actor=actor_row,
+                        organization=organization_row,
+                        domain=domain_row,
+                        profile_name=scan.scan_profile,
+                    )
+                except AppError as exc:
+                    await _mark_scan_failed(db, scan, exc.message)
+                    return
 
             try:
                 raw_findings = await run_scan_for_profile(
@@ -535,6 +553,26 @@ async def run_scan_job(
             scan.status = ScanStatus.COMPLETED
             scan.findings_count = len(saved)
             scan.completed_at = datetime.now(UTC)
+            from app.scanners.execution_stats import get_scanner_stats
+
+            stats = get_scanner_stats()
+            urls_scanned = sum(s.urls_scanned for s in stats)
+            checks_completed = len(stats)
+            checks_failed = sum(s.error_count + s.timeout_count for s in stats)
+            scope = dict(scan.scope_config or {})
+            scope["planned_scope"] = {
+                "target_url": scan.target_url,
+                "scan_profile": scan.scan_profile,
+                "authorization_source": scan.authorization_source,
+            }
+            scope["executed_telemetry"] = {
+                "findings_persisted": len(saved),
+                "scanner_runs_completed": checks_completed,
+                "scanner_runs_failed_or_timed_out": checks_failed,
+                "unique_urls_scanned_sum": urls_scanned if urls_scanned else None,
+                "note": "urls_scanned_sum" if urls_scanned else "url_counts_not_measured",
+            }
+            scan.scope_config = scope
             await log_audit_event(
                 db,
                 action="scan.completed",

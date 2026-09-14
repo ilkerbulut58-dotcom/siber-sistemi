@@ -16,6 +16,7 @@ from app.scanners.execution_stats import (
     pop_pending_scanner_enrich,
     record_scanner_stats,
     reset_scanner_stats,
+    scanner_stats_as_metrics,
 )
 from app.scanners.exposed_paths import scan_exposed_paths
 from app.scanners.nuclei import run_nuclei_scan
@@ -24,6 +25,7 @@ from app.scanners.secret_patterns import scan_response_secrets
 from app.scanners.sensitive_data import scan_sensitive_data
 from app.scanners.surface_crawl import run_surface_crawl_passive
 from app.scanners.zap_active import run_zap_active_scan
+from app.scanners.findings_header_enrich import enrich_findings_with_observed_headers
 from app.scanners.zap_passive import run_zap_passive_scan
 
 logger = logging.getLogger(__name__)
@@ -211,6 +213,11 @@ async def run_scan_for_profile(
         ]
 
     findings = await _run_scanners_parallel(scanners, timeout_seconds=timeout)
+    metrics = scanner_stats_as_metrics()
+    passive = metrics.get("passive_http") or {}
+    headers = passive.get("observed_headers") or passive.get("extra", {}).get("observed_headers")
+    if isinstance(headers, dict):
+        findings = enrich_findings_with_observed_headers(findings, headers)
     logger.info(
         "Profile %s finished with %s findings for %s (timeout=%ss)",
         profile,

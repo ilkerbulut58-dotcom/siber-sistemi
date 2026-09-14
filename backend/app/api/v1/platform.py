@@ -18,6 +18,7 @@ from app.schemas.common import APIResponse, ResponseMeta
 from app.schemas.domain import DomainResponse
 from app.schemas.organization import OrganizationCreate, OrganizationResponse
 from app.schemas.pilot import PilotTenantResponse, PilotTenantUpdate
+from app.schemas.scan_target import ScanTargetAssignmentCreate
 from app.schemas.support_grant import SupportGrantCreate, SupportGrantResponse
 from app.services.benchmark_quality_service import BenchmarkQualityService
 from app.services.organization_service import OrganizationService
@@ -257,3 +258,117 @@ async def platform_verify_pilot_domain(
         user_agent=request.headers.get("User-Agent"),
     )
     return APIResponse(data=DomainResponse.model_validate(domain), meta=_meta(request))
+
+
+@router.get(
+    "/predefined-scan-targets",
+    response_model=APIResponse[list],
+)
+async def list_predefined_scan_targets(
+    request: Request,
+    _platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list]:
+    from app.schemas.scan_target import PredefinedScanTargetResponse
+    from app.services.scan_target_service import ScanTargetService
+
+    targets = await ScanTargetService(db).list_targets()
+    return APIResponse(
+        data=[PredefinedScanTargetResponse.model_validate(t) for t in targets],
+        meta=_meta(request),
+    )
+
+
+@router.get(
+    "/scan-target-assignments",
+    response_model=APIResponse[list],
+)
+async def list_scan_target_assignments(
+    request: Request,
+    user_id: UUID | None = None,
+    _platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list]:
+    from app.schemas.scan_target import PredefinedScanTargetResponse, ScanTargetAssignmentResponse
+    from app.services.scan_target_service import ScanTargetService
+
+    assignments = await ScanTargetService(db).list_assignments(user_id=user_id)
+    payload = []
+    for row in assignments:
+        item = ScanTargetAssignmentResponse.model_validate(row)
+        if row.target:
+            item = item.model_copy(
+                update={"target": PredefinedScanTargetResponse.model_validate(row.target)}
+            )
+        payload.append(item)
+    return APIResponse(data=payload, meta=_meta(request))
+
+
+@router.post(
+    "/scan-target-assignments",
+    response_model=APIResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_scan_target_assignment(
+    data: ScanTargetAssignmentCreate,
+    request: Request,
+    platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse:
+    from app.schemas.scan_target import ScanTargetAssignmentResponse
+    from app.services.scan_target_service import ScanTargetService
+
+    assignment = await ScanTargetService(db).create_assignment(
+        data,
+        actor=platform_admin,
+        ip_address=get_client_ip(request),
+    )
+    return APIResponse(
+        data=ScanTargetAssignmentResponse.model_validate(assignment),
+        meta=_meta(request),
+    )
+
+
+@router.get(
+    "/customer-organizations/{organization_id}/members",
+    response_model=APIResponse[list],
+)
+async def platform_list_org_members(
+    organization_id: UUID,
+    request: Request,
+    _platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list]:
+    from app.core.exceptions import AppError
+    from app.models.organization import Organization
+    from app.services.organization_service import OrganizationService
+
+    org = await db.get(Organization, organization_id)
+    if org is None:
+        raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+    members = await OrganizationService(db).list_members(organization_id)
+    return APIResponse(data=members, meta=_meta(request))
+
+
+@router.post(
+    "/scan-target-assignments/{assignment_id}/revoke",
+    response_model=APIResponse,
+)
+async def revoke_scan_target_assignment(
+    assignment_id: UUID,
+    request: Request,
+    platform_admin: User = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse:
+    from app.schemas.scan_target import ScanTargetAssignmentResponse
+    from app.services.scan_target_service import ScanTargetService
+
+    assignment = await ScanTargetService(db).revoke_assignment(
+        assignment_id,
+        actor=platform_admin,
+        ip_address=get_client_ip(request),
+    )
+    return APIResponse(
+        data=ScanTargetAssignmentResponse.model_validate(assignment),
+        meta=_meta(request),
+    )

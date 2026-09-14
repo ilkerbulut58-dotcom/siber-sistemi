@@ -14,6 +14,7 @@ from tests.pilot.fixtures import PilotWorld, build_pilot_world
 def pilot_simulation_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "staging")
     monkeypatch.setenv("BENCHMARK_LAB_ISOLATED", "true")
+    monkeypatch.setenv("PILOT_RELAX_DOMAIN_VERIFICATION", "false")
     monkeypatch.delenv("SKIP_DOMAIN_VERIFICATION", raising=False)
     get_settings.cache_clear()
     yield

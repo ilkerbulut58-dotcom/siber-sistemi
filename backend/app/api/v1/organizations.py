@@ -303,3 +303,27 @@ async def remove_member(
         ip_address=get_client_ip(request),
     )
     return APIResponse(data={"message": "Member removed."}, meta=_meta(request))
+
+
+@router.get("/{org_id}/my-scan-target-assignments", response_model=APIResponse[list])
+async def my_scan_target_assignments(
+    org_id: UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    _membership: OrganizationMember = Depends(require_org_role(OrganizationRole.VIEWER)),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list]:
+    from app.schemas.scan_target import PredefinedScanTargetResponse, ScanTargetAssignmentResponse
+    from app.services.scan_target_service import ScanTargetService
+
+    rows = await ScanTargetService(db).list_assignments(user_id=user.id)
+    rows = [r for r in rows if r.organization_id == org_id and r.revoked_at is None]
+    payload = []
+    for row in rows:
+        item = ScanTargetAssignmentResponse.model_validate(row)
+        if row.target:
+            item = item.model_copy(
+                update={"target": PredefinedScanTargetResponse.model_validate(row.target)}
+            )
+        payload.append(item)
+    return APIResponse(data=payload, meta=_meta(request))

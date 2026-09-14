@@ -274,6 +274,12 @@ export const tr: Dictionary = {
     domainAddedTest: "Domain eklendi (test modu — otomatik doğrulandı).",
     domainAddFailed: "Domain eklenemedi",
     verified: "Doğrulandı",
+    verificationDnsVerified: "DNS doğrulandı",
+    verificationAdminAssignment: "Admin test yetkisi (DNS gerekmez)",
+    verificationAdminDnsExempt: "Admin DNS muafiyeti",
+    assignedTestTargets: "Size atanan hazır test hedefleri",
+    assignedTestTargetsHint:
+      "Bu hostname’i projeye aynen ekleyin; DNS TXT kaydı gerekmez. Başka domain eklemek için DNS doğrulaması şarttır.",
     pending: "Bekliyor",
     activeScanOn: "Aktif tarama: açık",
     activeScanOff: "Aktif tarama: kapalı",
@@ -744,6 +750,8 @@ export const tr: Dictionary = {
   },
   platform: {
     qualityOnlyAdmin: "Bu alan yalnız platform yöneticilerine açıktır.",
+    testTargetsTitle: "Hazır test hedefleri",
+    testTargetsNav: "Test hedefleri",
   },
   scanResults: {
     overview: "Özet",

@@ -10,6 +10,7 @@ from app.data.finding_catalog_de import get_catalog_entry as get_catalog_entry_d
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
+from app.services.report_finding_enrichment import enrich_risk_explanation, format_evidence_for_report
 
 
 @dataclass
@@ -31,6 +32,9 @@ class ReportFinding:
     ai_summary: str | None
     ai_remediation: str | None
     ai_confidence_label: str | None
+    evidence_text: str | None = None
+    confidence: str | None = None
+    finding_type: str | None = None
 
     @classmethod
     def from_finding(cls, finding: Finding, **overrides: object) -> ReportFinding:
@@ -52,6 +56,8 @@ class ReportFinding:
             "ai_summary": finding.ai_summary,
             "ai_remediation": finding.ai_remediation,
             "ai_confidence_label": finding.ai_confidence_label,
+            "confidence": finding.confidence,
+            "finding_type": (finding.evidence or {}).get("finding_type") if finding.evidence else None,
         }
         base.update(overrides)
         return cls(**base)  # type: ignore[arg-type]
@@ -94,8 +100,14 @@ def _german_fallback(finding: Finding, domain: str) -> ReportFinding:
 
 
 def localize_finding_for_report(finding: Finding, locale: Locale) -> ReportFinding:
+    evidence_text = format_evidence_for_report(finding, locale)
+    risk = enrich_risk_explanation(finding, locale)
     if locale != "de":
-        return ReportFinding.from_finding(finding)
+        return ReportFinding.from_finding(
+            finding,
+            evidence_text=evidence_text,
+            risk_explanation=risk,
+        )
 
     rule_id = finding.correlation_key or finding.source_rule_id
     domain = extract_domain(finding.affected_url or "")
@@ -111,9 +123,18 @@ def localize_finding_for_report(finding: Finding, locale: Locale) -> ReportFindi
                 remediation_steps=entry["remediation_steps_de"],
                 config_file_paths=entry["config_file_paths_de"],
                 config_snippet=entry["config_snippet"],
+                evidence_text=evidence_text,
             )
 
-    return _german_fallback(finding, domain)
+    fb = _german_fallback(finding, domain)
+    return ReportFinding.from_finding(
+        finding,
+        title=fb.title,
+        risk_explanation=fb.risk_explanation or risk,
+        remediation_steps=fb.remediation_steps,
+        config_file_paths=fb.config_file_paths,
+        evidence_text=evidence_text,
+    )
 
 
 def localize_findings_for_report(findings: list[Finding], locale: Locale) -> list[ReportFinding]:

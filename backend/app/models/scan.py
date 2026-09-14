@@ -58,6 +58,7 @@ class ScanJob(Base, TimestampMixin):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     celery_task_id: Mapped[str | None] = mapped_column(String(255))
+    authorization_source: Mapped[str | None] = mapped_column(String(50))
 
 
 class AuthorizationAcceptance(Base):

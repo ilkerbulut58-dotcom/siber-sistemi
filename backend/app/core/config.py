@@ -1,9 +1,11 @@
 """Application configuration via environment variables."""
 
+from __future__ import annotations
+
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, RedisDsn, field_validator
+from pydantic import Field, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -97,6 +99,13 @@ class Settings(BaseSettings):
     skip_domain_verification: bool = Field(
         default=False,
         description="Skip DNS/hostname checks and auto-verify domains for testing",
+    )
+    pilot_relax_domain_verification: bool = Field(
+        default=False,
+        description=(
+            "For pilot and expert_security_test tenants only: skip DNS proof and auto-verify domains "
+            "(production test phase; disable when DNS verification is mandatory again)"
+        ),
     )
     use_celery_for_scans: bool = Field(
         default=False,
@@ -276,6 +285,28 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
+
+    @property
+    def is_production_like(self) -> bool:
+        return self.environment in {"production", "staging"}
+
+    def domain_verification_enforced(self) -> bool:
+        """DNS / assignment / exempt auth always enforced outside local dev skip mode."""
+        if self.is_production_like:
+            return True
+        return not self.skip_domain_verification
+
+    @model_validator(mode="after")
+    def reject_unsafe_production_domain_flags(self) -> Settings:
+        if self.environment == "production" and (
+            self.skip_domain_verification or self.pilot_relax_domain_verification
+        ):
+            raise ValueError(
+                "Production cannot start with SKIP_DOMAIN_VERIFICATION or "
+                "PILOT_RELAX_DOMAIN_VERIFICATION enabled. "
+                "Domain verification must remain mandatory for normal users."
+            )
+        return self
 
 
 @lru_cache

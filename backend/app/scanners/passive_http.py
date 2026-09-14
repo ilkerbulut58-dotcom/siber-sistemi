@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.scanners.base import RawFinding
+from app.scanners.execution_stats import set_pending_scanner_enrich
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +322,12 @@ async def run_passive_http_scan(
                             raise
                     else:
                         validate_redirect_target(final_url, resolve_dns=True)
+            headers_lower = {k.lower(): v for k, v in response.headers.items()}
+            set_pending_scanner_enrich(
+                "passive_http",
+                observed_headers=headers_lower,
+                final_url=final_url,
+            )
             findings.extend(await scan_security_headers(target_url, response, header_scope=header_scope))
             findings.extend(await scan_disclosure_headers(target_url, response))
             if response.status_code >= 500:

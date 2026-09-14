@@ -41,6 +41,28 @@ export default function ProjectPage() {
   const [testMode, setTestMode] = useState(false);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [assignedTargets, setAssignedTargets] = useState<
+    { hostname: string; allowed_profiles: string[]; ends_at: string | null }[]
+  >([]);
+
+  function verificationBadge(domain: Domain): string | null {
+    if (!domain.is_verified) return null;
+    if (domain.verification_method === "admin_test_assignment") {
+      return t("project.verificationAdminAssignment");
+    }
+    if (domain.verification_method === "admin_dns_exempt") {
+      return t("project.verificationAdminDnsExempt");
+    }
+    if (
+      domain.verification_method === "dns_txt" ||
+      domain.verification_method === "meta_tag" ||
+      domain.verification_method === "well_known_file" ||
+      domain.verification_method === "manual_admin"
+    ) {
+      return t("project.verificationDnsVerified");
+    }
+    return null;
+  }
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +70,7 @@ export default function ProjectPage() {
       const healthBody = await healthRes.json();
       setTestMode(Boolean(healthBody?.data?.skip_domain_verification));
 
-      const [projectData, domainData, scanData, profileData, onboardingData, members] =
+      const [projectData, domainData, scanData, profileData, onboardingData, members, assignments] =
         await Promise.all([
         apiFetch<Project>(`/api/v1/organizations/${orgId}/projects/${projectId}`, {
           token: getAccessToken(),
@@ -68,6 +90,15 @@ export default function ProjectPage() {
           `/api/v1/organizations/${orgId}/members`,
           { token: getAccessToken() }
         ).catch(() => []),
+        apiFetch<
+          {
+            allowed_profiles: string[];
+            ends_at: string | null;
+            target?: { hostname: string };
+          }[]
+        >(`/api/v1/organizations/${orgId}/my-scan-target-assignments`, {
+          token: getAccessToken(),
+        }).catch(() => []),
       ]);
       setProject(projectData);
       setDomains(domainData);
@@ -76,6 +107,15 @@ export default function ProjectPage() {
       setOnboarding(onboardingData ?? null);
       const own = members.find((m) => m.user_id === user?.id);
       setMemberRole(own?.role ?? null);
+      setAssignedTargets(
+        assignments
+          .filter((a) => a.target?.hostname)
+          .map((a) => ({
+            hostname: a.target!.hostname,
+            allowed_profiles: a.allowed_profiles,
+            ends_at: a.ends_at,
+          }))
+      );
       setError(null);
     } catch (err) {
       const msg = formatApiError(err);
@@ -221,6 +261,25 @@ export default function ProjectPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {!testMode && assignedTargets.length > 0 && (
+                <div className="mb-6 rounded-md border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+                  <p className="font-medium">{t("project.assignedTestTargets")}</p>
+                  <p className="mt-1 text-muted-foreground">{t("project.assignedTestTargetsHint")}</p>
+                  <ul className="mt-2 list-disc pl-5">
+                    {assignedTargets.map((a) => (
+                      <li key={a.hostname}>
+                        <code>{a.hostname}</code>
+                        {a.ends_at ? (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            — {new Date(a.ends_at).toLocaleDateString(locale)}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <form onSubmit={addDomain} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="hostname">{t("project.hostname")}</Label>
@@ -269,6 +328,9 @@ export default function ProjectPage() {
                               : t("project.activeScanOff")}
                           </span>
                         )}
+                        {verificationBadge(domain) && (
+                          <span className="text-muted-foreground">{verificationBadge(domain)}</span>
+                        )}
                         {domain.is_verified && domain.admin_approved_at && (
                           <span className="text-muted-foreground">
                             {t("project.adminApprovedAt")}:{" "}
@@ -277,19 +339,22 @@ export default function ProjectPage() {
                         )}
                       </div>
                     </div>
-                    {!testMode && (
+                    {!testMode && domain.verification_method !== "admin_test_assignment" && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           onClick={() => showInstructions(domain.id)}
+                          disabled={domain.is_verified && domain.verification_method !== "dns_txt"}
                         >
                           {t("project.instructions")}
                         </Button>
-                        <Button type="button" size="sm" onClick={() => verifyDomain(domain.id)}>
-                          {t("project.verify")}
-                        </Button>
+                        {!domain.is_verified && (
+                          <Button type="button" size="sm" onClick={() => verifyDomain(domain.id)}>
+                            {t("project.verify")}
+                          </Button>
+                        )}
                         {domain.is_verified && isOrgAdmin && (
                           <>
                             {!domain.active_scan_allowed ? (

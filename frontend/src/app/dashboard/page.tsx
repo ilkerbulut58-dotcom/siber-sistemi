@@ -368,6 +368,11 @@ export default function DashboardPage() {
                     {t("dashboard.pilotTenants")}
                   </Button>
                 </Link>
+                <Link href="/dashboard/platform/test-targets">
+                  <Button variant="outline" size="sm">
+                    {t("platform.testTargetsNav")}
+                  </Button>
+                </Link>
                 <Button variant="outline" size="sm" onClick={() => setShowAdmin((v) => !v)}>
                   {showAdmin ? t("common.hide") : t("common.show")}
                 </Button>

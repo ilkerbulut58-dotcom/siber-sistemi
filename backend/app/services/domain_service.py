@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.models.domain import Domain, DomainVerification
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.domain import DomainCreate, VerificationInstructions, VerificationMethod
 from app.services.audit_service import log_audit_event
@@ -23,13 +24,52 @@ from app.services.domain_verification_service import (
     normalize_hostname,
     run_verification_detailed,
 )
+from app.services.pilot_service import PilotService
 from app.services.project_service import ProjectService
+from app.services.scan_authorization_service import (
+    AUTHORIZATION_ADMIN_ASSIGNMENT,
+    AUTHORIZATION_ADMIN_DNS_EXEMPT,
+    ScanAuthorizationService,
+)
 
 
 class DomainService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.settings = get_settings()
+
+    async def _get_organization(self, organization_id: UUID) -> Organization:
+        result = await self.db.execute(
+            select(Organization).where(Organization.id == organization_id)
+        )
+        organization = result.scalar_one_or_none()
+        if organization is None:
+            raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+        return organization
+
+    def _auto_verify_enabled(self, organization: Organization) -> bool:
+        return PilotService.relaxes_domain_verification(organization)
+
+    def _mark_domain_verified(
+        self,
+        domain: Domain,
+        *,
+        method: str,
+        verification: DomainVerification | None = None,
+        allow_active_scan: bool = False,
+    ) -> None:
+        now = datetime.now(UTC)
+        domain.is_verified = True
+        domain.verified_at = now
+        domain.last_checked_at = now
+        domain.verification_method = method
+        domain.revoked_at = None
+        domain.revoked_by = None
+        domain.verification_failure_reason = None
+        domain.verification_expires_at = verification_expires_at(domain)
+        domain.active_scan_allowed = allow_active_scan
+        if verification is not None:
+            verification.verified_at = now
 
     async def add(
         self,
@@ -40,10 +80,12 @@ class DomainService:
         actor: User,
         ip_address: str | None = None,
     ) -> tuple[Domain, DomainVerification]:
+        organization = await self._get_organization(organization_id)
         await ProjectService(self.db).get(organization_id, project_id)
         hostname = normalize_hostname(data.hostname)
+        auto_verify = self._auto_verify_enabled(organization)
 
-        if not self.settings.skip_domain_verification and not hostname_resolves(hostname):
+        if not auto_verify and not hostname_resolves(hostname):
             raise AppError(
                 "INVALID_HOSTNAME",
                 "Hostname could not be resolved. Check the domain name.",
@@ -61,10 +103,6 @@ class DomainService:
             organization_id=organization_id,
             hostname=hostname,
         )
-        if self.settings.skip_domain_verification:
-            domain.is_verified = True
-            domain.verified_at = datetime.now(UTC)
-            domain.active_scan_allowed = True
 
         self.db.add(domain)
         await self.db.flush()
@@ -76,10 +114,30 @@ class DomainService:
             method=data.method.value,
             expires_at=expires_at,
         )
-        if self.settings.skip_domain_verification:
-            verification.verified_at = datetime.now(UTC)
+        auth_service = ScanAuthorizationService(self.db)
+        assignment = await auth_service.active_assignment(
+            user_id=actor.id,
+            organization_id=organization_id,
+            hostname=hostname,
+            profile_name=None,
+        )
+        if assignment is not None:
+            self._mark_domain_verified(
+                domain,
+                method=AUTHORIZATION_ADMIN_ASSIGNMENT,
+                verification=verification,
+                allow_active_scan=False,
+            )
+        elif auto_verify:
+            self._mark_domain_verified(
+                domain,
+                method="test_skip",
+                verification=verification,
+                allow_active_scan=True,
+            )
         self.db.add(verification)
         await self.db.flush()
+        await self.db.refresh(domain)
 
         await log_audit_event(
             self.db,
@@ -92,7 +150,7 @@ class DomainService:
             details={
                 "hostname": hostname,
                 "method": data.method.value,
-                "auto_verified": self.settings.skip_domain_verification,
+                "auto_verified": auto_verify,
             },
         )
         return domain, verification
@@ -143,18 +201,30 @@ class DomainService:
         project_id: UUID,
         domain_id: UUID,
     ) -> VerificationInstructions:
-        if self.settings.skip_domain_verification:
-            domain = await self.get(organization_id, project_id, domain_id)
+        organization = await self._get_organization(organization_id)
+        domain = await self.get(organization_id, project_id, domain_id)
+        if self._auto_verify_enabled(organization):
             return VerificationInstructions(
                 domain_id=domain.id,
                 hostname=domain.hostname,
                 method=VerificationMethod.DNS_TXT,
                 token="test-mode",
                 expires_at=datetime.now(UTC),
-                instructions=["Test modu: DNS doğrulama devre dışı. Domain otomatik onaylı."],
+                instructions=["Development mode: DNS verification disabled."],
             )
 
-        domain = await self.get(organization_id, project_id, domain_id)
+        if domain.verification_method == AUTHORIZATION_ADMIN_ASSIGNMENT and domain.is_verified:
+            return VerificationInstructions(
+                domain_id=domain.id,
+                hostname=domain.hostname,
+                method=VerificationMethod.DNS_TXT,
+                token="assigned",
+                expires_at=domain.verification_expires_at or datetime.now(UTC),
+                instructions=[
+                    "Admin tarafından test için yetkilendirildi — DNS kaydı gerekmez.",
+                ],
+            )
+
         verification = await self._active_verification(domain.id)
         if verification is None:
             token, expires_at = new_verification_token()
@@ -194,23 +264,45 @@ class DomainService:
         actor: User,
         ip_address: str | None = None,
     ) -> tuple[Domain, bool, str, str | None]:
+        organization = await self._get_organization(organization_id)
         domain = await self.get(organization_id, project_id, domain_id)
 
         if domain.revoked_at is not None:
             return domain, False, "Domain verification was revoked.", "DOMAIN_REVOKED"
 
-        if self.settings.skip_domain_verification:
-            domain.is_verified = True
-            domain.verified_at = datetime.now(UTC)
-            domain.last_checked_at = datetime.now(UTC)
-            domain.active_scan_allowed = True
+        if self._auto_verify_enabled(organization):
+            verification = await self._active_verification(domain.id)
+            self._mark_domain_verified(
+                domain,
+                method="test_skip",
+                verification=verification,
+                allow_active_scan=True,
+            )
+            await log_audit_event(
+                self.db,
+                action="domain.verified",
+                user_id=actor.id,
+                organization_id=organization_id,
+                resource_type="domain",
+                resource_id=domain.id,
+                ip_address=ip_address,
+                details={"hostname": domain.hostname, "auto_verified": True, "method": "test_skip"},
+            )
             await self.db.flush()
             await self.db.refresh(domain)
-            return domain, True, "Test modu: domain otomatik doğrulandı.", None
+            return domain, True, "Development mode: domain auto-verified.", None
 
         verification = await self._active_verification(domain.id)
         if verification is None:
-            raise AppError("NO_VERIFICATION", "No active verification token.", status_code=400)
+            token, expires_at = new_verification_token()
+            verification = DomainVerification(
+                domain_id=domain.id,
+                token=token,
+                method=VerificationMethod.DNS_TXT.value,
+                expires_at=expires_at,
+            )
+            self.db.add(verification)
+            await self.db.flush()
 
         if verification.expires_at is not None:
             expires_at = verification.expires_at
@@ -218,6 +310,32 @@ class DomainService:
                 expires_at = expires_at.replace(tzinfo=UTC)
             if expires_at < datetime.now(UTC):
                 return domain, False, "Verification token expired.", "VERIFICATION_EXPIRED"
+
+        auth_service = ScanAuthorizationService(self.db)
+        if (
+            actor.dns_verification_exempt
+            and actor.is_email_verified
+            and await auth_service.user_is_org_admin(actor.id, organization_id)
+        ):
+            self._mark_domain_verified(
+                domain,
+                method=AUTHORIZATION_ADMIN_DNS_EXEMPT,
+                verification=verification,
+                allow_active_scan=False,
+            )
+            await log_audit_event(
+                self.db,
+                action="domain.verified",
+                user_id=actor.id,
+                organization_id=organization_id,
+                resource_type="domain",
+                resource_id=domain.id,
+                ip_address=ip_address,
+                details={"hostname": domain.hostname, "authorization": AUTHORIZATION_ADMIN_DNS_EXEMPT},
+            )
+            await self.db.flush()
+            await self.db.refresh(domain)
+            return domain, True, "Admin DNS exemption applied.", None
 
         verification.attempt_count += 1
         verification.last_attempt_at = datetime.now(UTC)

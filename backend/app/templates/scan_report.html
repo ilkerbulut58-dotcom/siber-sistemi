@@ -4,21 +4,29 @@
   <meta charset="utf-8"/>
   <title>{{ labels.page_title }} — {{ scan.target_url }}</title>
   <style>
-    body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; margin: 32px; }
-    h1 { font-size: 22px; margin-bottom: 4px; }
-    .meta { color: #555; margin-bottom: 24px; }
-    .summary { background: #f4f6f8; border: 1px solid #ddd; padding: 12px 16px; margin-bottom: 24px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 6px; }
+    @page { margin: 18mm 14mm; }
+    body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color: #111; line-height: 1.45; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    h2 { font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    h3 { font-size: 12px; margin: 12px 0 6px; }
+    .meta { color: #444; margin-bottom: 16px; }
+    .summary-box { background: #f4f6f8; border: 1px solid #ddd; padding: 10px 12px; margin-bottom: 16px; }
+    .scope-box { border: 1px solid #ddd; padding: 10px 12px; margin-bottom: 16px; }
+    table.summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 10px; }
+    table.summary-table th, table.summary-table td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+    table.summary-table th { background: #eee; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 4px; }
     .critical { background: #fee; color: #900; }
     .high { background: #fed; color: #a40; }
     .medium { background: #ffd; color: #860; }
     .low { background: #def; color: #046; }
     .info { background: #eee; color: #444; }
-    .finding { border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; page-break-inside: avoid; }
-    .finding h3 { margin: 8px 0 4px; font-size: 14px; }
-    .muted { color: #666; font-size: 11px; }
-    pre { background: #f0f0f0; padding: 8px; font-size: 10px; overflow-wrap: anywhere; white-space: pre-wrap; }
-    ol { margin: 6px 0; padding-left: 20px; }
+    .finding-block { margin-bottom: 18px; page-break-inside: avoid; }
+    .finding-head { margin-bottom: 6px; }
+    .muted { color: #666; font-size: 10px; }
+    pre.evidence { background: #f5f5f5; padding: 8px; font-size: 9px; white-space: pre-wrap; word-break: break-word; border: 1px solid #ddd; }
+    ol { margin: 4px 0; padding-left: 18px; }
+    .page-footer { margin-top: 24px; font-size: 9px; color: #666; }
   </style>
 </head>
 <body>
@@ -26,41 +34,84 @@
   <p class="meta">
     {{ labels.target }}: <strong>{{ scan.target_url }}</strong><br/>
     {{ labels.profile }}: {{ profile_label }} · {{ labels.status }}: {{ status_label }}<br/>
-    {{ labels.scan_id }}: {{ scan.id }} · {{ labels.completed_at }}: {{ completed_at }}<br/>
-    {{ labels.total_findings }}: {{ scan.findings_count }}
+    {{ labels.scan_id }}: {{ scan.id }}<br/>
+    {{ labels.observed_at }}: {{ completed_at }} · {{ labels.generated_at }}: {{ generated_at }}
   </p>
 
-  <div class="summary">
-    <strong>{{ labels.summary }}:</strong> {{ risk_summary }}<br/>
+  <div class="summary-box">
+    <strong>{{ labels.executive_summary }}</strong><br/>
+    {{ risk_summary }}
     {% for sev, count in severity_counts.items() if count %}
       <span class="badge {{ sev }}">{{ severity_labels[sev] }}: {{ count }}</span>
     {% endfor %}
   </div>
 
+  {% if scope_summary %}
+  <div class="scope-box">
+    <strong>{{ labels.scope_title }}</strong>
+    <ul style="margin:6px 0;padding-left:18px;">
+      {% for line in scope_summary %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {% if findings %}
+  <h2>{{ labels.findings_table }}</h2>
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>{{ labels.severity_col }}</th>
+        <th>{{ labels.status_col }}</th>
+        <th>{{ labels.findings }}</th>
+        <th>{{ labels.rule_id }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in findings %}
+      <tr>
+        <td>{{ severity_labels.get(f.severity, f.severity) }}</td>
+        <td>{{ status_labels.get(f.status, f.status) }}</td>
+        <td>{{ f.title }}</td>
+        <td class="muted">{{ f.source_rule_id or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
   <h2>{{ labels.findings }} ({{ findings|length }})</h2>
   {% for f in findings %}
-  <div class="finding">
-    <span class="badge {{ f.severity }}">{{ severity_labels.get(f.severity, f.severity) }}</span>
-    <span class="muted">{{ status_labels.get(f.status, f.status) }}</span>
+  <div class="finding-block">
+    <div class="finding-head">
+      <span class="badge {{ f.severity }}">{{ severity_labels.get(f.severity, f.severity) }}</span>
+      <span class="muted">{{ labels.status_col }}: {{ status_labels.get(f.status, f.status) }}</span>
+    </div>
     <h3>{{ f.title }}</h3>
+    <p class="muted">{{ labels.tool }}: {{ f.source_tool or '—' }} · {{ labels.rule_id }}: {{ f.source_rule_id or '—' }}</p>
+    {% if f.affected_url %}<p class="muted">{{ labels.url }}: {{ f.affected_url }}</p>{% endif %}
     {% if f.risk_explanation %}
     <p><strong>{{ labels.what_it_means }}</strong> {{ f.risk_explanation }}</p>
     {% elif f.description %}
     <p>{{ f.description }}</p>
     {% endif %}
-    {% if f.affected_url %}<p class="muted">{{ labels.url }}: {{ f.affected_url }}</p>{% endif %}
+    {% if f.evidence_text %}
+    <p><strong>{{ labels.evidence }}</strong></p>
+    <pre class="evidence">{{ f.evidence_text }}</pre>
+    {% else %}
+    <p class="muted">{{ labels.evidence_unavailable }}</p>
+    {% endif %}
     {% if f.remediation %}<p><strong>{{ labels.solution }}:</strong> {{ f.remediation }}</p>{% endif %}
     {% if f.remediation_steps %}
     <ol>{% for step in f.remediation_steps %}<li>{{ step }}</li>{% endfor %}</ol>
     {% endif %}
-    {% if f.config_snippet %}<pre>{{ f.config_snippet }}</pre>{% endif %}
+    {% if f.config_snippet %}<pre class="evidence">{{ f.config_snippet }}</pre>{% endif %}
   </div>
   {% endfor %}
   {% else %}
   <p>{{ labels.no_findings }}</p>
   {% endif %}
 
-  <p class="muted" style="margin-top:32px">{{ labels.footer }} — {{ generated_at }}</p>
+  <p class="page-footer">{{ labels.footer }}</p>
 </body>
 </html>

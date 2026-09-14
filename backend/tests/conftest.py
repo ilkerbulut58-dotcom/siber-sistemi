@@ -17,7 +17,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.database import Base, async_session_factory, engine
 from app.main import create_app
-from app.models import MobileApplication, ScanProfile  # noqa: F401 — register ORM metadata
+from app.models import MobileApplication, PredefinedScanTarget, ScanProfile, ScanTargetAssignment  # noqa: F401
 from app.models.benchmark import (  # noqa: F401
     BenchmarkFindingMatch,
     BenchmarkResult,

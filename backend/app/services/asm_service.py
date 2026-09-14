@@ -27,8 +27,9 @@ from app.security.hostname_auth import (
     validate_scan_target_url,
 )
 from app.services.audit_service import log_audit_event
-from app.services.domain_authorization_service import is_verification_valid
+from app.models.organization import Organization
 from app.services.domain_service import DomainService
+from app.services.scan_authorization_service import ScanAuthorizationService
 from app.services.finding_service import FindingService
 from app.services.project_service import ProjectService
 from app.services.quota_service import QuotaService
@@ -91,11 +92,18 @@ class AsmService:
         settings = get_settings()
         require_domain_verification = QuotaService.requires_domain_verification(actor, settings)
 
-        if require_domain_verification and not is_verification_valid(domain):
-            raise AppError(
-                "DOMAIN_NOT_VERIFIED",
-                "Domain must be verified and within the validity window before attack surface discovery.",
-                status_code=400,
+        organization = (
+            await self.db.execute(select(Organization).where(Organization.id == organization_id))
+        ).scalar_one_or_none()
+        if organization is None:
+            raise AppError("NOT_FOUND", "Organization not found.", status_code=404)
+
+        if require_domain_verification:
+            await ScanAuthorizationService(self.db).assert_scan_authorized(
+                actor=actor,
+                organization=organization,
+                domain=domain,
+                profile_name="asm",
             )
 
         target = str(data.target_url)
@@ -337,7 +345,33 @@ class AsmService:
         await self.db.commit()
 
         try:
+            from app.models.domain import Domain
+
             settings = get_settings()
+            domain_row = (
+                await self.db.execute(select(Domain).where(Domain.id == job.domain_id))
+            ).scalar_one_or_none()
+            organization_row = (
+                await self.db.execute(
+                    select(Organization).where(Organization.id == job.organization_id)
+                )
+            ).scalar_one_or_none()
+            actor_row = (
+                await self.db.execute(select(User).where(User.id == job.initiated_by))
+            ).scalar_one_or_none()
+            if (
+                domain_row
+                and organization_row
+                and actor_row
+                and QuotaService.requires_domain_verification(actor_row, settings)
+            ):
+                await ScanAuthorizationService(self.db).assert_scan_authorized(
+                    actor=actor_row,
+                    organization=organization_row,
+                    domain=domain_row,
+                    profile_name="asm",
+                )
+
             discovered = await discover_attack_surface(
                 job.target_url,
                 max_subdomains=settings.asm_max_subdomains,

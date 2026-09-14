@@ -38,6 +38,7 @@ class ScanResponse(BaseModel):
     error_log: str | None
     started_at: datetime | None
     completed_at: datetime | None
+    authorization_source: str | None = None
     created_at: datetime
     updated_at: datetime
 

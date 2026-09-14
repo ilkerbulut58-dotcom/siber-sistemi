@@ -15,9 +15,8 @@ class QuotaService:
 
     @staticmethod
     def requires_domain_verification(actor: User, settings: Settings) -> bool:
-        if actor.is_platform_admin:
-            return False
-        return not settings.skip_domain_verification
+        """When True, scan/create paths enforce DNS, assignment, or admin DNS exempt."""
+        return settings.domain_verification_enforced()
 
     @staticmethod
     def should_enforce_scan_limits(
