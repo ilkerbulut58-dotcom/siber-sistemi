@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.core.config import get_settings
 from app.scanners.base import RawFinding
 from app.scanners.execution_stats import set_pending_scanner_enrich
 
@@ -142,7 +143,12 @@ async def scan_disclosure_headers(target_url: str, response: httpx.Response) -> 
                 description=f"X-Powered-By: {powered}",
                 severity="info",
                 affected_url=target_url,
-                evidence={"x_powered_by": powered},
+                evidence={
+                    "evidence_type": "http_header",
+                    "header_name": "X-Powered-By",
+                    "header_value": powered,
+                    "x_powered_by": powered,
+                },
             )
         )
     return findings
@@ -185,7 +191,12 @@ async def scan_security_headers(
                 severity="info",
                 affected_url=target_url,
                 remediation="Remove or genericize the Server response header.",
-                evidence={"server": server},
+                evidence={
+                    "evidence_type": "http_header",
+                    "header_name": "Server",
+                    "header_value": server,
+                    "server": server,
+                },
             )
         )
 
@@ -248,7 +259,8 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
             if not_after:
                 expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
                 days_left = (expiry - datetime.now(UTC)).days
-                if days_left < 30:
+                warning_days = get_settings().tls_cert_expiry_warning_days
+                if days_left < warning_days:
                     findings.append(
                         RawFinding(
                             source_tool="tls_check",
@@ -258,7 +270,12 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
                             severity="high" if days_left < 7 else "medium",
                             affected_url=target_url,
                             remediation="Renew the TLS certificate before expiry.",
-                            evidence={"expires_at": not_after, "days_left": days_left},
+                            evidence={
+                                "expires_at": not_after,
+                                "days_left": days_left,
+                                "warning_threshold_days": warning_days,
+                                "observed_at_utc": datetime.now(UTC).isoformat(),
+                            },
                         )
                     )
     except ssl.SSLCertVerificationError as exc:

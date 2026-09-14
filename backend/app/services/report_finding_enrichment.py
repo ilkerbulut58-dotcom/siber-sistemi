@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.security.evidence_sanitizer import sanitize_evidence_dict
@@ -22,35 +19,75 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
         return _evidence_missing(locale)
 
     lines: list[str] = []
-    if raw.get("evidence_type") == "http_header" and raw.get("header_value"):
+    etype = raw.get("evidence_type")
+
+    if etype == "http_header" or raw.get("header_name"):
         name = raw.get("header_name") or "Header"
-        lines.append(f"{name}: {raw['header_value']}")
-    if header := raw.get("missing_header"):
-        lines.append(f"Header: {header} (missing)")
+        val = raw.get("header_value") or raw.get("server") or raw.get("x_powered_by")
+        if locale == "de":
+            lines.append(f"Kopfzeile: {name}")
+            lines.append(f"Beobachteter Wert: {val or '—'}")
+            lines.append("Nachweistyp: HTTP-Antwortheader")
+        else:
+            lines.append(f"Başlık adı: {name}")
+            lines.append(f"Gözlenen değer: {val or '—'}")
+            lines.append("Kanıt türü: HTTP yanıt başlığı")
+        if finding.affected_url:
+            lines.append(f"URL: {finding.affected_url}")
+        if finding.source_tool:
+            lines.append(f"Kaynak: {finding.source_tool}" if locale != "de" else f"Quelle: {finding.source_tool}")
+        if finding.source_rule_id:
+            lines.append(
+                f"Kural: {finding.source_rule_id}" if locale != "de" else f"Regel: {finding.source_rule_id}"
+            )
+        return "\n".join(lines)
+
+    if raw.get("expires_at") or finding.source_rule_id == "cert-expiring-soon":
+        expires = raw.get("expires_at")
+        days = raw.get("days_left")
+        threshold = raw.get("warning_threshold_days")
+        if locale == "de":
+            if expires:
+                lines.append(f"Ablauf: {expires}")
+            if days is not None:
+                lines.append(f"Volle Tage bei Beobachtung: {days}")
+            if threshold is not None:
+                lines.append(f"Warnschwelle (Plattform): {threshold} Tage")
+            lines.append(f"Quelle: {finding.source_tool or 'tls_check'}")
+            if finding.source_rule_id:
+                lines.append(f"Regel: {finding.source_rule_id}")
+        else:
+            if expires:
+                lines.append(f"Bitiş: {expires}")
+            if days is not None:
+                lines.append(f"Tarama anında kalan (tam gün): {days}")
+            if threshold is not None:
+                lines.append(f"Uyarı eşiği (platform): {threshold} gün")
+            lines.append(f"Kaynak: {finding.source_tool or 'tls_check'}")
+            if finding.source_rule_id:
+                lines.append(f"Kural: {finding.source_rule_id}")
+        if finding.affected_url:
+            lines.append(f"URL: {finding.affected_url}")
+        return "\n".join(lines) if lines else _evidence_missing(locale)
+
     if powered := raw.get("x_powered_by"):
         lines.append(f"X-Powered-By: {powered}")
     if server := raw.get("server"):
         lines.append(f"Server: {server}")
-    if expires := raw.get("expires_at"):
-        days = raw.get("days_left")
-        if locale == "de":
-            lines.append(f"Zertifikat gültig bis: {expires}" + (f" ({days} Tage)" if days is not None else ""))
-        else:
-            lines.append(f"Sertifika bitiş: {expires}" + (f" ({days} gün kaldı)" if days is not None else ""))
+    if raw.get("missing_header"):
+        lines.append(f"Header: {raw['missing_header']} (missing)")
     if status_code := raw.get("status_code"):
         lines.append(f"HTTP status: {status_code}")
     if matcher := raw.get("matcher"):
-        lines.append(f"Matcher: {matcher}")
+        if locale == "de":
+            lines.append(f"Matcher (kein vollständiger Header-Nachweis): {matcher}")
+        else:
+            lines.append(f"Matcher (tam HTTP başlık kanıtı değil): {matcher}")
 
-    if not lines:
-        try:
-            compact = json.dumps(raw, ensure_ascii=False, indent=2)
-        except TypeError:
-            compact = str(raw)
-        if len(compact) > 4000:
-            compact = compact[:4000] + "…"
-        return compact
-    return "\n".join(lines)
+    if lines:
+        return "\n".join(lines)
+
+    return _evidence_missing(locale)
 
 
 def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:

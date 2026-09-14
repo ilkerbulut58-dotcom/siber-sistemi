@@ -147,6 +147,10 @@ class Settings(BaseSettings):
         default=90,
         description="Overall timeout for code profile scanners (parallel)",
     )
+    tls_cert_expiry_warning_days: int = Field(
+        default=30,
+        description="Days before certificate expiry to raise cert-expiring-soon finding",
+    )
     scan_stale_minutes: int = Field(
         default=12,
         description="Mark scans stuck in active states as failed after this many minutes",

@@ -17,6 +17,12 @@ from app.scanners.execution_stats import (
     record_scanner_stats,
     reset_scanner_stats,
     scanner_stats_as_metrics,
+    set_profile_execution_snapshot,
+)
+from app.scanners.profile_registry import (
+    SCANNER_DEFINITIONS,
+    planned_scanner_ids,
+    profile_scope_note,
 )
 from app.scanners.exposed_paths import scan_exposed_paths
 from app.scanners.nuclei import run_nuclei_scan
@@ -94,6 +100,15 @@ async def _run_scanners_parallel(
     done, pending = await asyncio.wait(tasks, timeout=timeout_seconds)
 
     for task in pending:
+        name = (task.get_name() or "").removeprefix("scanner:")
+        if name:
+            record_scanner_stats(
+                ScannerRunStats(
+                    scanner_name=name,
+                    finding_count=0,
+                    timeout_count=1,
+                )
+            )
         task.cancel()
     if pending:
         await asyncio.gather(*pending, return_exceptions=True)
@@ -212,12 +227,54 @@ async def run_scan_for_profile(
             ("sensitive_data", scan_sensitive_data, {"target_url": target_url}),
         ]
 
+    planned = planned_scanner_ids(profile)
     findings = await _run_scanners_parallel(scanners, timeout_seconds=timeout)
     metrics = scanner_stats_as_metrics()
     passive = metrics.get("passive_http") or {}
     headers = passive.get("observed_headers") or passive.get("extra", {}).get("observed_headers")
     if isinstance(headers, dict):
         findings = enrich_findings_with_observed_headers(findings, headers)
+
+    scanner_runs: list[dict] = []
+    for sid in planned:
+        m = metrics.get(sid) or {}
+        if m.get("timeout_count"):
+            status = "timeout"
+        elif m.get("error_count"):
+            status = "failed"
+        elif sid in metrics:
+            status = "completed"
+        else:
+            status = "not_run"
+        defn = SCANNER_DEFINITIONS.get(sid)
+        scanner_runs.append(
+            {
+                "scanner_id": sid,
+                "status": status,
+                "finding_count": m.get("finding_count", 0),
+                "execution_seconds": m.get("execution_seconds"),
+                "scanner_version": m.get("scanner_version"),
+                "urls_scanned": m.get("urls_scanned"),
+                "timeout_count": m.get("timeout_count", 0),
+                "error_count": m.get("error_count", 0),
+                "control_summary_tr": defn.control_summary_tr if defn else sid,
+                "control_summary_de": defn.control_summary_de if defn else sid,
+            }
+        )
+
+    set_profile_execution_snapshot(
+        {
+            "profile": profile,
+            "planned_scanners": planned,
+            "scanner_runs": scanner_runs,
+            "code_source_scan_status": (
+                "not_supported_no_upload" if profile == "code" else "not_applicable"
+            ),
+            "profile_scope_note_tr": profile_scope_note(profile, "tr"),
+            "profile_scope_note_de": profile_scope_note(profile, "de"),
+        }
+    )
+
     logger.info(
         "Profile %s finished with %s findings for %s (timeout=%ss)",
         profile,

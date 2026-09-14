@@ -27,6 +27,7 @@ from app.models.scan import ScanJob, ScanStatus
 from app.services.finding_service import FindingService
 from app.services.pdf_utils import html_to_pdf
 from app.services.report_finding_localization import localize_findings_for_report
+from app.services.report_scope import build_report_scope_context, profile_label
 from app.services.scan_service import ScanService
 
 logger = logging.getLogger(__name__)
@@ -90,19 +91,21 @@ class ReportService:
 
         template = self._jinja.get_template("scan_report.html")
         status_key = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
-        scope_summary = self._scope_summary_lines(scan, locale)
+        scope_ctx = build_report_scope_context(scan, locale)
         return template.render(
             locale=locale,
             labels=SCAN_REPORT_LABELS[locale],
             scan=scan,
             findings=findings,
-            profile_label=PROFILE_LABELS[locale].get(scan.scan_profile, scan.scan_profile),
+            profile_label=scope_ctx["profile_label"],
             status_label=STATUS_LABELS[locale].get(status_key, status_key),
             severity_labels=SEVERITY_LABELS[locale],
             status_labels=FINDING_STATUS_LABELS[locale],
             severity_counts=severity_counts,
             risk_summary=scan_risk_summary(locale, severity_counts),
-            scope_summary=scope_summary,
+            scope_summary_rows=scope_ctx["scope_summary_rows"],
+            scanner_rows=scope_ctx["scanner_rows"],
+            profile_scope_note=scope_ctx["profile_scope_note"],
             completed_at=(
                 scan.completed_at.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC")
                 if scan.completed_at
@@ -174,7 +177,7 @@ class ReportService:
                 "id": str(scan.id),
                 "target_url": scan.target_url,
                 "scan_profile": scan.scan_profile,
-                "profile_label": PROFILE_LABELS[locale].get(scan.scan_profile, scan.scan_profile),
+                "profile_label": profile_label(scan.scan_profile, locale),
                 "status": status_key,
                 "status_label": STATUS_LABELS[locale].get(status_key, status_key),
                 "findings_count": scan.findings_count,
@@ -211,7 +214,7 @@ class ReportService:
                 }
                 for f in findings
             ],
-            "scope": ReportService._scope_summary_lines(scan, locale),
+            "scope": build_report_scope_context(scan, locale),
         }
         content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         return content, "application/json; charset=utf-8", self._filename(scan, "json")

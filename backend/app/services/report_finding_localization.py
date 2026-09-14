@@ -7,10 +7,12 @@ from uuid import UUID
 
 from app.data.finding_catalog_de import SEVERITY_LABEL_DE
 from app.data.finding_catalog_de import get_catalog_entry as get_catalog_entry_de
+from app.data.finding_catalog_tr import get_catalog_entry as get_catalog_entry_tr
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
 from app.services.report_finding_enrichment import enrich_risk_explanation, format_evidence_for_report
+from app.services.report_remediation_context import contextual_remediation
 
 
 @dataclass
@@ -102,37 +104,45 @@ def _german_fallback(finding: Finding, domain: str) -> ReportFinding:
 def localize_finding_for_report(finding: Finding, locale: Locale) -> ReportFinding:
     evidence_text = format_evidence_for_report(finding, locale)
     risk = enrich_risk_explanation(finding, locale)
+    rem_override, steps_override, snippet_override = contextual_remediation(finding, locale)
+
+    rule_id = finding.correlation_key or finding.source_rule_id
+    domain = extract_domain(finding.affected_url or "")
+    if rule_id:
+        entry = get_catalog_entry_de(rule_id, domain) if locale == "de" else get_catalog_entry_tr(rule_id, domain)
+        if entry:
+            prefix = "de" if locale == "de" else "tr"
+            return ReportFinding.from_finding(
+                finding,
+                title=entry[f"title_{prefix}"],
+                description=entry[f"description_{prefix}"],
+                risk_explanation=entry[f"risk_explanation_{prefix}"],
+                remediation=rem_override or entry[f"remediation_summary_{prefix}"],
+                remediation_steps=steps_override or entry[f"remediation_steps_{prefix}"],
+                config_file_paths=entry[f"config_file_paths_{prefix}"],
+                config_snippet=snippet_override if snippet_override is not None else entry["config_snippet"],
+                evidence_text=evidence_text,
+            )
+
     if locale != "de":
         return ReportFinding.from_finding(
             finding,
             evidence_text=evidence_text,
             risk_explanation=risk,
+            remediation=rem_override or finding.remediation,
+            remediation_steps=steps_override or finding.remediation_steps,
+            config_snippet=snippet_override if snippet_override is not None else finding.config_snippet,
         )
-
-    rule_id = finding.correlation_key or finding.source_rule_id
-    domain = extract_domain(finding.affected_url or "")
-    if rule_id:
-        entry = get_catalog_entry_de(rule_id, domain)
-        if entry:
-            return ReportFinding.from_finding(
-                finding,
-                title=entry["title_de"],
-                description=entry["description_de"],
-                risk_explanation=entry["risk_explanation_de"],
-                remediation=entry["remediation_summary_de"],
-                remediation_steps=entry["remediation_steps_de"],
-                config_file_paths=entry["config_file_paths_de"],
-                config_snippet=entry["config_snippet"],
-                evidence_text=evidence_text,
-            )
 
     fb = _german_fallback(finding, domain)
     return ReportFinding.from_finding(
         finding,
         title=fb.title,
         risk_explanation=fb.risk_explanation or risk,
-        remediation_steps=fb.remediation_steps,
+        remediation=rem_override or fb.remediation,
+        remediation_steps=steps_override or fb.remediation_steps,
         config_file_paths=fb.config_file_paths,
+        config_snippet=snippet_override if snippet_override is not None else fb.config_snippet,
         evidence_text=evidence_text,
     )
 

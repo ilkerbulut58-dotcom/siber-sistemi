@@ -903,8 +903,9 @@ export const de: Dictionary = {
         "Erweiterte Untersuchung mit breiterer Erkundung. Mehr Requests, Operator-Freigabe erforderlich.",
     },
     code: {
-      label: "Code / Datei-Scan",
-      description: "In diesem Closed Pilot nicht verfügbar.",
+      label: "HTTP-Oberflächen- und Pfadscan",
+      description:
+        "HTTP/TLS-, Pfad- und Secret-Muster-Prüfungen über die Ziel-URL. Kein Upload von Quellcode oder Repos.",
     },
   },
   scanRisk: {

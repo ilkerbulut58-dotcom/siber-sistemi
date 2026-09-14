@@ -69,7 +69,7 @@ TABLES = [
 SCAN_PROFILES = [
     ("safe", "Safe Scan", "Passive checks for production targets."),
     ("deep", "Deep Scan", "Active testing for staging environments."),
-    ("code", "Code Scan", "Repository and dependency analysis."),
+    ("code", "HTTP surface path scan", "HTTP/TLS, exposed paths, response secrets — no repo upload."),
     ("benchmark-active-web", "Benchmark Active Web", "Isolated lab only."),
     ("benchmark-active-api", "Benchmark Active API", "Isolated lab only."),
 ]

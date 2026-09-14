@@ -553,17 +553,30 @@ async def run_scan_job(
             scan.status = ScanStatus.COMPLETED
             scan.findings_count = len(saved)
             scan.completed_at = datetime.now(UTC)
-            from app.scanners.execution_stats import get_scanner_stats
+            from app.scanners.execution_stats import (
+                get_profile_execution_snapshot,
+                get_scanner_stats,
+            )
+            from app.scanners.profile_registry import planned_scanner_ids
 
             stats = get_scanner_stats()
+            execution = get_profile_execution_snapshot() or {}
             urls_scanned = sum(s.urls_scanned for s in stats)
-            checks_completed = len(stats)
-            checks_failed = sum(s.error_count + s.timeout_count for s in stats)
+            checks_completed = sum(
+                1 for r in (execution.get("scanner_runs") or []) if r.get("status") == "completed"
+            )
+            checks_failed = sum(
+                1
+                for r in (execution.get("scanner_runs") or [])
+                if r.get("status") in {"failed", "timeout"}
+            )
             scope = dict(scan.scope_config or {})
             scope["planned_scope"] = {
                 "target_url": scan.target_url,
                 "scan_profile": scan.scan_profile,
                 "authorization_source": scan.authorization_source,
+                "planned_scanners": execution.get("planned_scanners")
+                or planned_scanner_ids(scan.scan_profile),
             }
             scope["executed_telemetry"] = {
                 "findings_persisted": len(saved),
@@ -571,6 +584,10 @@ async def run_scan_job(
                 "scanner_runs_failed_or_timed_out": checks_failed,
                 "unique_urls_scanned_sum": urls_scanned if urls_scanned else None,
                 "note": "urls_scanned_sum" if urls_scanned else "url_counts_not_measured",
+                "scanner_runs": execution.get("scanner_runs") or [],
+                "code_source_scan_status": execution.get("code_source_scan_status"),
+                "profile_scope_note_tr": execution.get("profile_scope_note_tr"),
+                "profile_scope_note_de": execution.get("profile_scope_note_de"),
             }
             scan.scope_config = scope
             await log_audit_event(

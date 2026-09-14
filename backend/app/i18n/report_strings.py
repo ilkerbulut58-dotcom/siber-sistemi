@@ -15,12 +15,48 @@ PROFILE_LABELS: dict[Locale, dict[str, str]] = {
     "tr": {
         "safe": "Güvenli Tarama",
         "deep": "Derin Tarama",
-        "code": "Kod / Dosya Taraması",
+        "code": "HTTP yüzey ve dosya yolu taraması",
     },
     "de": {
         "safe": "Sicherer Scan",
         "deep": "Tiefenscan",
-        "code": "Code / Datei-Scan",
+        "code": "HTTP-Oberflächen- und Pfadscan",
+    },
+}
+
+AUTH_SOURCE_LABELS: dict[Locale, dict[str, str]] = {
+    "tr": {
+        "dns_verification": "DNS doğrulaması",
+        "admin_test_assignment": "Admin test hedefi ataması",
+        "admin_dns_exempt": "Admin DNS muafiyeti",
+        "dev_skip": "Geliştirme modu (DNS atlandı)",
+        "platform_manual": "Platform manuel",
+    },
+    "de": {
+        "dns_verification": "DNS-Verifizierung",
+        "admin_test_assignment": "Admin-Testziel-Zuweisung",
+        "admin_dns_exempt": "Admin-DNS-Ausnahme",
+        "dev_skip": "Entwicklungsmodus (DNS übersprungen)",
+        "platform_manual": "Manuell (Plattform)",
+    },
+}
+
+SCANNER_STATUS_LABELS: dict[Locale, dict[str, str]] = {
+    "tr": {
+        "completed": "Tamamlandı",
+        "failed": "Başarısız",
+        "timeout": "Zaman aşımı",
+        "not_run": "Çalışmadı",
+        "skipped": "Atlandı",
+        "unknown": "Bilinmiyor",
+    },
+    "de": {
+        "completed": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "timeout": "Timeout",
+        "not_run": "Nicht gestartet",
+        "skipped": "Übersprungen",
+        "unknown": "Unbekannt",
     },
 }
 
@@ -108,6 +144,15 @@ SCAN_REPORT_LABELS: dict[Locale, dict[str, str]] = {
         "auth_source": "Yetki kaynağı",
         "findings_table": "Bulgu özeti",
         "evidence_unavailable": "Bu taramada kaydedilmedi",
+        "scanner_table_title": "Motor çalışma özeti",
+        "scanner_col_name": "Motor",
+        "scanner_col_status": "Durum",
+        "scanner_col_controls": "Kontrol türü",
+        "scanner_col_findings": "Bulgu",
+        "scanner_col_duration": "Süre",
+        "scanner_col_urls": "URL",
+        "scope_note_title": "Profil notu",
+        "page_of": "Sayfa",
     },
     "de": {
         "page_title": "SIBER Scan-Bericht",
@@ -137,6 +182,15 @@ SCAN_REPORT_LABELS: dict[Locale, dict[str, str]] = {
         "auth_source": "Autorisierung",
         "findings_table": "Befundübersicht",
         "evidence_unavailable": "In diesem Scan nicht gespeichert",
+        "scanner_table_title": "Scanner-Ausführung",
+        "scanner_col_name": "Scanner",
+        "scanner_col_status": "Status",
+        "scanner_col_controls": "Prüfart",
+        "scanner_col_findings": "Befunde",
+        "scanner_col_duration": "Dauer",
+        "scanner_col_urls": "URLs",
+        "scope_note_title": "Profilhinweis",
+        "page_of": "Seite",
     },
 }
 

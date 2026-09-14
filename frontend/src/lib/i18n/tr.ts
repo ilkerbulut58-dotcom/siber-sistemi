@@ -902,8 +902,9 @@ export const tr: Dictionary = {
         "Daha geniş sayfa ve yol keşfi yapan genişletilmiş inceleme. Daha fazla istek oluşturabilir ve operatör onayı gerektirir.",
     },
     code: {
-      label: "Kod / Dosya Taraması",
-      description: "Bu kapalı pilotta kullanılamaz.",
+      label: "HTTP yüzey ve dosya yolu taraması",
+      description:
+        "Hedef URL üzerinden HTTP/TLS, açık yol ve yanıt içi gizli kalıp kontrolleri. Yüklenen kaynak kodu veya repo taraması yok.",
     },
   },
   scanRisk: {

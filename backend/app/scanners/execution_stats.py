@@ -8,6 +8,7 @@ from typing import Any
 
 _scanner_stats: ContextVar[list[ScannerRunStats] | None] = ContextVar("scanner_run_stats", default=None)
 _pending_enrich: ContextVar[dict[str, dict[str, Any]] | None] = ContextVar("scanner_pending_enrich", default=None)
+_profile_execution: ContextVar[dict[str, Any] | None] = ContextVar("profile_execution_snapshot", default=None)
 
 
 @dataclass
@@ -52,6 +53,15 @@ def pop_pending_scanner_enrich(scanner_name: str) -> dict[str, Any]:
 def reset_scanner_stats() -> None:
     _scanner_stats.set([])
     _pending_enrich.set({})
+    _profile_execution.set(None)
+
+
+def set_profile_execution_snapshot(payload: dict[str, Any]) -> None:
+    _profile_execution.set(payload)
+
+
+def get_profile_execution_snapshot() -> dict[str, Any] | None:
+    return _profile_execution.get()
 
 
 def record_scanner_stats(stats: ScannerRunStats) -> None:

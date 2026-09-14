@@ -59,12 +59,34 @@ async def test_write_sample_pdf_tr_and_de(client: AsyncClient, db_session) -> No
         completed_at=datetime.now(UTC),
         authorization_source="dns_verification",
         scope_config={
-            "planned_scope": {"scan_profile": "safe", "authorization_source": "dns_verification"},
+            "planned_scope": {
+                "scan_profile": "safe",
+                "authorization_source": "dns_verification",
+                "planned_scanners": ["passive_http", "sensitive_data", "zap", "nuclei"],
+            },
             "executed_telemetry": {
                 "findings_persisted": 2,
-                "scanner_runs_completed": 3,
+                "scanner_runs_completed": 4,
                 "scanner_runs_failed_or_timed_out": 0,
                 "unique_urls_scanned_sum": None,
+                "scanner_runs": [
+                    {
+                        "scanner_id": "passive_http",
+                        "status": "completed",
+                        "finding_count": 2,
+                        "execution_seconds": 0.8,
+                        "control_summary_tr": "HTTP/TLS",
+                        "control_summary_de": "HTTP/TLS",
+                    },
+                    {
+                        "scanner_id": "nuclei",
+                        "status": "completed",
+                        "finding_count": 0,
+                        "execution_seconds": 2.1,
+                        "control_summary_tr": "Nuclei",
+                        "control_summary_de": "Nuclei",
+                    },
+                ],
             },
         },
     )
