@@ -72,7 +72,7 @@ export default function QuickScanPage() {
 
   const quotaUnlimited = Boolean(user?.is_platform_admin);
   const todayCount = onboarding?.daily_scan_count ?? 0;
-  const effectiveQuota = quotaUnlimited ? null : (onboarding?.daily_scan_quota ?? 5);
+  const effectiveQuota = quotaUnlimited ? null : (onboarding?.daily_scan_quota ?? null);
   const quotaExceeded =
     !quotaUnlimited && effectiveQuota !== null && todayCount >= effectiveQuota;
   const activeScanAllowed = onboarding?.pilot_active_scan_allowed !== false;

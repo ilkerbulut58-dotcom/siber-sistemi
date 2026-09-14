@@ -38,12 +38,13 @@ export default function OrgDashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [scans, setScans] = useState<ScanJob[]>([]);
+  const [memberRole, setMemberRole] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const token = getAccessToken();
-      const [orgData, projectData, onboardingData, scanData] = await Promise.all([
+      const [orgData, projectData, onboardingData, scanData, members] = await Promise.all([
         apiFetch<Organization>(`/api/v1/organizations/${orgId}`, { token }),
         apiFetch<Project[]>(`/api/v1/organizations/${orgId}/projects`, { token }),
         apiFetch<OnboardingStatus>(`/api/v1/organizations/${orgId}/onboarding-status`, {
@@ -52,15 +53,21 @@ export default function OrgDashboardPage() {
         apiFetch<ScanJob[]>(`/api/v1/organizations/${orgId}/scans`, { token }).catch(
           () => [] as ScanJob[]
         ),
+        apiFetch<{ user_id: string; role: string }[]>(
+          `/api/v1/organizations/${orgId}/members`,
+          { token }
+        ).catch(() => []),
       ]);
       setOrg(orgData);
       setProjects(projectData);
       setOnboarding(onboardingData);
       setScans(scanData);
+      const own = members.find((m) => m.user_id === user?.id);
+      setMemberRole(own?.role ?? null);
     } catch (err) {
       setError(formatApiError(err));
     }
-  }, [formatApiError, getAccessToken, orgId]);
+  }, [formatApiError, getAccessToken, orgId, user?.id]);
 
   useEffect(() => {
     load();
@@ -73,10 +80,20 @@ export default function OrgDashboardPage() {
 
   const dailyQuota = onboarding?.daily_scan_quota;
   const quotaUnlimited = Boolean(user?.is_platform_admin);
-  const effectiveQuota = quotaUnlimited ? null : (dailyQuota ?? 5);
-  const quotaDisplay = quotaUnlimited ? t("org.quotaUnlimited") : String(effectiveQuota);
+  const effectiveQuota = quotaUnlimited ? null : (dailyQuota ?? null);
+  const quotaDisplay = quotaUnlimited
+    ? t("org.quotaUnlimited")
+    : effectiveQuota != null
+      ? String(effectiveQuota)
+      : null;
   const quotaExceeded =
-    !quotaUnlimited && effectiveQuota !== null && todayScanCount >= effectiveQuota;
+    !quotaUnlimited &&
+    effectiveQuota !== null &&
+    todayScanCount >= effectiveQuota;
+  const isExpertTenant = onboarding?.tenant_type === "expert_security_test";
+  const canCreateProject =
+    memberRole === "owner" || memberRole === "admin" || user?.is_platform_admin;
+  const primaryProjectId = onboarding?.first_project_id ?? projects[0]?.id;
 
   async function createProject(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -103,8 +120,9 @@ export default function OrgDashboardPage() {
   const stepHref = (stepId: string): string | null => {
     const projectId = onboarding?.first_project_id ?? projects[0]?.id;
     if (stepId === "email_verified") return "/dashboard/settings";
-    if ((stepId === "domain_added" || stepId === "domain_verified") && projectId) {
-      return `/dashboard/${orgId}/projects/${projectId}`;
+    if (stepId === "domain_added" || stepId === "domain_verified") {
+      if (projectId) return `/dashboard/${orgId}/projects/${projectId}`;
+      return "/dashboard/domains";
     }
     if (stepId === "safe_scan_started") return "/dashboard/scan";
     if (stepId === "findings_reviewed" && onboarding?.latest_completed_scan_id) {
@@ -118,6 +136,9 @@ export default function OrgDashboardPage() {
     }
     return null;
   };
+
+  const nextIncompleteStep = onboarding?.steps.find((s) => !s.completed);
+  const nextStepLink = nextIncompleteStep ? stepHref(nextIncompleteStep.step_id) : null;
 
   return (
     <>
@@ -155,15 +176,29 @@ export default function OrgDashboardPage() {
           </p>
         )}
 
+        {onboarding?.show_onboarding_checklist && nextStepLink && nextIncompleteStep && (
+          <div className="mb-4 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 text-sm">
+            <span className="font-medium text-indigo-100">{t("org.nextStepBanner")}: </span>
+            <span className="text-indigo-50/90">{onboardingStepLabel(nextIncompleteStep.step_id)}</span>
+            <Link href={nextStepLink} className="ml-2 font-medium text-indigo-200 underline hover:text-white">
+              {t("org.completeStep")}
+            </Link>
+          </div>
+        )}
+
         <div className="mb-6 grid gap-4 md:grid-cols-2">
           {onboarding?.show_onboarding_checklist && (
             <Card>
               <CardHeader>
-                <CardTitle>{t("org.onboarding")}</CardTitle>
+                <CardTitle>
+                  {isExpertTenant ? t("org.onboardingExpertTitle") : t("org.onboarding")}
+                </CardTitle>
                 <CardDescription>
-                  {onboarding.ready_to_scan
-                    ? t("org.onboardingReady")
-                    : t("org.onboardingPending")}
+                  {isExpertTenant
+                    ? t("org.onboardingExpertDesc")
+                    : onboarding.ready_to_scan
+                      ? t("org.onboardingReady")
+                      : t("org.onboardingPending")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -200,10 +235,20 @@ export default function OrgDashboardPage() {
               <CardTitle>{t("org.dailyQuota")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-semibold">
-                {t("common.today")}: {todayScanCount} {t("common.of")} {quotaDisplay}{" "}
-                {t("common.scans")}
-              </p>
+              {quotaDisplay != null ? (
+                <p className="text-2xl font-semibold">
+                  {t("common.today")}: {todayScanCount} {t("common.of")} {quotaDisplay}{" "}
+                  {t("common.scans")}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t("org.quotaUnavailable")}</p>
+              )}
+              {onboarding?.scan_concurrency_limit != null && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("settings.tenantConcurrency")}: {onboarding.scan_concurrency_limit}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">{t("org.quotaResetHint")}</p>
               {quotaExceeded && (
                 <p className="mt-2 text-sm text-orange-400">{t("org.quotaExceeded")}</p>
               )}
@@ -212,34 +257,55 @@ export default function OrgDashboardPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("org.newProject")}</CardTitle>
-              <CardDescription>{t("org.newProjectDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={createProject} className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t("org.projectName")}</Label>
-                  <Input id="name" name="name" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="environment">{t("org.environment")}</Label>
-                  <select
-                    id="environment"
-                    name="environment"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    defaultValue="production"
-                  >
-                    <option value="production">{t("org.envProduction")}</option>
-                    <option value="staging">{t("org.envStaging")}</option>
-                    <option value="development">{t("org.envDevelopment")}</option>
-                  </select>
-                </div>
-                <Button type="submit">{t("org.createProject")}</Button>
-              </form>
-            </CardContent>
-          </Card>
+          {canCreateProject ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("org.newProject")}</CardTitle>
+                <CardDescription>{t("org.newProjectDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={createProject} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">{t("org.projectName")}</Label>
+                    <Input id="name" name="name" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="environment">{t("org.environment")}</Label>
+                    <select
+                      id="environment"
+                      name="environment"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      defaultValue="production"
+                    >
+                      <option value="production">{t("org.envProduction")}</option>
+                      <option value="staging">{t("org.envStaging")}</option>
+                      <option value="development">{t("org.envDevelopment")}</option>
+                    </select>
+                  </div>
+                  <Button type="submit">{t("org.createProject")}</Button>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("org.projects")}</CardTitle>
+                <CardDescription>{t("org.expertProjectHint")}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {primaryProjectId && (
+                  <Link href={`/dashboard/${orgId}/projects/${primaryProjectId}`}>
+                    <Button type="button">{t("org.openProject")}</Button>
+                  </Link>
+                )}
+                <Link href="/dashboard/domains">
+                  <Button type="button" variant="outline">
+                    {t("org.expertOpenDomains")}
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

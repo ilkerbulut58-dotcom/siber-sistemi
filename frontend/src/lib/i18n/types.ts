@@ -197,6 +197,14 @@ export interface Dictionary {
     ctaVerifyDomain: string;
     ctaStartScan: string;
     ctaReviewFindings: string;
+    onboardingExpertTitle: string;
+    onboardingExpertDesc: string;
+    expertProjectHint: string;
+    expertOpenDomains: string;
+    quotaResetHint: string;
+    quotaUnavailable: string;
+    nextStepBanner: string;
+    openProject: string;
   };
   onboarding: {
     account_created: string;

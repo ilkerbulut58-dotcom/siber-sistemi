@@ -224,6 +224,9 @@ export const de: Dictionary = {
     projects: "Projekte",
     noProjects: "Noch keine Projekte.",
     onboarding: "Pilot-Einrichtung",
+    onboardingExpertTitle: "Einstieg — Checkliste",
+    onboardingExpertDesc:
+      "Schließen Sie die Schritte der Reihe nach ab; der Link in jeder Zeile führt zur passenden Seite.",
     onboardingReady: "Bereit zum Scannen",
     onboardingPending: "Einrichtungsschritte abschließen",
     dailyQuota: "Tägliches Scan-Kontingent",
@@ -236,8 +239,16 @@ export const de: Dictionary = {
     completeStep: "Abschließen →",
     ctaAddDomain: "Domain hinzufügen",
     ctaVerifyDomain: "Verifizierung abschließen",
-    ctaStartScan: "Safe-Scan starten",
+    ctaStartScan: "Sicheren Scan starten",
     ctaReviewFindings: "Findings prüfen",
+    expertProjectHint:
+      "Ihr Testkonto darf keine Projekte anlegen. Öffnen Sie das vorbereitete Projekt für Domains oder wenden Sie sich an den Support.",
+    expertOpenDomains: "Zu meinen Domains",
+    quotaResetHint: "Kontingent wird um Mitternacht (UTC) zurückgesetzt.",
+    quotaUnavailable:
+      "Kontingent konnte nicht geladen werden — Seite neu laden oder Einstellungen prüfen.",
+    nextStepBanner: "Nächster Schritt",
+    openProject: "Projekt öffnen",
   },
   onboarding: {
     account_created: "Konto erstellen",
@@ -245,7 +256,7 @@ export const de: Dictionary = {
     domain_added: "Domain hinzufügen",
     domain_verified: "Eigentum oder Scan-Berechtigung verifizieren",
     authorization_accepted: "Scan-Berechtigung bestätigen",
-    safe_scan_started: "Safe-Scan starten",
+    safe_scan_started: "Sicheren Scan starten",
     findings_reviewed: "Findings und Bericht prüfen",
     feedback_or_retest: "Feedback oder Retest senden",
   },
