@@ -12,7 +12,7 @@
 
 **Frontend CI kök nedeni:** `frontend/src/lib/i18n/types.ts` içinde sözlükte olan `platform.testTargetsTitle` / `project.verificationDnsVerified` (ve site profili SPF etiketleri) tip tanımında yoktu → `tsc --noEmit` kırılıyordu. **Düzeltme:** eksik anahtarlar `types.ts`, `tr.ts`, `de.ts` ile hizalandı; yerelde `npm run typecheck` geçti.
 
-**Backend CI:** Paylaşılan ekrandaki frontend tip hatası dışında, CI ortamında `ENVIRONMENT=development` olduğu için `QuotaService.requires_domain_verification` testleri geçer. Tam pytest yerelde `289 passed, 1 failed` (`test_platform_admin_skips_domain_verification` — production `Settings` ile bilinçli DNS zorunluluğu); CI ile uyumlu.
+**Backend CI:** CI #153 `backend` job’da tam pytest geçti. Yerelde `py -m pytest` → **290 passed, 0 failed** (`test_platform_admin_dns_policy`, commit `520a376`).
 
 ## Kanıt kaybı
 

@@ -20,9 +20,9 @@ const projectRoot = path.join(__dirname, '..');
 const remoteRoot = '/opt/siber';
 const archiveName = 'siber-deploy.tgz';
 const archivePath = path.join(projectRoot, archiveName);
-const deploySha = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf8' }).trim();
-const shortDeploySha = deploySha.slice(0, 12);
 const releaseTag = process.env.RELEASE_TAG || 'v0.9.0-rc6-expert';
+let deploySha = '';
+let shortDeploySha = '';
 const appVersion = process.env.APP_VERSION || '0.9.0-rc6-expert';
 const buildTimestamp = new Date().toISOString();
 
@@ -48,17 +48,25 @@ function assertCleanGit() {
     console.error('ERROR: RELEASE_TAG is required');
     process.exit(1);
   }
+  let tagSha;
   try {
-    const tagSha = execSync(`git rev-list -n 1 ${releaseTag}`, { cwd: projectRoot, encoding: 'utf8' }).trim();
-    if (tagSha !== localHead) {
-      console.error(`ERROR: tag ${releaseTag} (${tagSha}) does not point to HEAD (${localHead})`);
-      process.exit(1);
-    }
+    tagSha = execSync(`git rev-list -n 1 ${releaseTag}`, { cwd: projectRoot, encoding: 'utf8' }).trim();
   } catch {
     console.error(`ERROR: release tag ${releaseTag} not found — create with git tag ${releaseTag}`);
     process.exit(1);
   }
-  console.log('Git preflight OK:', localHead, releaseTag);
+  try {
+    execSync(`git merge-base --is-ancestor ${tagSha} ${remoteHead}`, { cwd: projectRoot, stdio: 'pipe' });
+  } catch {
+    console.error(`ERROR: tag ${releaseTag} (${tagSha}) is not contained in origin/main (${remoteHead})`);
+    process.exit(1);
+  }
+  deploySha = tagSha;
+  shortDeploySha = deploySha.slice(0, 12);
+  if (localHead !== tagSha) {
+    console.log(`Deploy release tag ${releaseTag} at ${tagSha} (main at ${localHead})`);
+  }
+  console.log('Git preflight OK:', deploySha, releaseTag);
 }
 
 const nginxConf = `location /api/v1/ {
@@ -73,20 +81,9 @@ const nginxConf = `location /api/v1/ {
 
 function buildArchive() {
   if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath);
-  const excludes = [
-    '--exclude=backend/.venv',
-    '--exclude=backend/__pycache__',
-    '--exclude=backend/.pytest_cache',
-    '--exclude=backend/.ruff_cache',
-    '--exclude=frontend/node_modules',
-    '--exclude=frontend/.next',
-    '--exclude=deploy/simple-setup',
-    '--exclude=scripts/ssh-probe',
-    '--exclude=*.tgz',
-    '--exclude=.git',
-    '--exclude=.env',
-  ].join(' ');
-  const cmd = `tar -czf "${archiveName}" ${excludes} -C "${projectRoot}" backend frontend docker-compose.prod.yml deploy/production.env.example README.md`;
+  const paths =
+    'backend frontend docker-compose.prod.yml deploy/production.env.example README.md';
+  const cmd = `git archive --format=tar.gz -o "${archiveName}" ${deploySha} ${paths}`;
   execSync(cmd, { cwd: projectRoot, stdio: 'inherit' });
   console.log('Archive:', archivePath, `(${Math.round(fs.statSync(archivePath).size / 1024)} KB)`);
   console.log('Deploy SHA:', deploySha);

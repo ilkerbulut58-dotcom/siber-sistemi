@@ -43,11 +43,13 @@ st, reg = api('POST', '/api/v1/auth/register', {
     'full_name': 'DNS Reject Smoke',
 })
 assert st == 201, reg
+print('SMOKE_USER', email)
 token = reg['data']['tokens']['access_token']
 
 st, org = api('POST', '/api/v1/organizations', {'name': 'DNS Reject Org'}, token=token)
 assert st == 201, org
 org_id = org['data']['id']
+print('SMOKE_ORG', org_id)
 
 st, project = api('POST', f'/api/v1/organizations/{org_id}/projects', {
     'name': 'P', 'environment': 'staging',
