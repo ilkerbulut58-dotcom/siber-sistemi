@@ -20,10 +20,7 @@ def _has_version_token(value: str) -> bool:
     lowered = value.lower()
     if "/" in value:
         return True
-    for token in ("nginx/", "apache/", "microsoft-iis/"):
-        if token in lowered:
-            return True
-    return False
+    return any(token in lowered for token in ("nginx/", "apache/", "microsoft-iis/"))
 
 
 def contextual_remediation(finding: Finding, locale: Locale) -> tuple[str | None, list | None, str | None]:

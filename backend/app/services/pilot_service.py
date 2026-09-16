@@ -52,7 +52,6 @@ class PilotService:
     def assert_can_scan(organization: Organization) -> None:
         if not organization.is_pilot and not PilotService.is_expert_tenant(organization):
             return
-        from app.core.config import get_settings
 
         if not organization.is_active:
             raise AppError(

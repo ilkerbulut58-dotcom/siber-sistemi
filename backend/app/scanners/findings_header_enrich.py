@@ -35,21 +35,18 @@ def enrich_findings_with_observed_headers(
                 evidence["header_value"] = snapshot["content-security-policy"][:4000]
             if "content-security-policy-report-only" in snapshot:
                 evidence["report_only_policy"] = snapshot["content-security-policy-report-only"][:4000]
-        if "cache" in title or "cache-control" in rule:
-            if "cache-control" in snapshot:
-                evidence["evidence_type"] = "http_header"
-                evidence["header_name"] = "Cache-Control"
-                evidence["header_value"] = snapshot["cache-control"][:2000]
-        if "x-powered-by" in title or "x-powered-by" in rule:
-            if "x-powered-by" in snapshot:
-                evidence.setdefault("evidence_type", "http_header")
-                evidence["header_name"] = "X-Powered-By"
-                evidence["header_value"] = snapshot["x-powered-by"][:500]
-        if "server" in title and "disclosure" in title:
-            if "server" in snapshot:
-                evidence.setdefault("evidence_type", "http_header")
-                evidence["header_name"] = "Server"
-                evidence["header_value"] = snapshot["server"][:500]
+        if ("cache" in title or "cache-control" in rule) and "cache-control" in snapshot:
+            evidence["evidence_type"] = "http_header"
+            evidence["header_name"] = "Cache-Control"
+            evidence["header_value"] = snapshot["cache-control"][:2000]
+        if ("x-powered-by" in title or "x-powered-by" in rule) and "x-powered-by" in snapshot:
+            evidence.setdefault("evidence_type", "http_header")
+            evidence["header_name"] = "X-Powered-By"
+            evidence["header_value"] = snapshot["x-powered-by"][:500]
+        if "server" in title and "disclosure" in title and "server" in snapshot:
+            evidence.setdefault("evidence_type", "http_header")
+            evidence["header_name"] = "Server"
+            evidence["header_value"] = snapshot["server"][:500]
 
         if evidence != (finding.evidence or {}):
             finding.evidence = evidence

@@ -28,12 +28,12 @@ from app.security.hostname_auth import (
     validate_scan_target_url,
 )
 from app.services.audit_service import log_audit_event
-from app.services.scan_authorization_service import ScanAuthorization, ScanAuthorizationService
 from app.services.domain_service import DomainService
 from app.services.finding_service import FindingService
 from app.services.pilot_service import PilotService
 from app.services.project_service import ProjectService
 from app.services.quota_service import QuotaService
+from app.services.scan_authorization_service import ScanAuthorization, ScanAuthorizationService
 
 logger = logging.getLogger(__name__)
 

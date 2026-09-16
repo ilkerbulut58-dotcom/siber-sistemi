@@ -1,6 +1,6 @@
 """Predefined test targets, DNS requirement, and admin assignments."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
@@ -8,7 +8,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, update
 
-from app.core.config import get_settings
 from app.core.database import async_session_factory
 from app.models.scan_target import PredefinedScanTarget, ScanTargetAssignment
 from app.models.user import User

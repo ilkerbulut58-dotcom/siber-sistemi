@@ -11,7 +11,10 @@ from app.data.finding_catalog_tr import get_catalog_entry as get_catalog_entry_t
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
-from app.services.report_finding_enrichment import enrich_risk_explanation, format_evidence_for_report
+from app.services.report_finding_enrichment import (
+    enrich_risk_explanation,
+    format_evidence_for_report,
+)
 from app.services.report_remediation_context import contextual_remediation
 
 

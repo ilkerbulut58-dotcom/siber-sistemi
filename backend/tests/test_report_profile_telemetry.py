@@ -5,11 +5,11 @@ from uuid import uuid4
 
 import pytest
 
+from app.models.finding import Finding, FindingSeverity, FindingStatus
+from app.models.scan import ScanJob, ScanStatus
 from app.scanners.orchestrator import run_scan_for_profile
 from app.services.report_remediation_context import contextual_remediation
 from app.services.report_scope import build_report_scope_context, profile_label
-from app.models.finding import Finding, FindingSeverity, FindingStatus
-from app.models.scan import ScanJob, ScanStatus
 
 
 @pytest.mark.asyncio
