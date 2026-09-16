@@ -47,8 +47,9 @@ export function formatMaskedEvidence(
 ): { label: string; value: string }[] {
   if (!evidence || Object.keys(evidence).length === 0) return [];
 
+  const flattened = flattenToolEvidence(evidence);
   const rows: { label: string; value: string }[] = [];
-  const headers = evidence.headers;
+  const headers = flattened.headers;
 
   if (headers && typeof headers === "object" && !Array.isArray(headers)) {
     for (const [name, headerValue] of Object.entries(headers as Record<string, unknown>)) {
@@ -62,8 +63,13 @@ export function formatMaskedEvidence(
     }
   }
 
-  const skip = new Set(["headers"]);
-  for (const [key, val] of Object.entries(evidence)) {
+  const skip = new Set([
+    "headers",
+    "tool_evidence",
+    "correlation_key",
+    "evidence_conflicts",
+  ]);
+  for (const [key, val] of Object.entries(flattened)) {
     if (skip.has(key)) continue;
     const lower = key.toLowerCase();
     if (SENSITIVE_HEADER_NAMES.has(lower)) {
@@ -77,6 +83,16 @@ export function formatMaskedEvidence(
     rows.push({ label: key, value: maskEvidenceValue(val) });
   }
 
+  const conflicts = evidence.evidence_conflicts ?? flattened.evidence_conflicts;
+  if (conflicts && typeof conflicts === "object" && !Array.isArray(conflicts)) {
+    for (const [field, rowsConflict] of Object.entries(conflicts as Record<string, unknown>)) {
+      rows.push({
+        label: `conflict:${field}`,
+        value: redactText(JSON.stringify(rowsConflict)),
+      });
+    }
+  }
+
   const total = rows.reduce((n, r) => n + r.value.length, 0);
   if (total > MAX_EVIDENCE) {
     return rows.map((r) => ({
@@ -85,4 +101,27 @@ export function formatMaskedEvidence(
     }));
   }
   return rows;
+}
+
+function flattenToolEvidence(evidence: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  const toolEvidence = evidence.tool_evidence;
+  if (toolEvidence && typeof toolEvidence === "object" && !Array.isArray(toolEvidence)) {
+    for (const bucket of Object.values(toolEvidence as Record<string, unknown>)) {
+      if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) continue;
+      for (const [key, value] of Object.entries(bucket as Record<string, unknown>)) {
+        if (value == null || value === "") continue;
+        if (!(key in merged) || merged[key] == null || merged[key] === "") {
+          merged[key] = value;
+        }
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(evidence)) {
+    if (key === "tool_evidence" || key === "correlation_key") continue;
+    if (!(key in merged) || merged[key] == null || merged[key] === "") {
+      merged[key] = value;
+    }
+  }
+  return merged;
 }

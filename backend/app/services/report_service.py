@@ -10,6 +10,7 @@ from typing import Literal
 from uuid import UUID
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup, escape
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
@@ -37,6 +38,12 @@ ReportFormat = Literal["html", "pdf", "json"]
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
 
+def _nl2br(value: object) -> Markup:
+    if value is None:
+        return Markup("")
+    return Markup("<br/>".join(str(escape(str(value))).split("\n")))
+
+
 class ReportService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -44,6 +51,7 @@ class ReportService:
             loader=FileSystemLoader(Path(__file__).resolve().parent.parent / "templates"),
             autoescape=select_autoescape(["html"]),
         )
+        self._jinja.filters["nl2br"] = _nl2br
 
     async def build(
         self,
@@ -73,9 +81,9 @@ class ReportService:
         localized_findings = localize_findings_for_report(findings_sorted, loc)
 
         if report_format == "json":
-            return self._build_json(scan, localized_findings, loc)
+            return self._build_json(scan, localized_findings, loc, findings_sorted)
 
-        html = self._render_html(scan, localized_findings, loc)
+        html = self._render_html(scan, localized_findings, loc, findings_sorted)
         if report_format == "html":
             filename = self._filename(scan, "html")
             return html.encode("utf-8"), "text/html; charset=utf-8", filename
@@ -84,14 +92,14 @@ class ReportService:
         filename = self._filename(scan, "pdf")
         return pdf_bytes, "application/pdf", filename
 
-    def _render_html(self, scan: ScanJob, findings, locale: Locale) -> str:
+    def _render_html(self, scan: ScanJob, findings, locale: Locale, source_findings=None) -> str:
         severity_counts: dict[str, int] = {}
         for finding in findings:
             severity_counts[finding.severity] = severity_counts.get(finding.severity, 0) + 1
 
         template = self._jinja.get_template("scan_report.html")
         status_key = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
-        scope_ctx = build_report_scope_context(scan, locale)
+        scope_ctx = build_report_scope_context(scan, locale, findings=source_findings)
         return template.render(
             locale=locale,
             labels=SCAN_REPORT_LABELS[locale],
@@ -132,11 +140,8 @@ class ReportService:
             failed = executed.get("scanner_runs_failed_or_timed_out")
             if failed is not None:
                 lines.append(f"Ausgeführt — fehlgeschlagen/Timeout: {failed}")
-            urls = executed.get("unique_urls_scanned_sum")
-            if urls is None:
-                lines.append("Ausgeführt — URL-Anzahl: nicht gemessen")
-            else:
-                lines.append(f"Ausgeführt — URL-Summe (Scanner): {urls}")
+            urls = ReportService._legacy_url_line(executed, locale)
+            lines.append(urls)
             if executed.get("findings_persisted") is not None:
                 lines.append(f"Ausgeführt — gespeicherte Befunde: {executed['findings_persisted']}")
         else:
@@ -150,11 +155,8 @@ class ReportService:
             failed = executed.get("scanner_runs_failed_or_timed_out")
             if failed is not None:
                 lines.append(f"Gerçekleşen — başarısız/zaman aşımı: {failed}")
-            urls = executed.get("unique_urls_scanned_sum")
-            if urls is None:
-                lines.append("Gerçekleşen — URL sayısı: ölçülmedi")
-            else:
-                lines.append(f"Gerçekleşen — URL toplamı (scanner): {urls}")
+            urls = ReportService._legacy_url_line(executed, locale)
+            lines.append(urls)
             fp = executed.get("findings_persisted") or legacy.get("findings_persisted")
             if fp is not None:
                 lines.append(f"Gerçekleşen — kaydedilen bulgu: {fp}")
@@ -165,6 +167,7 @@ class ReportService:
         scan: ScanJob,
         findings,
         locale: Locale,
+        source_findings=None,
     ) -> tuple[bytes, str, str]:
         severity_counts: dict[str, int] = {}
         for finding in findings:
@@ -214,7 +217,7 @@ class ReportService:
                 }
                 for f in findings
             ],
-            "scope": build_report_scope_context(scan, locale),
+            "scope": build_report_scope_context(scan, locale, findings=source_findings),
         }
         content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         return content, "application/json; charset=utf-8", self._filename(scan, "json")
@@ -223,6 +226,30 @@ class ReportService:
     def _risk_summary(counts: dict[str, int]) -> str:
         """Backward-compatible helper for tests."""
         return scan_risk_summary("tr", counts)
+
+    @staticmethod
+    def _legacy_url_line(executed: dict, locale: Locale) -> str:
+        runs = executed.get("scanner_runs") or []
+        parts = []
+        for row in runs:
+            urls = row.get("urls_scanned")
+            if urls not in (None, "", 0):
+                parts.append(f"{row.get('scanner_id', '?')} {urls}")
+        if locale == "de":
+            if parts:
+                return (
+                    "Ausgeführt — URLs: Pro Scanner: "
+                    + ", ".join(parts)
+                    + "; eindeutige URL-Gesamtzahl nicht gemessen"
+                )
+            return "Ausgeführt — URL-Anzahl: nicht gemessen"
+        if parts:
+            return (
+                "Gerçekleşen — URL: Motor başına: "
+                + ", ".join(parts)
+                + "; benzersiz toplam ölçülmedi"
+            )
+        return "Gerçekleşen — URL sayısı: ölçülmedi"
 
     @staticmethod
     def _filename(scan: ScanJob, extension: str) -> str:

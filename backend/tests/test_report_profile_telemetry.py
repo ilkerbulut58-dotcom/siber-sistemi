@@ -113,3 +113,94 @@ def test_xpowered_passenger_not_php_only() -> None:
     assert steps
     assert any("Passenger" in s or "Plesk" in s for s in steps)
     assert not steps[0].startswith("PHP:")
+    assert any("Phusion Passenger" in s for s in steps)
+
+
+def test_legacy_url_sum_not_shown_as_unique_total() -> None:
+    scan = ScanJob(
+        id=uuid4(),
+        organization_id=uuid4(),
+        project_id=uuid4(),
+        domain_id=uuid4(),
+        initiated_by=uuid4(),
+        scan_profile="safe",
+        target_url="https://example.test/",
+        status=ScanStatus.COMPLETED.value,
+        findings_count=7,
+        authorization_source="admin_dns_exempt",
+        scope_config={
+            "planned_scope": {
+                "scan_profile": "safe",
+                "authorization_source": "admin_dns_exempt",
+                "planned_scanners": ["passive_http", "zap", "nuclei"],
+            },
+            "executed_telemetry": {
+                "findings_persisted": 7,
+                "unique_urls_scanned_sum": 2,
+                "scanner_runs_completed": 4,
+                "scanner_runs_failed_or_timed_out": 0,
+                "scanner_runs": [
+                    {
+                        "scanner_id": "zap",
+                        "status": "completed",
+                        "finding_count": 5,
+                        "urls_scanned": 1,
+                        "control_summary_tr": "OWASP ZAP pasif/aktif tarama",
+                    },
+                    {
+                        "scanner_id": "nuclei",
+                        "status": "completed",
+                        "finding_count": 0,
+                        "urls_scanned": 1,
+                        "control_summary_tr": "Nuclei",
+                    },
+                    {
+                        "scanner_id": "passive_http",
+                        "status": "completed",
+                        "finding_count": 3,
+                    },
+                ],
+            },
+        },
+    )
+    findings = [
+        Finding(
+            id=uuid4(),
+            organization_id=scan.organization_id,
+            project_id=scan.project_id,
+            scan_job_id=scan.id,
+            source_tool="correlated",
+            source_rule_id="server-disclosure",
+            title="Server",
+            severity=FindingSeverity.INFO.value,
+            status=FindingStatus.OPEN.value,
+            evidence={"source_count": 1},
+        )
+        for _ in range(6)
+    ]
+    findings.append(
+        Finding(
+            id=uuid4(),
+            organization_id=scan.organization_id,
+            project_id=scan.project_id,
+            scan_job_id=scan.id,
+            source_tool="zap",
+            source_rule_id="generic.csp-wildcard-directive",
+            title="CSP: Wildcard Directive",
+            severity=FindingSeverity.MEDIUM.value,
+            status=FindingStatus.OPEN.value,
+            evidence={"source_count": 2},
+        )
+    )
+    ctx = build_report_scope_context(scan, "tr", findings=findings)
+    url_row = next(r for r in ctx["scope_summary_rows"] if r["label"].endswith("URL"))
+    assert url_row["value"] != "2"
+    assert "benzersiz toplam ölçülmedi" in url_row["value"]
+    assert "zap 1" in url_row["value"]
+    assert "nuclei 1" in url_row["value"]
+    finding_row = next(r for r in ctx["scope_summary_rows"] if r["label"].endswith("bulgu"))
+    assert "8 ham kaynak" in finding_row["value"]
+    assert "7 benzersiz" in finding_row["value"]
+    zap_row = next(r for r in ctx["scanner_rows"] if r["name"] == "zap")
+    assert "kaydedilmedi" in zap_row["controls"]
+    assert "pasif/aktif tarama" not in zap_row["controls"]

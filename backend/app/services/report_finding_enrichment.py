@@ -5,7 +5,9 @@ from __future__ import annotations
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.security.evidence_sanitizer import sanitize_evidence_dict
-from app.services.finding_evidence import flatten_finding_evidence
+from app.services.finding_evidence import normalize_finding_evidence
+from app.services.pdf_utils import wrap_text_for_pdf
+from app.services.report_catalog_keys import report_catalog_key
 
 
 def _evidence_missing(locale: Locale) -> str:
@@ -18,7 +20,7 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
     raw = sanitize_evidence_dict(finding.evidence)
     if not raw:
         return _evidence_missing(locale)
-    raw = flatten_finding_evidence(
+    raw = normalize_finding_evidence(
         raw,
         source_tool=finding.source_tool,
         source_rule_id=finding.source_rule_id or finding.correlation_key,
@@ -28,6 +30,7 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
 
     lines: list[str] = []
     etype = raw.get("evidence_type")
+    conflicts = raw.get("evidence_conflicts")
 
     if etype == "http_header" or raw.get("header_name"):
         name = raw.get("header_name") or "Header"
@@ -40,15 +43,9 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
             lines.append(f"Başlık adı: {name}")
             lines.append(f"Gözlenen değer: {val or '—'}")
             lines.append("Kanıt türü: HTTP yanıt başlığı")
-        if finding.affected_url:
-            lines.append(f"URL: {finding.affected_url}")
-        if finding.source_tool:
-            lines.append(f"Kaynak: {finding.source_tool}" if locale != "de" else f"Quelle: {finding.source_tool}")
-        if finding.source_rule_id:
-            lines.append(
-                f"Kural: {finding.source_rule_id}" if locale != "de" else f"Regel: {finding.source_rule_id}"
-            )
-        return "\n".join(lines)
+        _append_common(lines, finding, locale)
+        _append_conflicts(lines, conflicts, locale)
+        return wrap_text_for_pdf("\n".join(lines))
 
     if raw.get("expires_at") or finding.source_rule_id == "cert-expiring-soon":
         expires = raw.get("expires_at")
@@ -56,27 +53,38 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
         threshold = raw.get("warning_threshold_days")
         if locale == "de":
             if expires:
-                lines.append(f"Ablauf: {expires}")
+                lines.append(f"Ablauf (Beobachtungszeitpunkt): {expires}")
             if days is not None:
                 lines.append(f"Volle Tage bei Beobachtung: {days}")
             if threshold is not None:
-                lines.append(f"Warnschwelle (Plattform): {threshold} Tage")
+                lines.append(
+                    f"Warnschwelle laut Scan-Datensatz: {threshold} Tage "
+                    "(nicht der aktuelle Plattform-Default, falls er später geändert wurde)"
+                )
+            else:
+                lines.append("Warnschwelle: in diesem Datensatz nicht gespeichert")
             lines.append(f"Quelle: {finding.source_tool or 'tls_check'}")
             if finding.source_rule_id:
                 lines.append(f"Regel: {finding.source_rule_id}")
         else:
             if expires:
-                lines.append(f"Bitiş: {expires}")
+                lines.append(f"Bitiş (gözlem anı): {expires}")
             if days is not None:
-                lines.append(f"Tarama anında kalan (tam gün): {days}")
+                lines.append(f"Tarama gözlem anında kalan (tam gün): {days}")
             if threshold is not None:
-                lines.append(f"Uyarı eşiği (platform): {threshold} gün")
+                lines.append(
+                    f"Taramada kaydedilen uyarı eşiği: {threshold} gün "
+                    "(sonradan değişmiş olsa bile rapor anındaki varsayılan değil)"
+                )
+            else:
+                lines.append("Uyarı eşiği: bu kayıtta saklanmamış")
             lines.append(f"Kaynak: {finding.source_tool or 'tls_check'}")
             if finding.source_rule_id:
                 lines.append(f"Kural: {finding.source_rule_id}")
         if finding.affected_url:
             lines.append(f"URL: {finding.affected_url}")
-        return "\n".join(lines) if lines else _evidence_missing(locale)
+        _append_conflicts(lines, conflicts, locale)
+        return wrap_text_for_pdf("\n".join(lines) if lines else _evidence_missing(locale))
 
     if powered := raw.get("x_powered_by"):
         lines.append(f"X-Powered-By: {powered}")
@@ -93,74 +101,155 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
             lines.append(f"Matcher (tam HTTP başlık kanıtı değil): {matcher}")
 
     if lines:
-        return "\n".join(lines)
+        _append_conflicts(lines, conflicts, locale)
+        return wrap_text_for_pdf("\n".join(lines))
 
     return _evidence_missing(locale)
 
 
 def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:
-    if finding.risk_explanation and finding.risk_explanation.strip() != finding.title.strip():
+    if finding.risk_explanation and not _is_placeholder_risk(finding):
         return finding.risk_explanation
-    evidence = flatten_finding_evidence(
+    evidence = normalize_finding_evidence(
         finding.evidence or {},
         source_tool=finding.source_tool,
         source_rule_id=finding.source_rule_id or finding.correlation_key,
     )
-    title_lower = (finding.title or "").lower()
-    if locale == "de":
-        if "csp" in title_lower or "content-security" in title_lower:
-            policy = evidence.get("policy") or evidence.get("csp")
-            extra = _csp_risk_note(policy, locale)
-            if policy:
-                return (
-                    "Die beobachtete Content-Security-Policy enthält riskante Direktiven. "
-                    f"Policy: {policy}. {extra}"
-                )
-            return (
-                "Eine Content-Security-Policy-Schwäche wurde erkannt — kein bestätigtes XSS. "
-                + extra
-            )
-        if "cache" in title_lower:
-            return (
-                "Cache-Control-Header sollten zum Inhaltstyp passen. "
-                "Nicht jede Antwort benötigt no-store."
-            )
-    else:
-        if "csp" in title_lower or "content-security" in title_lower:
-            policy = evidence.get("policy") or evidence.get("csp")
-            extra = _csp_risk_note(policy, locale)
-            if policy:
-                return f"Gözlemlenen CSP: {policy}. {extra}"
-            return (
-                "CSP ile ilgili bir zayıflık tespit edildi; doğrulanmış XSS değildir. " + extra
-            )
-        if "cache" in title_lower:
-            return (
-                "Cache-Control başlığı içeriğin hassasiyetine göre değerlendirilmelidir. "
-                "Her yanıt için no-store gerekmez."
-            )
+    catalog_key = report_catalog_key(finding)
+    policy = (
+        evidence.get("policy")
+        or evidence.get("csp")
+        or (
+            evidence.get("header_value")
+            if "content-security-policy" in str(evidence.get("header_name") or "").lower()
+            else None
+        )
+    )
+    if catalog_key == "generic.csp-wildcard-directive":
+        return _csp_wildcard_risk(policy, locale)
+    if catalog_key == "generic.csp-script-src-unsafe-inline":
+        return _csp_script_risk(policy, locale)
+    if catalog_key == "generic.csp-style-src-unsafe-inline":
+        return _csp_style_risk(policy, locale)
+    if catalog_key == "generic.re-examine-cache-control-directives":
+        return _cache_risk(evidence.get("header_value"), locale)
     return finding.description
 
 
-def _csp_risk_note(policy: str | None, locale: Locale) -> str:
-    if not policy:
+def _is_placeholder_risk(finding: Finding) -> bool:
+    risk = (finding.risk_explanation or "").strip()
+    title = (finding.title or "").strip()
+    if not risk or risk == title:
+        return True
+    return bool(title and (risk.startswith(f"{title} —") or risk.startswith(f"{title} -")))
+
+
+def _append_common(lines: list[str], finding: Finding, locale: Locale) -> None:
+    if finding.affected_url:
+        lines.append(f"URL: {finding.affected_url}")
+    if finding.source_tool:
+        lines.append(f"Kaynak: {finding.source_tool}" if locale != "de" else f"Quelle: {finding.source_tool}")
+    if finding.source_rule_id:
+        lines.append(
+            f"Kural: {finding.source_rule_id}" if locale != "de" else f"Regel: {finding.source_rule_id}"
+        )
+
+
+def _append_conflicts(lines: list[str], conflicts: object, locale: Locale) -> None:
+    if not isinstance(conflicts, dict) or not conflicts:
+        return
+    for field, rows in conflicts.items():
+        if not isinstance(rows, list):
+            continue
+        rendered = "; ".join(
+            f"{row.get('origin', '?')}={row.get('value')}" for row in rows if isinstance(row, dict)
+        )
         if locale == "de":
-            return "Keine vollständige Policy im Scan-Nachweis gespeichert."
-        return "Tam policy metni bu taramada kaydedilmedi."
-    lowered = policy.lower()
-    notes: list[str] = []
-    if "unsafe-inline" in lowered:
-        notes.append(
-            "unsafe-inline erlaubt Inline-Skripte/Stile (höheres XSS-Risiko bei anderen Schwächen)."
-            if locale == "de"
-            else "unsafe-inline satır içi script/stil riskini artırır (tek başına sızma kanıtı değildir)."
+            lines.append(f"Quellenkonflikt bei {field} (keine stille Auswahl): {rendered}")
+        else:
+            lines.append(f"Kaynak çelişkisi ({field}; sessiz seçim yok): {rendered}")
+
+
+def _csp_wildcard_risk(policy: str | None, locale: Locale) -> str:
+    extra = _wildcard_note(policy, locale)
+    if locale == "de":
+        base = (
+            "CSP erlaubt weite Quellen. Das ist ein Konfigurationshinweis, kein bestätigtes XSS."
         )
-    if "*" in lowered and "script-src" in lowered:
-        notes.append(
-            "Wildcard in script-src erweitert erlaubte Skript-Quellen stark."
-            if locale == "de"
-            else "script-src içinde wildcard izin verilen kaynakları genişletir."
+        if policy:
+            return f"{base} Beobachtete Policy: {policy}. {extra}".strip()
+        return f"{base} Vollständige Policy fehlt in diesem Datensatz. {extra}".strip()
+    base = "CSP geniş kaynak izni içeriyor. Bu yapılandırma uyarısıdır; doğrulanmış XSS değildir."
+    if policy:
+        return f"{base} Gözlenen politika: {policy}. {extra}".strip()
+    return f"{base} Tam politika bu kayıtta yok. {extra}".strip()
+
+
+def _csp_script_risk(policy: str | None, locale: Locale) -> str:
+    if locale == "de":
+        text = (
+            "script-src unsafe-inline erlaubt Inline-JavaScript. "
+            "Wirkung unterscheidet sich von style-src unsafe-inline. Kein nachgewiesenes XSS."
         )
-    if not notes:
-        return ""
-    return " ".join(notes)
+        return f"{text} Policy: {policy}" if policy else text
+    text = (
+        "script-src unsafe-inline satır içi JavaScript'e izin verir. "
+        "Etkisi style-src unsafe-inline'dan farklıdır. Doğrulanmış XSS değildir."
+    )
+    return f"{text} Politika: {policy}" if policy else text
+
+
+def _csp_style_risk(policy: str | None, locale: Locale) -> str:
+    if locale == "de":
+        text = (
+            "style-src unsafe-inline erlaubt Inline-CSS (Style-Injection), "
+            "nicht dasselbe wie ausführbares Inline-Skript. Kein bestätigtes XSS."
+        )
+        return f"{text} Policy: {policy}" if policy else text
+    text = (
+        "style-src unsafe-inline satır içi CSS'e izin verir (stil enjeksiyonu); "
+        "çalıştırılabilir satır içi script ile aynı etki değildir. Doğrulanmış XSS değildir."
+    )
+    return f"{text} Politika: {policy}" if policy else text
+
+
+def _cache_risk(value: object, locale: Locale) -> str:
+    observed = str(value or "").strip()
+    if locale == "de":
+        text = (
+            "Cache-Control steuert Zwischenspeicherung. "
+            "s-maxage allein ist kein Nachweis eines Datenlecks; Sensitivität unbekannt."
+        )
+        return f"{text} Beobachtet: {observed}" if observed else text
+    text = (
+        "Cache-Control önbelleği yönetir. "
+        "s-maxage tek başına veri sızıntısı kanıtı değildir; yanıt hassasiyeti bu kayıtta bilinmiyor."
+    )
+    return f"{text} Gözlenen: {observed}" if observed else text
+
+
+def _wildcard_note(policy: str | None, locale: Locale) -> str:
+    if not policy:
+        return (
+            "Ohne Policy-Text kann literal * nicht behauptet werden."
+            if locale == "de"
+            else "Politika metni yokken literal `*` olduğu yazılamaz."
+        )
+    has_star = "*" in policy
+    if has_star:
+        return (
+            "Literal * kommt in der gespeicherten Policy vor."
+            if locale == "de"
+            else "Kayıtlı politikada literal `*` var."
+        )
+    if any(token in policy.lower() for token in ("https:", "http:", "data:", "blob:")):
+        return (
+            "Keine literale *; beobachtbar sind weite Schema-Quellen."
+            if locale == "de"
+            else "Literal `*` yok; gözlenen geniş şema izinleridir."
+        )
+    return (
+        "Keine literale * in der gespeicherten Policy."
+        if locale == "de"
+        else "Kayıtlı politikada literal `*` yok."
+    )

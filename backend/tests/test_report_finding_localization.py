@@ -114,3 +114,70 @@ async def test_report_html_german_finding_text(client: AsyncClient, db_session) 
     finding_payload = json_report.json()["findings"][0]
     assert "HTTPS-Pflicht (HSTS) fehlt" in finding_payload["title"]
     assert "Türkçe" not in finding_payload["title"]
+
+
+def test_localize_csp_wildcard_uses_catalog_not_english_generic():
+    finding = Finding(
+        id=uuid4(),
+        organization_id=uuid4(),
+        project_id=uuid4(),
+        scan_job_id=uuid4(),
+        source_tool="zap",
+        source_rule_id="generic.csp-wildcard-directive",
+        correlation_key="generic.csp-wildcard-directive",
+        title="CSP: Wildcard Directive",
+        description="Ensure that your web server is properly configured.",
+        severity="medium",
+        fingerprint="abc123" * 10 + "abcd",
+        status=FindingStatus.OPEN,
+        affected_url="https://example.test/",
+        remediation="Ensure that your web server, application server, load balancer, etc. is properly configured to set the Content-Security-Policy header.",
+        risk_explanation="CSP: Wildcard Directive — Orta önem derecesinde tespit edildi.",
+        evidence={
+            "evidence_type": "http_header",
+            "header_name": "Content-Security-Policy",
+            "header_value": "default-src 'self'; img-src https: data: blob:",
+        },
+        first_seen_at=datetime.now(UTC),
+        last_seen_at=datetime.now(UTC),
+    )
+    tr = localize_finding_for_report(finding, "tr")
+    de = localize_finding_for_report(finding, "de")
+    assert "XSS" in (tr.risk_explanation or "")
+    assert "doğrulanmış" in (tr.risk_explanation or "").lower() or "bestätig" in (de.risk_explanation or "").lower()
+    assert "Ensure that your web server" not in (tr.remediation or "")
+    assert tr.remediation_steps
+    assert any("yıldız" in step.lower() or "*" in step for step in tr.remediation_steps)
+    assert any("https:" in step or "şema" in step.lower() for step in tr.remediation_steps)
+    assert "XSS" in (de.risk_explanation or "")
+    assert "Ensure that your web server" not in (de.remediation or "")
+
+
+def test_localize_cache_control_not_data_leak():
+    finding = Finding(
+        id=uuid4(),
+        organization_id=uuid4(),
+        project_id=uuid4(),
+        scan_job_id=uuid4(),
+        source_tool="zap",
+        source_rule_id="generic.re-examine-cache-control-directives",
+        title="Re-examine Cache-control Directives",
+        description="For secure content, ensure no-cache.",
+        severity="info",
+        fingerprint="feedbeef" * 8,
+        status=FindingStatus.OPEN,
+        affected_url="https://example.test/",
+        remediation='For secure content, ensure the cache-control HTTP header is set with "no-cache, no-store, must-revalidate".',
+        risk_explanation="Re-examine Cache-control Directives — Bilgi önem derecesinde tespit edildi.",
+        evidence={
+            "evidence_type": "http_header",
+            "header_name": "Cache-Control",
+            "header_value": "s-maxage=31536000",
+        },
+        first_seen_at=datetime.now(UTC),
+        last_seen_at=datetime.now(UTC),
+    )
+    tr = localize_finding_for_report(finding, "tr")
+    assert "s-maxage" in (tr.risk_explanation or "") + " ".join(tr.remediation_steps or [])
+    assert "sızıntı" in ((tr.risk_explanation or "") + (tr.remediation or "")).lower()
+    assert "For secure content" not in (tr.remediation or "")

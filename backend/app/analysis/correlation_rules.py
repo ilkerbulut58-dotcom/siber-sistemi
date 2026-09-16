@@ -12,7 +12,8 @@ from app.utils.url_canonicalization import (
 ZAP_ALERT_TITLE_MAP: list[tuple[str, str]] = [
     ("server leaks version information", "server-disclosure"),
     ("server leaks information via \"x-powered-by\"", "x-powered-by-disclosure"),
-    ("content security policy", "missing-header-content-security-policy"),
+    ("content security policy (csp) header not set", "missing-header-content-security-policy"),
+    ("csp header not set", "missing-header-content-security-policy"),
     ("strict-transport-security", "missing-header-strict-transport-security"),
     ("x-content-type-options", "missing-header-x-content-type-options"),
     ("x-frame-options", "missing-header-x-frame-options"),

@@ -48,6 +48,7 @@ FROM base AS production
 ARG GIT_COMMIT=""
 ARG RELEASE_TAG=""
 ARG BUILD_TIMESTAMP=""
+ARG APP_VERSION=""
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.version="${RELEASE_TAG}" \
       org.opencontainers.image.created="${BUILD_TIMESTAMP}"
@@ -62,7 +63,8 @@ RUN sed -i 's/\r$//' scripts/celery_worker_healthcheck.sh scripts/celery_mobile_
 
 ENV GIT_COMMIT=${GIT_COMMIT} \
     RELEASE_TAG=${RELEASE_TAG} \
-    BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+    BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+    APP_VERSION=${APP_VERSION}
 
 RUN useradd --create-home --shell /bin/bash appuser \
     && mkdir -p /var/siber/mobile \

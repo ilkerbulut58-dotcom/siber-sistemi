@@ -259,6 +259,87 @@ FINDING_CATALOG_DE: dict[str, FindingCatalogEntryDe] = {
         "config_snippet": "proxy_hide_header X-Powered-By;",
         "hosting": "multi",
     },
+    "generic.csp-wildcard-directive": {
+        "title_de": "CSP: weite Quellen",
+        "description_de": (
+            "Die Content-Security-Policy erlaubt weite Quellen (Schema-Quellen oder Stern). "
+            "Literal * nur nennen, wenn es im Nachweis steht."
+        ),
+        "risk_explanation_de": (
+            "Zusammen mit anderen Schwächen können unerwünschte Ressourcen geladen werden. "
+            "Kein bestätigtes XSS."
+        ),
+        "remediation_summary_de": (
+            "Nur die nachgewiesene weite Direktive einengen. Keine universelle CSP als einzige Lösung."
+        ),
+        "remediation_steps_de": [
+            "Policy-Text im Nachweis lesen; fehlendes * nicht behaupten.",
+            "Schema-Quellen (https:, data:, blob:) von literalem * trennen.",
+            "Nur benötigte Ursprünge zulassen; zuerst Staging.",
+            "Mit erneutem SIBER-Scan dieselbe Direktive prüfen.",
+        ],
+        "config_file_paths_de": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.csp-script-src-unsafe-inline": {
+        "title_de": "CSP: script-src unsafe-inline",
+        "description_de": "script-src erlaubt Inline-JavaScript (unsafe-inline).",
+        "risk_explanation_de": (
+            "Bei XSS könnte der Browser Inline-Skripte ausführen. "
+            "Konfigurationshinweis, kein nachgewiesenes XSS. Nicht identisch mit style-src unsafe-inline."
+        ),
+        "remediation_summary_de": (
+            "Nach Inventar der Inline-Skripte Nonce oder Hash prüfen; keine Copy-Paste-CSP."
+        ),
+        "remediation_steps_de": [
+            "Vorhandene Inline-<script>-Blöcke inventarisieren.",
+            "Wenn möglich in Dateien auslagern oder Nonce/Hash nutzen.",
+            "style-src nicht mit diesem Schritt vermischen.",
+            "Staging testen, dann erneut scannen.",
+        ],
+        "config_file_paths_de": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.csp-style-src-unsafe-inline": {
+        "title_de": "CSP: style-src unsafe-inline",
+        "description_de": "style-src erlaubt Inline-CSS (unsafe-inline).",
+        "risk_explanation_de": (
+            "Erleichtert Style-Injection, belegt kein Skript-XSS. "
+            "Getrennt von script-src unsafe-inline behandeln."
+        ),
+        "remediation_summary_de": "Inline-Styles reduzieren; Nonce/Hash nur wenn die App das kann.",
+        "remediation_steps_de": [
+            "Inline-Styles und style-Attribute inventarisieren.",
+            "Nonce/Hash für Styles nur bei Unterstützung durch die Anwendung.",
+            "script-src-Härten nicht als Fix für diesen Befund kopieren.",
+            "Staging, dann erneuter Scan.",
+        ],
+        "config_file_paths_de": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.re-examine-cache-control-directives": {
+        "title_de": "Cache-Control-Direktiven prüfen",
+        "description_de": "Die Antwort setzt Cache-Control (z. B. s-maxage); die TTL kann lang sein.",
+        "risk_explanation_de": (
+            "s-maxage ist eine Shared-Cache-TTL. Allein kein Nachweis eines Datenlecks. "
+            "Die Sensitivität dieser Antwort ist unbekannt, sofern nicht gespeichert."
+        ),
+        "remediation_summary_de": (
+            "no-store nur für wirklich sensible Antworten; öffentliche Assets dürfen cachen."
+        ),
+        "remediation_steps_de": [
+            "Cache-Control-Wert im Nachweis lesen.",
+            "Separat prüfen, ob die Antwort Sitzungs- oder Personendaten enthält (hier oft unbekannt).",
+            "Sensible Antworten: no-store; statische Assets: Caching belassen.",
+            "In Staging verifizieren.",
+        ],
+        "config_file_paths_de": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
 }
 
 SEVERITY_LABEL_DE = {

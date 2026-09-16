@@ -11,6 +11,7 @@ from app.data.finding_catalog_tr import get_catalog_entry as get_catalog_entry_t
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
+from app.services.report_catalog_keys import report_catalog_key
 from app.services.report_finding_enrichment import (
     enrich_risk_explanation,
     format_evidence_for_report,
@@ -109,22 +110,30 @@ def localize_finding_for_report(finding: Finding, locale: Locale) -> ReportFindi
     risk = enrich_risk_explanation(finding, locale)
     rem_override, steps_override, snippet_override = contextual_remediation(finding, locale)
 
-    rule_id = finding.correlation_key or finding.source_rule_id
+    rule_id = report_catalog_key(finding) or finding.correlation_key or finding.source_rule_id
     domain = extract_domain(finding.affected_url or "")
     if rule_id:
         entry = get_catalog_entry_de(rule_id, domain) if locale == "de" else get_catalog_entry_tr(rule_id, domain)
         if entry:
             prefix = "de" if locale == "de" else "tr"
+            use_override = rem_override is not None
+            catalog_risk = entry[f"risk_explanation_{prefix}"]
+            catalog_key = report_catalog_key(finding)
+            if catalog_key.startswith("generic.csp") or catalog_key.startswith("generic.re-examine"):
+                risk_text = risk or catalog_risk
+            else:
+                risk_text = catalog_risk
             return ReportFinding.from_finding(
                 finding,
                 title=entry[f"title_{prefix}"],
                 description=entry[f"description_{prefix}"],
-                risk_explanation=entry[f"risk_explanation_{prefix}"],
-                remediation=rem_override or entry[f"remediation_summary_{prefix}"],
-                remediation_steps=steps_override or entry[f"remediation_steps_{prefix}"],
+                risk_explanation=risk_text,
+                remediation=rem_override if use_override else entry[f"remediation_summary_{prefix}"],
+                remediation_steps=steps_override if use_override else entry[f"remediation_steps_{prefix}"],
                 config_file_paths=entry[f"config_file_paths_{prefix}"],
-                config_snippet=snippet_override if snippet_override is not None else entry["config_snippet"],
+                config_snippet=snippet_override if use_override else entry["config_snippet"],
                 evidence_text=evidence_text,
+                source_rule_id=finding.source_rule_id,
             )
 
     if locale != "de":

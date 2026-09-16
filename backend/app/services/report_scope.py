@@ -25,7 +25,7 @@ def auth_source_label(raw: str | None, locale: Locale) -> str:
     return AUTH_SOURCE_LABELS[locale].get(raw, raw)
 
 
-def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
+def build_report_scope_context(scan: ScanJob, locale: Locale, findings: list | None = None) -> dict:
     cfg = scan.scope_config or {}
     planned = cfg.get("planned_scope") or {}
     executed = cfg.get("executed_telemetry") or {}
@@ -34,16 +34,17 @@ def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
     scanner_rows: list[dict] = []
     for row in executed.get("scanner_runs") or []:
         status_key = row.get("status") or "unknown"
+        scanner_id = str(row.get("scanner_id") or "")
         scanner_rows.append(
             {
-                "name": row.get("scanner_id", "—"),
+                "name": scanner_id or "—",
                 "status": SCANNER_STATUS_LABELS[locale].get(status_key, status_key),
                 "status_key": status_key,
                 "findings": row.get("finding_count", 0),
                 "duration": _fmt_seconds(row.get("execution_seconds")),
                 "version": row.get("scanner_version") or "—",
                 "urls": row.get("urls_scanned") if row.get("urls_scanned") else labels["not_measured"],
-                "controls": row.get(f"control_summary_{locale}") or row.get("control_summary_tr") or "—",
+                "controls": _control_label(row, scanner_id, locale, labels),
                 "skip_reason": _skip_reason(row, locale),
             }
         )
@@ -61,11 +62,11 @@ def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
         {"label": labels["executed_failed"], "value": str(executed.get("scanner_runs_failed_or_timed_out", "—"))},
         {
             "label": labels["executed_urls"],
-            "value": _url_scope_label(executed, scanner_rows, labels),
+            "value": _url_scope_label(scanner_rows, labels),
         },
         {
             "label": labels["executed_findings"],
-            "value": _finding_count_label(executed, scan.findings_count, labels),
+            "value": _finding_count_label(executed, scan.findings_count, labels, findings),
         },
     ]
     if code_status_label:
@@ -79,24 +80,49 @@ def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
     }
 
 
-def _finding_count_label(executed: dict, findings_count: int | None, labels: dict[str, str]) -> str:
+def _control_label(row: dict, scanner_id: str, locale: Locale, labels: dict[str, str]) -> str:
+    if scanner_id.lower() == "zap" and not row.get("zap_mode") and not row.get("recorded_mode"):
+        return labels["zap_mode_unrecorded"]
+    return row.get(f"control_summary_{locale}") or row.get("control_summary_tr") or "—"
+
+
+def _finding_count_label(
+    executed: dict,
+    findings_count: int | None,
+    labels: dict[str, str],
+    findings: list | None,
+) -> str:
     unique = executed.get("findings_persisted", findings_count)
+    if unique is None and findings is not None:
+        unique = len(findings)
     raw = executed.get("raw_finding_sources")
+    if raw is None and findings:
+        raw = sum(_source_count(item) for item in findings)
     if raw is not None and unique is not None and int(raw) != int(unique):
         return labels["finding_dedup"].format(raw=raw, unique=unique)
-    return str(unique if unique is not None else "—")
+    if unique is not None:
+        return str(unique)
+    return "—"
 
 
-def _url_scope_label(executed: dict, scanner_rows: list[dict], labels: dict[str, str]) -> str:
-    if executed.get("unique_urls_scanned_sum") is not None:
-        return str(executed["unique_urls_scanned_sum"])
+def _source_count(finding: object) -> int:
+    evidence = getattr(finding, "evidence", None) or {}
+    if isinstance(evidence, dict) and evidence.get("source_count") not in (None, ""):
+        try:
+            return int(evidence["source_count"])
+        except (TypeError, ValueError):
+            return 1
+    return 1
+
+
+def _url_scope_label(scanner_rows: list[dict], labels: dict[str, str]) -> str:
     parts = []
     for row in scanner_rows:
         urls = row.get("urls")
-        if urls and urls != labels["not_measured"] and urls != "—":
-            parts.append(f"{row['name']}={urls}")
+        if urls not in (None, "", labels["not_measured"], "—"):
+            parts.append(f"{row['name']} {urls}")
     if parts:
-        return labels["url_per_scanner"].format(details=", ".join(parts))
+        return labels["url_per_scanner_no_unique"].format(details=", ".join(parts))
     return labels["not_measured"]
 
 
@@ -143,6 +169,8 @@ def _scope_labels(locale: Locale) -> dict[str, str]:
             "code_source_not_supported": "Nicht unterstützt (kein Upload/Repo in diesem Profil)",
             "finding_dedup": "{raw} Quellen → {unique} eindeutige Befunde",
             "url_per_scanner": "Pro Scanner (keine dedupl. Summe): {details}",
+            "url_per_scanner_no_unique": "Pro Scanner: {details}; eindeutige URL-Gesamtzahl nicht gemessen",
+            "zap_mode_unrecorded": "Für diesen Scan wurde kein ZAP-Modus gespeichert (allgemeine Fähigkeit, kein Nachweis der ausgeführten Prüfung)",
         }
     return {
         "planned_profile": "Planlanan — profil",
@@ -157,4 +185,6 @@ def _scope_labels(locale: Locale) -> dict[str, str]:
         "code_source_not_supported": "Desteklenmiyor (bu profilde dosya/repo yüklemesi yok)",
         "finding_dedup": "{raw} ham kaynak → {unique} benzersiz bulgu",
         "url_per_scanner": "Motor başına (benzersiz toplam değil): {details}",
+        "url_per_scanner_no_unique": "Motor başına: {details}; benzersiz toplam ölçülmedi",
+        "zap_mode_unrecorded": "Bu tarama için ZAP modu kaydedilmedi (motorun genel pasif/aktif yeteneği, gerçekleşmiş test kaydı değil)",
     }

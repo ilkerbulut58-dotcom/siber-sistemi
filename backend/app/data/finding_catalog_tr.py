@@ -259,6 +259,87 @@ FINDING_CATALOG_TR: dict[str, FindingCatalogEntry] = {
         "config_snippet": "proxy_hide_header X-Powered-By;",
         "hosting": "multi",
     },
+    "generic.csp-wildcard-directive": {
+        "title_tr": "CSP: geniş kaynak izni",
+        "description_tr": (
+            "Content-Security-Policy içinde kaynak listesi geniş (şema düzeyi izin veya yıldız). "
+            "Literal `*` yalnız kanıtta varsa belirtilir."
+        ),
+        "risk_explanation_tr": (
+            "Başka bir zayıflıkla birleşirse istenmeyen kaynak yüklemesi kolaylaşabilir. "
+            "Bu, doğrulanmış XSS sömürüsü değildir."
+        ),
+        "remediation_summary_tr": (
+            "Kanıtta görülen geniş yönergeyi daraltın. Tek bir genel CSP'yi kesin çözüm diye uygulamayın."
+        ),
+        "remediation_steps_tr": [
+            "Kanıttaki politika metnini okuyun; olmayan `*` karakterini varmış gibi yazmayın.",
+            "Şema izni (https:, data:, blob:) ile literal yıldızı ayırın.",
+            "Yalnız gereken kökenleri ekleyin; staging'de deneyin.",
+            "SIBER ile yeniden tarayıp aynı yönergeyi doğrulayın.",
+        ],
+        "config_file_paths_tr": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.csp-script-src-unsafe-inline": {
+        "title_tr": "CSP: script-src unsafe-inline",
+        "description_tr": "script-src satır içi JavaScript'e izin veriyor (unsafe-inline).",
+        "risk_explanation_tr": (
+            "XSS oluşursa tarayıcı satır içi script'i çalıştırabilir. "
+            "Bu yapılandırma uyarısıdır; doğrulanmış XSS değildir. style-src unsafe-inline ile aynı etki değildir."
+        ),
+        "remediation_summary_tr": (
+            "Inline script envanterinden sonra nonce veya hash değerlendirin; genel CSP kopyalamayın."
+        ),
+        "remediation_steps_tr": [
+            "Sayfadaki satır içi <script> kullanımlarını listeleyin.",
+            "Mümkünse harici dosyaya taşıyın veya nonce/hash kullanın.",
+            "style-src kuralını bu adımla karıştırmayın.",
+            "Staging'de deneyip yeniden tarayın.",
+        ],
+        "config_file_paths_tr": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.csp-style-src-unsafe-inline": {
+        "title_tr": "CSP: style-src unsafe-inline",
+        "description_tr": "style-src satır içi CSS'e izin veriyor (unsafe-inline).",
+        "risk_explanation_tr": (
+            "Stil enjeksiyonunu kolaylaştırır; çalıştırılabilir script XSS'i kanıtlamaz. "
+            "script-src unsafe-inline'dan ayrı ele alın."
+        ),
+        "remediation_summary_tr": "Inline style ihtiyacını azaltın; destekleniyorsa nonce/hash kullanın.",
+        "remediation_steps_tr": [
+            "Satır içi style ve style özniteliklerini envanterleyin.",
+            "Uygulama destekliyorsa style için nonce/hash deneyin.",
+            "script-src düzeltmesini bu bulguya kopyalamayın.",
+            "Staging'de deneyip yeniden tarayın.",
+        ],
+        "config_file_paths_tr": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
+    "generic.re-examine-cache-control-directives": {
+        "title_tr": "Cache-Control yönergelerini gözden geçirin",
+        "description_tr": "Yanıtta Cache-Control (ör. s-maxage) görülüyor; önbellek süresi uzun olabilir.",
+        "risk_explanation_tr": (
+            "s-maxage paylaşılan önbellek TTL'sidir. Tek başına hassas veri sızıntısı kanıtı değildir. "
+            "Bu kayıttaki yanıtın hassasiyeti bilinmiyorsa sızıntı iddia edilmemelidir."
+        ),
+        "remediation_summary_tr": (
+            "İçerik gerçekten hassassa no-store değerlendirin; genel varlıklar için uzun önbellek normal olabilir."
+        ),
+        "remediation_steps_tr": [
+            "Kanıttaki Cache-Control değerini okuyun.",
+            "Yanıtın oturum veya kişisel veri içerip içermediğini ayrı doğrulayın (bu tarama bunu kaydetmediyse bilinmiyor).",
+            "Hassas yanıtlar için no-store; statik varlıklar için mevcut önbelleği koruyun.",
+            "Değişikliği staging'de doğrulayın.",
+        ],
+        "config_file_paths_tr": [],
+        "config_snippet": None,
+        "hosting": "multi",
+    },
 }
 
 SEVERITY_LABEL_TR = {

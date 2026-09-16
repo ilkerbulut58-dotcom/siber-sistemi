@@ -109,7 +109,31 @@ async def test_write_sample_pdf_tr_and_de(client: AsyncClient, db_session) -> No
         },
         fingerprint="abc123",
     )
-    db_session.add_all([user, org, project, domain, scan, finding])
+    csp = Finding(
+        id=uuid4(),
+        organization_id=org.id,
+        project_id=project.id,
+        scan_job_id=scan.id,
+        source_tool="zap",
+        source_rule_id="generic.csp-wildcard-directive",
+        correlation_key="generic.csp-wildcard-directive",
+        title="CSP: Wildcard Directive",
+        severity=FindingSeverity.MEDIUM.value,
+        status=FindingStatus.OPEN.value,
+        affected_url=scan.target_url,
+        risk_explanation="CSP: Wildcard Directive — Orta önem derecesinde tespit edildi.",
+        remediation="Ensure that your web server is properly configured.",
+        evidence={
+            "evidence_type": "http_header",
+            "header_name": "Content-Security-Policy",
+            "header_value": (
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:"
+            ),
+        },
+        fingerprint="csp123",
+    )
+    db_session.add_all([user, org, project, domain, scan, finding, csp])
     await db_session.commit()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

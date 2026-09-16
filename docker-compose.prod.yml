@@ -68,6 +68,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-}
         RELEASE_TAG: ${RELEASE_TAG:-}
         BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
+        APP_VERSION: ${APP_VERSION:-}
     container_name: siber-api
     restart: unless-stopped
     environment:
@@ -148,6 +149,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-}
         RELEASE_TAG: ${RELEASE_TAG:-}
         BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-}
+        APP_VERSION: ${APP_VERSION:-}
     container_name: siber-worker
     restart: unless-stopped
     command: celery -A app.tasks.celery_app worker --beat --loglevel=info -Q scans,monitoring --concurrency=2

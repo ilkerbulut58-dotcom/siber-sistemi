@@ -23,7 +23,9 @@ const archivePath = path.join(projectRoot, archiveName);
 const releaseTag = process.env.RELEASE_TAG || 'v0.9.0-rc6-expert';
 let deploySha = '';
 let shortDeploySha = '';
-const appVersion = process.env.APP_VERSION || '0.9.0-rc6-expert';
+const appVersion =
+  process.env.APP_VERSION ||
+  (releaseTag.startsWith('v') ? releaseTag.slice(1) : releaseTag);
 const buildTimestamp = new Date().toISOString();
 
 function assertCleanGit() {
@@ -237,9 +239,13 @@ chmod 600 ${remoteRoot}/.env
 
 echo "=== DOCKER BUILD & ROLLING START ==="
 cd ${remoteRoot}
+set -a
+. ${remoteRoot}/.env
+set +a
 export GIT_COMMIT=${deploySha}
 export RELEASE_TAG=${releaseTag}
 export BUILD_TIMESTAMP=${buildTimestamp}
+export APP_VERSION=${appVersion}
 export NEXT_PUBLIC_APP_VERSION=${appVersion}
 export NEXT_PUBLIC_GIT_COMMIT=${deploySha}
 export NEXT_PUBLIC_RELEASE_TAG=${releaseTag}
@@ -247,6 +253,7 @@ docker compose -f docker-compose.prod.yml build \\
   --build-arg GIT_COMMIT=${deploySha} \\
   --build-arg RELEASE_TAG=${releaseTag} \\
   --build-arg BUILD_TIMESTAMP=${buildTimestamp} \\
+  --build-arg APP_VERSION=${appVersion} \\
   --build-arg NEXT_PUBLIC_APP_VERSION=${appVersion} \\
   --build-arg NEXT_PUBLIC_GIT_COMMIT=${deploySha} \\
   --build-arg NEXT_PUBLIC_RELEASE_TAG=${releaseTag}
@@ -257,6 +264,26 @@ for i in $(seq 1 90); do
   if curl -sf http://127.0.0.1:8010/api/v1/health >/dev/null; then echo "API up"; break; fi
   sleep 3
   if [ "$i" -eq 90 ]; then echo "API timeout"; exit 1; fi
+done
+
+echo "=== WAIT FOR WORKER ==="
+for i in $(seq 1 60); do
+  WSTATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' siber-worker 2>/dev/null || echo missing)
+  echo "worker_status=$WSTATUS"
+  if [ "$WSTATUS" = "healthy" ]; then echo "WORKER up"; break; fi
+  sleep 5
+  if [ "$i" -eq 60 ]; then echo "WORKER timeout status=$WSTATUS"; exit 1; fi
+done
+
+echo "=== WAIT FOR FRONTEND ==="
+for i in $(seq 1 40); do
+  if docker inspect -f '{{.State.Running}}' siber-frontend 2>/dev/null | grep -q true \\
+    && curl -sf -o /dev/null http://127.0.0.1:3011/; then
+    echo "FRONTEND up"
+    break
+  fi
+  sleep 3
+  if [ "$i" -eq 40 ]; then echo "FRONTEND timeout"; exit 1; fi
 done
 
 echo "=== SYNC POSTGRES PASSWORD ==="
@@ -326,10 +353,23 @@ docker compose -f docker-compose.prod.yml exec -T postgres psql -U siber -d sibe
   "UPDATE users SET is_active=false WHERE email='admin@admin.com';" || true
 
 echo "=== POST-DEPLOY VERSION CHECK ==="
-HEALTH_COMMIT=$(curl -sf http://127.0.0.1:8010/api/v1/health | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('git_commit',''))")
-echo "health_git_commit=$HEALTH_COMMIT expected_prefix=${shortDeploySha}"
-if [ -n "$HEALTH_COMMIT" ] && [ "$HEALTH_COMMIT" != "${shortDeploySha}" ]; then
-  echo "ERROR: health commit mismatch"
+HEALTH_JSON=$(curl -sf http://127.0.0.1:8010/api/v1/health)
+HEALTH_COMMIT=$(printf '%s' "$HEALTH_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('git_commit',''))")
+HEALTH_VER=$(printf '%s' "$HEALTH_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('version',''))")
+echo "health_git_commit=$HEALTH_COMMIT expected_sha=${deploySha}"
+echo "health_version=$HEALTH_VER expected_app_version=${appVersion}"
+export HEALTH_COMMIT
+export DEPLOY_SHA=${deploySha}
+python3 - <<'PY'
+import os, sys
+h = os.environ.get("HEALTH_COMMIT", "")
+full = os.environ.get("DEPLOY_SHA", "")
+short = full[:12]
+ok = bool(h and full) and (full.startswith(h) or h.startswith(short) or h == short)
+sys.exit(0 if ok else 1)
+PY
+if [ "$HEALTH_VER" != "${appVersion}" ]; then
+  echo "ERROR: health version mismatch"
   exit 1
 fi
 

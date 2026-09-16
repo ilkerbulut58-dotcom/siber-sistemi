@@ -22,4 +22,17 @@ describe("evidence-masker", () => {
     const rows = formatMaskedEvidence({ cookie_sample: "session=abc123" });
     expect(rows[0]?.value).toBe("[REDACTED]");
   });
+
+  it("reads nested tool_evidence header values", () => {
+    const rows = formatMaskedEvidence({
+      tool_evidence: {
+        passive_http: {
+          header_name: "X-Powered-By",
+          header_value: "Phusion Passenger(R), PleskLin",
+        },
+      },
+    });
+    expect(rows.some((r) => r.value.includes("Phusion Passenger"))).toBe(true);
+    expect(rows.some((r) => r.label === "tool_evidence")).toBe(false);
+  });
 });

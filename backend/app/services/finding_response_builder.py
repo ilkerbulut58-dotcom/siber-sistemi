@@ -7,6 +7,7 @@ from app.analysis.types import AnalyzedFinding
 from app.models.finding import Finding
 from app.schemas.finding import FindingResponse, RiskBreakdownResponse
 from app.security.evidence_sanitizer import sanitize_evidence_dict, sanitize_text
+from app.services.finding_evidence import normalize_finding_evidence
 
 
 def _analyzed_from_finding(finding: Finding) -> AnalyzedFinding:
@@ -62,7 +63,12 @@ def to_finding_response(finding: Finding) -> FindingResponse:
         source_tools=finding.source_tools,
         verification_status=finding.verification_status,
         verification_notes=sanitize_text(finding.verification_notes),
-        evidence=sanitize_evidence_dict(finding.evidence),
+        evidence=normalize_finding_evidence(
+            sanitize_evidence_dict(finding.evidence),
+            source_tool=finding.source_tool,
+            source_rule_id=finding.source_rule_id or finding.correlation_key,
+        )
+        or None,
         status=finding.status,
         remediation=sanitize_text(finding.remediation),
         risk_explanation=sanitize_text(finding.risk_explanation),
