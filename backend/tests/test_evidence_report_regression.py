@@ -3,8 +3,8 @@
 from uuid import uuid4
 
 from app.models.finding import Finding, FindingSeverity, FindingStatus
-from app.services.report_finding_enrichment import format_evidence_for_report
 from app.services.finding_evidence import flatten_finding_evidence
+from app.services.report_finding_enrichment import format_evidence_for_report
 
 
 def _correlated_cert_evidence() -> dict:

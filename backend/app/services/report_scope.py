@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.i18n.report_strings import AUTH_SOURCE_LABELS, Locale, PROFILE_LABELS, SCANNER_STATUS_LABELS
+from app.i18n.report_strings import (
+    AUTH_SOURCE_LABELS,
+    PROFILE_LABELS,
+    SCANNER_STATUS_LABELS,
+    Locale,
+)
 from app.models.scan import ScanJob
 from app.scanners.profile_registry import PROFILE_DISPLAY, profile_scope_note
 
