@@ -1,11 +1,9 @@
 """Passive HTTP security checks (Safe Scan)."""
 
 import logging
-import os
 import re
 import ssl
 from datetime import UTC, datetime
-from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -13,6 +11,14 @@ import httpx
 from app.core.config import get_settings
 from app.scanners.base import RawFinding
 from app.scanners.execution_stats import set_pending_scanner_enrich
+from app.scanners.scan_http_client import (
+    _httpx_verify,
+    http_error_evidence,
+    is_tls_error,
+    open_tcp_socket,
+    scan_async_client,
+    scan_ssl_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,35 +67,28 @@ SECURITY_HEADERS: dict[str, dict[str, str]] = {
 SERVER_DISCLOSURE = re.compile(r"(apache|nginx|iis|php|express|asp\.net)", re.I)
 
 
-def _benchmark_ca_path() -> Path | None:
-    env_path = os.environ.get("BENCHMARK_CA_CERT_PATH", "").strip()
-    if env_path:
-        path = Path(env_path)
-        if path.is_file():
-            return path
-    default = (
-        Path(__file__).resolve().parents[3]
-        / "benchmarks"
-        / "docker"
-        / "realistic"
-        / "certs"
-        / "ca.crt"
+def _http_failure_finding(target_url: str, exc: httpx.HTTPError) -> RawFinding:
+    evidence = http_error_evidence(exc)
+    if is_tls_error(exc):
+        return RawFinding(
+            source_tool="tls_check",
+            source_rule_id="cert-invalid",
+            title="TLS certificate verification failed",
+            description=str(exc),
+            severity="critical",
+            affected_url=target_url,
+            remediation="Install a valid certificate from a trusted CA.",
+            evidence=evidence,
+        )
+    return RawFinding(
+        source_tool="passive_http",
+        source_rule_id="http-unreachable",
+        title="Target unreachable",
+        description=str(exc),
+        severity="high",
+        affected_url=target_url,
+        evidence=evidence,
     )
-    return default if default.is_file() else None
-
-
-def _benchmark_ssl_context() -> ssl.SSLContext:
-    ca_path = _benchmark_ca_path()
-    if ca_path is not None:
-        return ssl.create_default_context(cafile=str(ca_path))
-    return ssl.create_default_context()
-
-
-def _httpx_verify():
-    ca_path = _benchmark_ca_path()
-    if ca_path is not None:
-        return str(ca_path)
-    return True
 
 
 async def scan_http_redirect(hostname: str, https_url: str) -> list[RawFinding]:
@@ -97,7 +96,7 @@ async def scan_http_redirect(hostname: str, https_url: str) -> list[RawFinding]:
     findings: list[RawFinding] = []
     http_url = f"http://{hostname}/"
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=False) as client:
+        async with scan_async_client(timeout=15.0, follow_redirects=False) as client:
             response = await client.get(http_url)
             if response.status_code not in (301, 302, 307, 308):
                 findings.append(
@@ -250,10 +249,11 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
 
     findings: list[RawFinding] = []
     try:
-        context = _benchmark_ssl_context()
-        with ssl.create_connection((parsed.hostname, parsed.port or 443), timeout=10) as sock, context.wrap_socket(
-            sock, server_hostname=parsed.hostname
-        ) as ssock:
+        context = scan_ssl_context()
+        with (
+            open_tcp_socket(parsed.hostname, parsed.port or 443, timeout=10) as sock,
+            context.wrap_socket(sock, server_hostname=parsed.hostname) as ssock,
+        ):
             cert = ssock.getpeercert()
             not_after = cert.get("notAfter")
             if not_after:
@@ -288,6 +288,7 @@ async def scan_tls_certificate(target_url: str) -> list[RawFinding]:
                 severity="critical",
                 affected_url=target_url,
                 remediation="Install a valid certificate from a trusted CA.",
+                evidence=http_error_evidence(exc),
             )
         )
     except Exception as exc:
@@ -314,7 +315,7 @@ async def run_passive_http_scan(
             findings.extend(await scan_http_redirect(hostname, target_url))
 
     try:
-        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, verify=_httpx_verify()) as client:
+        async with scan_async_client(timeout=25.0, follow_redirects=True, verify=_httpx_verify()) as client:
             response = await client.get(target_url)
             final_url = str(response.url)
             if final_url.rstrip("/") != target_url.rstrip("/"):
@@ -360,15 +361,12 @@ async def run_passive_http_scan(
                     )
                 )
     except httpx.HTTPError as exc:
-        findings.append(
-            RawFinding(
-                source_tool="passive_http",
-                source_rule_id="http-unreachable",
-                title="Target unreachable",
-                description=str(exc),
-                severity="high",
-                affected_url=target_url,
-            )
-        )
+        failure = _http_failure_finding(target_url, exc)
+        if failure.source_rule_id == "cert-invalid" and any(
+            item.source_rule_id == "cert-invalid" for item in findings
+        ):
+            logger.info("TLS error during HTTP GET for %s after cert-invalid finding", target_url)
+        else:
+            findings.append(failure)
 
     return findings

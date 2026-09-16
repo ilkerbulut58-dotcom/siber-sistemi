@@ -9,6 +9,7 @@ from urllib.parse import urldefrag, urljoin, urlparse
 import httpx
 
 from app.scanners.base import RawFinding
+from app.scanners.scan_http_client import scan_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ async def run_surface_crawl_passive(target_url: str) -> list[RawFinding]:
     queue: list[str] = [target_url]
     findings: list[RawFinding] = []
 
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+    async with scan_async_client(timeout=15.0, follow_redirects=True) as client:
         while queue and len(visited) < MAX_PAGES:
             url = queue.pop(0)
             clean = urldefrag(url)[0]

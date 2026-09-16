@@ -9,6 +9,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from app.scanners.base import RawFinding
+from app.scanners.scan_http_client import scan_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ async def scan_exposed_paths(target_url: str) -> list[RawFinding]:
     base = f"{parsed.scheme}://{parsed.netloc}"
     findings: list[RawFinding] = []
 
-    async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as client:
+    async with scan_async_client(timeout=12.0, follow_redirects=False) as client:
         for path, severity, rule_id, hint in SENSITIVE_PATHS:
             url = urljoin(base + "/", path.lstrip("/"))
             try:

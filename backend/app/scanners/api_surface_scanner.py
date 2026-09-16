@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import httpx
 
 from app.scanners.base import RawFinding
-from app.scanners.passive_http import _httpx_verify
+from app.scanners.scan_http_client import scan_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ async def run_api_surface_scan(target_url: str) -> list[RawFinding]:
     origin = _site_origin(target_url)
     cors_urls, _ = _crapi_probe_paths(target_url)
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, verify=_httpx_verify()) as client:
+        async with scan_async_client(timeout=20.0, follow_redirects=True) as client:
             cors_findings: list[RawFinding] = []
             for probe_url in dict.fromkeys(cors_urls):
                 request_method = "POST" if "/auth/" in probe_url else "GET"

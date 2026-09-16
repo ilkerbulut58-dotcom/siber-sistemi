@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.scanners.base import RawFinding
+from app.scanners.scan_http_client import scan_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ async def scan_sensitive_data(target_url: str) -> list[RawFinding]:
 
     urls = [target_url, *{f"{parsed.scheme}://{parsed.netloc}{p}" for p in JS_PATHS}]
 
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+    async with scan_async_client(timeout=15.0, follow_redirects=True) as client:
         for url in urls:
             try:
                 response = await client.get(url)

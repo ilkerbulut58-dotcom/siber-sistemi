@@ -81,7 +81,7 @@ async def test_run_api_surface_scan_probes_crapi_identity_route():
     client.request = AsyncMock(side_effect=fake_request)
     client.get = AsyncMock(return_value=missing_response)
 
-    with patch("app.scanners.api_surface_scanner.httpx.AsyncClient") as client_cls:
+    with patch("app.scanners.api_surface_scanner.scan_async_client") as client_cls:
         client_cls.return_value.__aenter__.return_value = client
         findings = await run_api_surface_scan("https://benchmark-crapi-proxy/health")
 

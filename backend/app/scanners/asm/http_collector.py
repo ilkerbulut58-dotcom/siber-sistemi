@@ -6,6 +6,8 @@ import logging
 
 import httpx
 
+from app.scanners.scan_http_client import scan_async_client
+
 logger = logging.getLogger(__name__)
 
 SECURITY_HEADER_NAMES = (
@@ -21,7 +23,7 @@ SECURITY_HEADER_NAMES = (
 async def probe_http(url: str) -> dict[str, object]:
     result: dict[str, object] = {"url": url}
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with scan_async_client(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(url)
             headers = {k.lower(): v for k, v in response.headers.items()}
             result["status_code"] = response.status_code

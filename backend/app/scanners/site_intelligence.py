@@ -14,6 +14,7 @@ from app.scanners.asm.dns_collector import collect_dns_records
 from app.scanners.asm.http_collector import probe_http
 from app.scanners.asm.tech_collector import detect_technologies
 from app.scanners.asm.tls_collector import collect_tls_info
+from app.scanners.scan_http_client import scan_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def _extract_title(html: str) -> str | None:
 async def _redirect_chain(url: str) -> list[dict[str, Any]]:
     chain: list[dict[str, Any]] = []
     try:
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as client:
+        async with scan_async_client(timeout=12.0, follow_redirects=False) as client:
             current = url
             for _ in range(8):
                 response = await client.get(current)
@@ -87,7 +88,7 @@ async def _fetch_well_known(base_url: str) -> dict[str, Any]:
     parsed = urlparse(base_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
-    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+    async with scan_async_client(timeout=10.0, follow_redirects=True) as client:
         for path in WELL_KNOWN_PATHS:
             url = f"{origin}{path}"
             try:
@@ -144,7 +145,7 @@ async def collect_site_intelligence(target_url: str) -> dict[str, Any]:
     set_cookies: list[str] = []
     page_title: str | None = None
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with scan_async_client(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(target_url)
             body_sample = response.text[:12000]
             page_title = _extract_title(body_sample)
