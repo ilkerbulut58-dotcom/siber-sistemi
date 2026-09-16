@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.security.evidence_sanitizer import sanitize_evidence_dict
+from app.services.finding_evidence import flatten_finding_evidence
 
 
 def _evidence_missing(locale: Locale) -> str:
@@ -15,6 +16,13 @@ def _evidence_missing(locale: Locale) -> str:
 
 def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
     raw = sanitize_evidence_dict(finding.evidence)
+    if not raw:
+        return _evidence_missing(locale)
+    raw = flatten_finding_evidence(
+        raw,
+        source_tool=finding.source_tool,
+        source_rule_id=finding.source_rule_id or finding.correlation_key,
+    )
     if not raw:
         return _evidence_missing(locale)
 
@@ -93,19 +101,24 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
 def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:
     if finding.risk_explanation and finding.risk_explanation.strip() != finding.title.strip():
         return finding.risk_explanation
-    evidence = finding.evidence or {}
+    evidence = flatten_finding_evidence(
+        finding.evidence or {},
+        source_tool=finding.source_tool,
+        source_rule_id=finding.source_rule_id or finding.correlation_key,
+    )
     title_lower = (finding.title or "").lower()
     if locale == "de":
         if "csp" in title_lower or "content-security" in title_lower:
             policy = evidence.get("policy") or evidence.get("csp")
+            extra = _csp_risk_note(policy, locale)
             if policy:
                 return (
-                    "Die beobachtete Content-Security-Policy enthält unsichere Direktiven. "
-                    f"Policy-Ausschnitt: {policy}"
+                    "Die beobachtete Content-Security-Policy enthält riskante Direktiven. "
+                    f"Policy: {policy}. {extra}"
                 )
             return (
-                "Eine Content-Security-Policy-Schwäche wurde erkannt. "
-                "Dies bedeutet nicht automatisch eine bestätigte XSS-Ausnutzung."
+                "Eine Content-Security-Policy-Schwäche wurde erkannt — kein bestätigtes XSS. "
+                + extra
             )
         if "cache" in title_lower:
             return (
@@ -115,13 +128,11 @@ def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:
     else:
         if "csp" in title_lower or "content-security" in title_lower:
             policy = evidence.get("policy") or evidence.get("csp")
+            extra = _csp_risk_note(policy, locale)
             if policy:
-                return (
-                    "Gözlemlenen CSP politikasında riskli direktifler var. "
-                    f"Policy: {policy}"
-                )
+                return f"Gözlemlenen CSP: {policy}. {extra}"
             return (
-                "CSP ile ilgili bir zayıflık tespit edildi; bu otomatik olarak doğrulanmış XSS anlamına gelmez."
+                "CSP ile ilgili bir zayıflık tespit edildi; doğrulanmış XSS değildir. " + extra
             )
         if "cache" in title_lower:
             return (
@@ -129,3 +140,27 @@ def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:
                 "Her yanıt için no-store gerekmez."
             )
     return finding.description
+
+
+def _csp_risk_note(policy: str | None, locale: Locale) -> str:
+    if not policy:
+        if locale == "de":
+            return "Keine vollständige Policy im Scan-Nachweis gespeichert."
+        return "Tam policy metni bu taramada kaydedilmedi."
+    lowered = policy.lower()
+    notes: list[str] = []
+    if "unsafe-inline" in lowered:
+        notes.append(
+            "unsafe-inline erlaubt Inline-Skripte/Stile (höheres XSS-Risiko bei anderen Schwächen)."
+            if locale == "de"
+            else "unsafe-inline satır içi script/stil riskini artırır (tek başına sızma kanıtı değildir)."
+        )
+    if "*" in lowered and "script-src" in lowered:
+        notes.append(
+            "Wildcard in script-src erweitert erlaubte Skript-Quellen stark."
+            if locale == "de"
+            else "script-src içinde wildcard izin verilen kaynakları genişletir."
+        )
+    if not notes:
+        return ""
+    return " ".join(notes)

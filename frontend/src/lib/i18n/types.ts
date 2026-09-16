@@ -232,6 +232,11 @@ export interface Dictionary {
     domainAddedTest: string;
     domainAddFailed: string;
     verified: string;
+    verificationDnsVerified: string;
+    verificationAdminAssignment: string;
+    verificationAdminDnsExempt: string;
+    assignedTestTargets: string;
+    assignedTestTargetsHint: string;
     pending: string;
     activeScanOn: string;
     activeScanOff: string;
@@ -487,7 +492,15 @@ export interface Dictionary {
     technologies: string;
     cdnWaf: string;
     spf: string;
+    spfFound: string;
+    spfNotFound: string;
+    spfInvalidMultiple: string;
+    spfQueryFailed: string;
     dmarc: string;
+    dmarcFound: string;
+    dmarcNotFound: string;
+    dmarcQueryFailed: string;
+    cdnNotDetected: string;
     present: string;
     absent: string;
     dnsSummary: string;
@@ -694,6 +707,8 @@ export interface Dictionary {
   };
   platform: {
     qualityOnlyAdmin: string;
+    testTargetsTitle: string;
+    testTargetsNav: string;
   };
   scanResults: {
     overview: string;

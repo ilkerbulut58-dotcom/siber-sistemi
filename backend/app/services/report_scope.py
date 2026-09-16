@@ -56,13 +56,12 @@ def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
         {"label": labels["executed_failed"], "value": str(executed.get("scanner_runs_failed_or_timed_out", "—"))},
         {
             "label": labels["executed_urls"],
-            "value": (
-                str(executed["unique_urls_scanned_sum"])
-                if executed.get("unique_urls_scanned_sum") is not None
-                else labels["not_measured"]
-            ),
+            "value": _url_scope_label(executed, scanner_rows, labels),
         },
-        {"label": labels["executed_findings"], "value": str(executed.get("findings_persisted", scan.findings_count or "—"))},
+        {
+            "label": labels["executed_findings"],
+            "value": _finding_count_label(executed, scan.findings_count, labels),
+        },
     ]
     if code_status_label:
         summary_rows.append({"label": labels["code_source"], "value": code_status_label})
@@ -73,6 +72,27 @@ def build_report_scope_context(scan: ScanJob, locale: Locale) -> dict:
         "profile_scope_note": note,
         "profile_label": profile_label(scan.scan_profile, locale),
     }
+
+
+def _finding_count_label(executed: dict, findings_count: int | None, labels: dict[str, str]) -> str:
+    unique = executed.get("findings_persisted", findings_count)
+    raw = executed.get("raw_finding_sources")
+    if raw is not None and unique is not None and int(raw) != int(unique):
+        return labels["finding_dedup"].format(raw=raw, unique=unique)
+    return str(unique if unique is not None else "—")
+
+
+def _url_scope_label(executed: dict, scanner_rows: list[dict], labels: dict[str, str]) -> str:
+    if executed.get("unique_urls_scanned_sum") is not None:
+        return str(executed["unique_urls_scanned_sum"])
+    parts = []
+    for row in scanner_rows:
+        urls = row.get("urls")
+        if urls and urls != labels["not_measured"] and urls != "—":
+            parts.append(f"{row['name']}={urls}")
+    if parts:
+        return labels["url_per_scanner"].format(details=", ".join(parts))
+    return labels["not_measured"]
 
 
 def _fmt_seconds(value: object) -> str:
@@ -116,6 +136,8 @@ def _scope_labels(locale: Locale) -> dict[str, str]:
             "not_measured": "nicht gemessen",
             "code_source": "Quellcode-Upload",
             "code_source_not_supported": "Nicht unterstützt (kein Upload/Repo in diesem Profil)",
+            "finding_dedup": "{raw} Quellen → {unique} eindeutige Befunde",
+            "url_per_scanner": "Pro Scanner (keine dedupl. Summe): {details}",
         }
     return {
         "planned_profile": "Planlanan — profil",
@@ -128,4 +150,6 @@ def _scope_labels(locale: Locale) -> dict[str, str]:
         "not_measured": "ölçülmedi",
         "code_source": "Kaynak kod yüklemesi",
         "code_source_not_supported": "Desteklenmiyor (bu profilde dosya/repo yüklemesi yok)",
+        "finding_dedup": "{raw} ham kaynak → {unique} benzersiz bulgu",
+        "url_per_scanner": "Motor başına (benzersiz toplam değil): {details}",
     }

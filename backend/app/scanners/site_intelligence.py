@@ -25,13 +25,25 @@ WELL_KNOWN_PATHS = (
 )
 
 
+def _normalize_txt(value: str) -> str:
+    return value.strip().strip('"').replace('" "', "").replace('""', "")
+
+
 def _parse_email_security(txt_records: list[str]) -> dict[str, Any]:
-    spf = [r for r in txt_records if r.lower().startswith("v=spf1")]
-    dmarc = [r for r in txt_records if r.lower().startswith("v=dmarc1")]
-    dkim = [r for r in txt_records if r.lower().startswith("v=dkim1") or "dkim" in r.lower()]
+    normalized = [_normalize_txt(r) for r in txt_records if r and r.strip()]
+    spf = [r for r in normalized if r.lower().startswith("v=spf1")]
+    dmarc = [r for r in normalized if r.lower().startswith("v=dmarc1")]
+    dkim = [r for r in normalized if r.lower().startswith("v=dkim1") or "dkim" in r.lower()]
+    spf_status = "not_found"
+    if len(spf) > 1:
+        spf_status = "invalid_multiple"
+    elif len(spf) == 1:
+        spf_status = "found"
     return {
-        "spf_present": bool(spf),
+        "spf_present": spf_status == "found",
+        "spf_status": spf_status,
         "dmarc_present": bool(dmarc),
+        "dmarc_status": "found" if dmarc else "not_found",
         "dkim_hints": len(dkim),
         "spf_record": spf[0][:200] if spf else None,
         "dmarc_record": dmarc[0][:200] if dmarc else None,
@@ -39,8 +51,12 @@ def _parse_email_security(txt_records: list[str]) -> dict[str, Any]:
 
 
 def _extract_title(html: str) -> str | None:
+    import html as html_module
+
     match = re.search(r"<title[^>]*>([^<]{1,200})</title>", html, re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    if not match:
+        return None
+    return html_module.unescape(match.group(1).strip())
 
 
 async def _redirect_chain(url: str) -> list[dict[str, Any]]:

@@ -67,6 +67,19 @@ def _merge_group(correlation_key: str, url: str, items: list[RawFinding]) -> Cor
         if item.evidence:
             evidence.setdefault("tool_evidence", {})[item.source_tool] = item.evidence
 
+    if primary.evidence:
+        for key, value in primary.evidence.items():
+            if key not in evidence and value not in (None, "", {}, []):
+                evidence[key] = value
+    for item in items:
+        if not item.evidence:
+            continue
+        for key, value in item.evidence.items():
+            if key in evidence or value in (None, "", {}, []):
+                continue
+            if key not in {"matcher"}:
+                evidence[key] = value
+
     if correlation_key in SECRET_CORRELATION_KEYS:
         locations = sorted({normalize_url(item.affected_url) for item in items if item.affected_url})
         if len(locations) > 1:

@@ -578,8 +578,13 @@ async def run_scan_job(
                 "planned_scanners": execution.get("planned_scanners")
                 or planned_scanner_ids(scan.scan_profile),
             }
+            raw_source_total = 0
+            for finding in saved:
+                ev = finding.evidence or {}
+                raw_source_total += int(ev.get("source_count") or 1)
             scope["executed_telemetry"] = {
                 "findings_persisted": len(saved),
+                "raw_finding_sources": raw_source_total,
                 "scanner_runs_completed": checks_completed,
                 "scanner_runs_failed_or_timed_out": checks_failed,
                 "unique_urls_scanned_sum": urls_scanned if urls_scanned else None,

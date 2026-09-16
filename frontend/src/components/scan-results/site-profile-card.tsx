@@ -42,6 +42,22 @@ export function SiteProfileCard({ profile }: { profile: SiteProfile | null }) {
     note: "",
   };
 
+  function spfLabel(): string {
+    const status = email.spf_status as string | undefined;
+    if (status === "found") return t("siteProfile.spfFound");
+    if (status === "invalid_multiple") return t("siteProfile.spfInvalidMultiple");
+    if (status === "query_failed") return t("siteProfile.spfQueryFailed");
+    if (email.spf_present === true) return t("siteProfile.spfFound");
+    return t("siteProfile.spfNotFound");
+  }
+
+  function dmarcLabel(): string {
+    const status = email.dmarc_status as string | undefined;
+    if (status === "found" || email.dmarc_present === true) return t("siteProfile.dmarcFound");
+    if (status === "query_failed") return t("siteProfile.dmarcQueryFailed");
+    return t("siteProfile.dmarcNotFound");
+  }
+
   const tlsLabel =
     tls.valid === true
       ? `${t("siteProfile.tlsValid")}${tls.days_until_expiry != null ? ` (${tls.days_until_expiry} ${t("siteProfile.daysSuffix")})` : ""}`
@@ -70,10 +86,14 @@ export function SiteProfileCard({ profile }: { profile: SiteProfile | null }) {
           />
           <Row
             label={t("siteProfile.cdnWaf")}
-            value={cdnWaf.length ? cdnWaf.map((c) => c.name).join(", ") : "—"}
+            value={
+              cdnWaf.length
+                ? cdnWaf.map((c) => c.name).join(", ")
+                : t("siteProfile.cdnNotDetected")
+            }
           />
-          <Row label={t("siteProfile.spf")} value={email.spf_present ? t("siteProfile.present") : t("siteProfile.absent")} />
-          <Row label={t("siteProfile.dmarc")} value={email.dmarc_present ? t("siteProfile.present") : t("siteProfile.absent")} />
+          <Row label={t("siteProfile.spf")} value={spfLabel()} />
+          <Row label={t("siteProfile.dmarc")} value={dmarcLabel()} />
           {Object.entries(dns).slice(0, 4).map(([rtype, values]) => (
             <Row
               key={rtype}

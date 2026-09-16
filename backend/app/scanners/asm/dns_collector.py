@@ -24,6 +24,13 @@ def collect_dns_records(hostname: str) -> dict[str, list[str]]:
             for answer in answers:
                 if rtype == "MX":
                     values.append(str(answer.exchange).rstrip("."))
+                elif rtype == "TXT":
+                    strings = getattr(answer, "strings", None)
+                    if strings:
+                        text = b"".join(strings).decode("utf-8", errors="replace")
+                    else:
+                        text = str(answer).strip('"')
+                    values.append(text.strip())
                 else:
                     values.append(str(answer).rstrip('"'))
             if values:
