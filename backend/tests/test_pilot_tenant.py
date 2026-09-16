@@ -120,15 +120,15 @@ def test_regular_user_enforces_quota() -> None:
     assert QuotaService.effective_daily_quota(user, org, 5) == 2
 
 
-def test_platform_admin_skips_domain_verification() -> None:
+def test_platform_admin_dns_policy() -> None:
     from types import SimpleNamespace
 
     from app.core.config import Settings
     from app.services.quota_service import QuotaService
 
     admin = SimpleNamespace(is_platform_admin=True)
-    settings = Settings(environment="production", skip_domain_verification=False)
-    assert QuotaService.requires_domain_verification(admin, settings) is False
+    prod = Settings(environment="production", skip_domain_verification=False)
+    assert QuotaService.requires_domain_verification(admin, prod) is True
     assert QuotaService.is_unrestricted_scan_actor(admin) is True
 
 
