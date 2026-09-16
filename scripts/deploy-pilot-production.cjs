@@ -40,10 +40,7 @@ function assertCleanGit() {
     console.error(`ERROR: HEAD (${localHead}) != origin/main (${remoteHead})`);
     process.exit(1);
   }
-  if (!deploySha || !shortDeploySha) {
-    console.error('ERROR: build metadata git commit is empty');
-    process.exit(1);
-  }
+
   if (!releaseTag) {
     console.error('ERROR: RELEASE_TAG is required');
     process.exit(1);
@@ -63,6 +60,11 @@ function assertCleanGit() {
   }
   deploySha = tagSha;
   shortDeploySha = deploySha.slice(0, 12);
+
+  if (!deploySha || !shortDeploySha) {
+    console.error('ERROR: build metadata git commit is empty');
+    process.exit(1);
+  }
   if (localHead !== tagSha) {
     console.log(`Deploy release tag ${releaseTag} at ${tagSha} (main at ${localHead})`);
   }
