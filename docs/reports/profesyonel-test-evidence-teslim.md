@@ -4,10 +4,11 @@
 
 | Öğe | Değer |
 | --- | --- |
-| Ana düzeltme | `d1608cb` — correlated `tool_evidence`, SPF, kapsam sayımı |
-| Takip | `e8bbaa6` (ruff), `520a376` (pilot test + bu teslim) |
-| Deploy etiketi | `v0.9.0-rc9-evidence-profile-3` → `520a376` |
-| Actions | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions (son push `520a376`) |
+| RC9 kanıt/SPF | `d1608cb` … `520a376` |
+| CI düzeltme (ruff) | `7c7355d` |
+| **Release (deploy hedefi)** | `7c7355d` + etiket `v0.9.0-rc9-evidence-profile-4` |
+| CI #153 | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions/runs/35083923384 — **success** |
+| CI #152 (`bed197b`) | backend **ruff failure** (düzeltildi `7c7355d` ile) |
 
 **Frontend CI kök nedeni:** `frontend/src/lib/i18n/types.ts` içinde sözlükte olan `platform.testTargetsTitle` / `project.verificationDnsVerified` (ve site profili SPF etiketleri) tip tanımında yoktu → `tsc --noEmit` kırılıyordu. **Düzeltme:** eksik anahtarlar `types.ts`, `tr.ts`, `de.ts` ile hizalandı; yerelde `npm run typecheck` geçti.
 
@@ -43,8 +44,8 @@ Sentetik örnekler (yerel test fixture): `docs/reports/samples/sample-scan-repor
 ```text
 npm run typecheck          — OK
 npm run lint               — OK (yalnız uyarılar)
-py -m pytest (tam)         — 289 passed, 1 failed (production DNS test; CI development)
-py -m pytest tests/test_evidence_report_regression.py tests/test_site_profile_spf.py tests/test_scan_target_authorization.py tests/test_generate_sample_report_pdf.py — 28 passed
+py -m pytest (tam)         — 290 passed, 0 failed
+test_platform_admin_skips_domain_verification → test_platform_admin_dns_policy (520a376)
 ```
 
 ## Production dağıtım
@@ -53,13 +54,13 @@ Bu oturumda `DEPLOY_SSH_PASSWORD` ortamda yok → **deploy çalıştırılmadı*
 
 ```powershell
 $env:DEPLOY_CONFIRM='production-pilot'
-$env:RELEASE_TAG='v0.9.0-rc9-evidence-profile-3'
+$env:RELEASE_TAG='v0.9.0-rc9-evidence-profile-4'
 $env:APP_VERSION='0.9.0-rc9-evidence-profile'
-$env:DEPLOY_SSH_PASSWORD='…'
-node scripts/deploy-pilot-production.cjs
+# DEPLOY_SSH_PASSWORD: Cursor Agent ortam değişkeni veya bu terminal oturumunda (sohbete yazmayın)
+.\scripts\rc9-production-verify.ps1
 ```
 
-Sonra: health `git_commit=520a376`, `ssh-export-scan-report-pdf.cjs` ile `a6426ea8` PDF.
+Sonra: health `git_commit=7c7355d`, `scan-a6426ea8-report-tr.pdf`, `ssh-prod-dns-reject-smoke.cjs` → `DNS_REJECT_SMOKE_OK`.
 
 ## Yetkilendirme
 
@@ -68,12 +69,11 @@ Sonra: health `git_commit=520a376`, `ssh-export-scan-report-pdf.cjs` ile `a6426e
 | Doğrulanmamış hedef → tarama | Yerel: `test_unverified_domain_rejected` → 400 `DOMAIN_NOT_VERIFIED` |
 | Atanmış test hedefi (turbridge.de) DNS’siz | `test_assigned_predefined_target_without_dns` |
 | Admin DNS exempt (ilker) | `test_admin_dns_exempt_user` |
-| Canlı normal kullanıcı DNS reddi | **Bu oturumda canlı API smoke yapılmadı** (parola/token gerekir) |
+| Canlı normal kullanıcı DNS reddi | **Doğrulanamadı** — `DEPLOY_SSH_PASSWORD` agent oturumunda yok; yerel API: `test_unverified_domain_rejected`, `test_platform_admin_cannot_scan_unverified_domain` |
 
 ## Kalan sınırlamalar
 
 - `a6426ea8` PDF’inde DB’de hiç kaydedilmemiş alanlar (eski tarama `59f266d8` ile karşılaştırma) geriye dönük doldurulmaz; yalnız mevcut `tool_evidence` gösterilir.
-- GitHub Actions sonucu bu makinede `gh` yok; Actions web UI’dan #150 yeşil doğrulanmalı.
-- Production deploy ve canlı yetki negatif testi operatör adımı.
+- Production deploy + `a6426ea8` PDF + canlı DNS smoke: **tek eksik adım** agent oturumunda `DEPLOY_SSH_PASSWORD` (User/Machine/Agent env).
 
 **Profesyonel kullanım testine hazırlık:** Kod + yerel testler tamam; **production’da rc9 deploy, CI yeşil kanıtı ve canlı DNS red smoke** tamamlanmadan “canlı hazır” denmemeli.
