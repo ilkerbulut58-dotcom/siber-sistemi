@@ -5,9 +5,9 @@
 | Öğe | Değer |
 | --- | --- |
 | Ana düzeltme | `d1608cb` — correlated `tool_evidence`, SPF, kapsam sayımı |
-| Ruff düzeltmesi | `e8bbaa6` |
-| Deploy etiketi | `v0.9.0-rc9-evidence-profile-2` → `e8bbaa6` |
-| Actions | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions (CI #149+ `d1608cb`, #150+ `e8bbaa6`) |
+| Takip | `e8bbaa6` (ruff), `520a376` (pilot test + bu teslim) |
+| Deploy etiketi | `v0.9.0-rc9-evidence-profile-3` → `520a376` |
+| Actions | https://github.com/ilkerbulut58-dotcom/siber-sistemi/actions (son push `520a376`) |
 
 **Frontend CI kök nedeni:** `frontend/src/lib/i18n/types.ts` içinde sözlükte olan `platform.testTargetsTitle` / `project.verificationDnsVerified` (ve site profili SPF etiketleri) tip tanımında yoktu → `tsc --noEmit` kırılıyordu. **Düzeltme:** eksik anahtarlar `types.ts`, `tr.ts`, `de.ts` ile hizalandı; yerelde `npm run typecheck` geçti.
 
@@ -53,13 +53,13 @@ Bu oturumda `DEPLOY_SSH_PASSWORD` ortamda yok → **deploy çalıştırılmadı*
 
 ```powershell
 $env:DEPLOY_CONFIRM='production-pilot'
-$env:RELEASE_TAG='v0.9.0-rc9-evidence-profile-2'
+$env:RELEASE_TAG='v0.9.0-rc9-evidence-profile-3'
 $env:APP_VERSION='0.9.0-rc9-evidence-profile'
 $env:DEPLOY_SSH_PASSWORD='…'
 node scripts/deploy-pilot-production.cjs
 ```
 
-Sonra: health `git_commit=e8bbaa6`, `ssh-export-scan-report-pdf.cjs` ile `a6426ea8` PDF.
+Sonra: health `git_commit=520a376`, `ssh-export-scan-report-pdf.cjs` ile `a6426ea8` PDF.
 
 ## Yetkilendirme
 
