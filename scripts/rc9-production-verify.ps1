@@ -15,8 +15,8 @@ if (-not $env:DEPLOY_SSH_PASSWORD) {
 }
 
 $env:DEPLOY_CONFIRM = 'production-pilot'
-$env:RELEASE_TAG = 'v0.9.0-rc9-evidence-profile-4'
-$env:APP_VERSION = '0.9.0-rc9-evidence-profile'
+$env:RELEASE_TAG = 'v0.9.0-rc10-report-layout'
+$env:APP_VERSION = '0.9.0-rc10-report-layout'
 
 Write-Host '=== 1/3 Deploy (tag' $env:RELEASE_TAG ') ==='
 node scripts/deploy-pilot-production.cjs
