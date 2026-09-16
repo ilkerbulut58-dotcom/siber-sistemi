@@ -133,7 +133,7 @@
       {% for f in findings %}
       <tr>
         <td>{{ severity_labels.get(f.severity, f.severity) }}</td>
-        <td>{{ status_labels.get(f.status, f.status) }}</td>
+        <td>{{ f.status_label or status_labels.get(f.status, f.status) }}</td>
         <td>{{ f.title }}</td>
         <td class="rule-id">{{ f.source_rule_id or '—' }}</td>
       </tr>
@@ -147,15 +147,16 @@
     <div class="finding-intro">
       <div class="finding-head">
         <span class="badge {{ f.severity }}">{{ severity_labels.get(f.severity, f.severity) }}</span>
-        <span class="muted">{{ labels.status_col }}: {{ status_labels.get(f.status, f.status) }}</span>
+        <span class="muted">{{ labels.status_col }}: {{ f.status_label or status_labels.get(f.status, f.status) }}</span>
       </div>
       <h3>{{ f.title }}</h3>
       <p class="muted">{{ labels.tool }}: {{ f.source_tool or '—' }} · {{ labels.rule_id }}: {{ f.source_rule_id or '—' }}</p>
       {% if f.affected_url %}<p class="muted">{{ labels.url }}: {{ f.affected_url }}</p>{% endif %}
+      {% if f.description %}
+      <p><strong>{{ labels.description }}:</strong> {{ f.description }}</p>
+      {% endif %}
       {% if f.risk_explanation %}
       <p><strong>{{ labels.what_it_means }}</strong> {{ f.risk_explanation }}</p>
-      {% elif f.description %}
-      <p>{{ f.description }}</p>
       {% endif %}
     </div>
     {% if f.evidence_text %}
@@ -170,6 +171,10 @@
     {% endif %}
     {% if f.config_snippet %}
     <table class="evidence-box"><tr><td>{{ f.config_snippet | nl2br }}</td></tr></table>
+    {% endif %}
+    {% if f.technical_details %}
+    <p><strong>{{ labels.technical_appendix }}</strong></p>
+    <table class="evidence-box"><tr><td>{{ f.technical_details | nl2br }}</td></tr></table>
     {% endif %}
   </div>
   {% endfor %}

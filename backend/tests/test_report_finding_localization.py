@@ -8,10 +8,17 @@ from uuid import UUID, uuid4
 import pytest
 from httpx import AsyncClient
 
+from app.i18n.report_strings import FINDING_STATUS_LABELS
 from app.models.finding import Finding, FindingStatus
 from app.models.scan import ScanJob, ScanStatus
 from app.services.report_finding_localization import localize_finding_for_report
 from tests.test_scans import _verified_domain
+
+
+def test_all_finding_statuses_have_tr_and_de_labels():
+    expected = {status.value for status in FindingStatus}
+    assert expected <= FINDING_STATUS_LABELS["tr"].keys()
+    assert expected <= FINDING_STATUS_LABELS["de"].keys()
 
 
 def test_localize_hsts_finding_german():
@@ -181,3 +188,59 @@ def test_localize_cache_control_not_data_leak():
     assert "s-maxage" in (tr.risk_explanation or "") + " ".join(tr.remediation_steps or [])
     assert "sızıntı" in ((tr.risk_explanation or "") + (tr.remediation or "")).lower()
     assert "For secure content" not in (tr.remediation or "")
+
+
+@pytest.mark.parametrize(
+    ("locale", "title_fragment", "description_fragment", "risk_fragment", "solution_fragment"),
+    [
+        ("tr", "Katalogda bulunmayan", "Türkçe teknik çevirisi", "teknik olarak", "Özgün kanıtı"),
+        ("de", "Nicht katalogisierter", "deutsche Fachübersetzung", "technisch geprüft", "Originalnachweis"),
+    ],
+)
+def test_unknown_rule_uses_localized_wrapper_and_separate_original_engine_text(
+    locale,
+    title_fragment,
+    description_fragment,
+    risk_fragment,
+    solution_fragment,
+):
+    finding = Finding(
+        id=uuid4(),
+        organization_id=uuid4(),
+        project_id=uuid4(),
+        scan_job_id=uuid4(),
+        source_tool="new-engine",
+        source_rule_id="vendor-new-rule-42",
+        correlation_key="vendor-new-rule-42",
+        title="Vendor product handshake issue",
+        description="The product returned an unexpected protocol token.",
+        severity="high",
+        fingerprint="unknown1" * 8,
+        status=FindingStatus.OPEN,
+        affected_url="https://example.test/api?v=1",
+        remediation="Upgrade VendorProduct and review header X-Vendor-Mode.",
+        evidence={
+            "vendor_product": "VendorProduct",
+            "raw_protocol_token": "X-Vendor-Mode: legacy",
+        },
+        first_seen_at=datetime.now(UTC),
+        last_seen_at=datetime.now(UTC),
+    )
+
+    localized = localize_finding_for_report(finding, locale)
+
+    assert title_fragment in localized.title
+    assert description_fragment in (localized.description or "")
+    assert risk_fragment in (localized.risk_explanation or "")
+    assert solution_fragment in (localized.remediation or "")
+    assert "Vendor product handshake issue" not in localized.title
+    assert "The product returned" not in (localized.description or "")
+    assert "Upgrade VendorProduct" not in (localized.remediation or "")
+    assert "Vendor product handshake issue" in (localized.technical_details or "")
+    assert "The product returned" in (localized.technical_details or "")
+    assert "Upgrade VendorProduct" in (localized.technical_details or "")
+    assert "X-Vendor-Mode" in (localized.evidence_text or "")
+    assert "legacy" in (localized.evidence_text or "")
+    assert "raw_protocol_token" in (localized.evidence_text or "")
+    assert localized.affected_url == "https://example.test/api?v=1"
+    assert localized.status_label == ("Açık" if locale == "tr" else "Offen")

@@ -63,9 +63,13 @@ def _merge_group(correlation_key: str, url: str, items: list[RawFinding]) -> Cor
             for item in items
         ],
     }
+    tool_occurrences: dict[str, int] = defaultdict(int)
     for item in items:
         if item.evidence:
-            evidence.setdefault("tool_evidence", {})[item.source_tool] = item.evidence
+            occurrence = tool_occurrences[item.source_tool]
+            tool_occurrences[item.source_tool] += 1
+            evidence_key = item.source_tool if occurrence == 0 else f"{item.source_tool}#{occurrence + 1}"
+            evidence.setdefault("tool_evidence", {})[evidence_key] = item.evidence
 
     if primary.evidence:
         for key, value in primary.evidence.items():

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from app.i18n.report_strings import Locale
 from app.models.finding import Finding
 from app.security.evidence_sanitizer import sanitize_evidence_dict
@@ -104,7 +106,9 @@ def format_evidence_for_report(finding: Finding, locale: Locale) -> str:
         _append_conflicts(lines, conflicts, locale)
         return wrap_text_for_pdf("\n".join(lines))
 
-    return _evidence_missing(locale)
+    # Unknown engines/rules must not lose evidence merely because no formatter exists yet.
+    # Keep keys and values verbatim; only the surrounding report label is localized.
+    return wrap_text_for_pdf(json.dumps(raw, ensure_ascii=False, sort_keys=True, default=str))
 
 
 def enrich_risk_explanation(finding: Finding, locale: Locale) -> str | None:

@@ -3,6 +3,7 @@
 import pytest
 
 from app.analysis.correlation_engine import correlate_findings
+from app.analysis.pipeline import analyze_scan_findings
 from app.analysis.risk_engine import calculate_risk_score
 from app.analysis.types import AnalyzedFinding
 from app.scanners.base import RawFinding
@@ -31,6 +32,62 @@ def test_correlation_merges_same_header_from_multiple_tools() -> None:
     assert len(correlated) == 1
     assert correlated[0].correlation_key == "missing-header-x-frame-options"
     assert set(correlated[0].source_tools) == {"passive_http", "zap"}
+
+
+def test_correlation_preserves_multiple_evidence_rows_from_same_tool() -> None:
+    raw = [
+        RawFinding(
+            source_tool="zap",
+            source_rule_id="zap-10020",
+            title="X-Frame-Options Header Not Set",
+            description="first",
+            severity="medium",
+            affected_url="https://example.com/",
+            evidence={"matcher": "first"},
+        ),
+        RawFinding(
+            source_tool="zap",
+            source_rule_id="zap-10020",
+            title="X-Frame-Options Header Not Set",
+            description="second",
+            severity="medium",
+            affected_url="https://example.com/",
+            evidence={"matcher": "second"},
+        ),
+    ]
+
+    correlated = correlate_findings(raw)
+
+    assert len(correlated) == 1
+    assert correlated[0].evidence["tool_evidence"] == {
+        "zap": {"matcher": "first"},
+        "zap#2": {"matcher": "second"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_analysis_pipeline_does_not_translate_or_mutate_engine_text() -> None:
+    from unittest.mock import AsyncMock, patch
+
+    raw = RawFinding(
+        source_tool="new-engine",
+        source_rule_id="new-rule",
+        title="Original engine title",
+        description="Original engine description",
+        severity="medium",
+        affected_url="https://example.com/",
+    )
+
+    with (
+        patch("app.analysis.pipeline.correlate_findings", return_value=[]) as correlate,
+        patch("app.analysis.pipeline.verify_findings", new_callable=AsyncMock, return_value=[]),
+        patch("app.analysis.pipeline.score_findings", return_value=[]),
+    ):
+        await analyze_scan_findings("https://example.com/", [raw])
+
+    passed_raw = correlate.call_args.args[0][0]
+    assert passed_raw.title == "Original engine title"
+    assert passed_raw.description == "Original engine description"
 
 
 def test_risk_score_increases_with_confidence_and_tools() -> None:

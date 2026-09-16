@@ -198,7 +198,8 @@ class ReportService:
                     "severity": f.severity,
                     "severity_label": SEVERITY_LABELS[locale].get(f.severity, f.severity),
                     "status": f.status,
-                    "status_label": FINDING_STATUS_LABELS[locale].get(f.status, f.status),
+                    "status_label": f.status_label
+                    or FINDING_STATUS_LABELS[locale].get(f.status, f.status),
                     "description": f.description,
                     "risk_explanation": f.risk_explanation,
                     "affected_url": f.affected_url,
@@ -214,6 +215,7 @@ class ReportService:
                     "ai_confidence_label": f.ai_confidence_label,
                     "evidence_text": getattr(f, "evidence_text", None),
                     "confidence": getattr(f, "confidence", None),
+                    "technical_details": getattr(f, "technical_details", None),
                 }
                 for f in findings
             ],

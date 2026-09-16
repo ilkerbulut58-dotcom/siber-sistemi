@@ -7,8 +7,9 @@ from uuid import UUID
 
 from app.data.finding_catalog_de import SEVERITY_LABEL_DE
 from app.data.finding_catalog_de import get_catalog_entry as get_catalog_entry_de
+from app.data.finding_catalog_tr import SEVERITY_LABEL_TR
 from app.data.finding_catalog_tr import get_catalog_entry as get_catalog_entry_tr
-from app.i18n.report_strings import Locale
+from app.i18n.report_strings import FINDING_STATUS_LABELS, Locale
 from app.models.finding import Finding
 from app.services.finding_localization_service import extract_domain
 from app.services.report_catalog_keys import report_catalog_key
@@ -41,6 +42,8 @@ class ReportFinding:
     evidence_text: str | None = None
     confidence: str | None = None
     finding_type: str | None = None
+    status_label: str | None = None
+    technical_details: str | None = None
 
     @classmethod
     def from_finding(cls, finding: Finding, **overrides: object) -> ReportFinding:
@@ -64,44 +67,87 @@ class ReportFinding:
             "ai_confidence_label": finding.ai_confidence_label,
             "confidence": finding.confidence,
             "finding_type": (finding.evidence or {}).get("finding_type") if finding.evidence else None,
+            "status_label": None,
+            "technical_details": None,
         }
         base.update(overrides)
         return cls(**base)  # type: ignore[arg-type]
 
 
-def _german_fallback(finding: Finding, domain: str) -> ReportFinding:
-    sev_de = SEVERITY_LABEL_DE.get(finding.severity, finding.severity)
-    if finding.source_tool == "nuclei" and finding.source_rule_id:
-        risk_explanation = (
-            f"Die Nuclei-Sicherheitsvorlage '{finding.source_rule_id}' meldet ein mögliches "
-            f"Problem oder eine Fehlkonfiguration. Schweregrad: {sev_de}."
-        )
-        remediation_steps = [
-            "Finding-Beschreibung lesen.",
-            "Quellcode oder Server-Konfiguration für die betroffene Komponente prüfen.",
-            "Fix in Staging anwenden und anschließend mit SIBER erneut scannen.",
-        ]
-        config_file_paths = [
-            f"[Nginx] /etc/nginx/sites-available/{domain}",
-            "[Apache] .htaccess im Document Root",
-            "[Hosting-Panel] Domain-/SSL-Einstellungen (Plesk, cPanel, DirectAdmin usw.)",
-            "[Anwendung] Relevanter Quellcode (Git/FTP)",
-        ]
-    else:
-        risk_explanation = finding.risk_explanation or (
-            f"{finding.title} — Schweregrad: {sev_de}."
-        )
-        remediation_steps = finding.remediation_steps or [
-            "Technische Beschreibung prüfen.",
-            "Server- oder Anwendungskonfiguration aktualisieren.",
-        ]
-        config_file_paths = finding.config_file_paths
+def _technical_details(finding: Finding, locale: Locale) -> str:
+    heading = "Özgün motor çıktısı" if locale == "tr" else "Originalausgabe der Scan-Engine"
+    title_label = "Başlık" if locale == "tr" else "Titel"
+    description_label = "Açıklama" if locale == "tr" else "Beschreibung"
+    remediation_label = "Çözüm" if locale == "tr" else "Lösung"
+    rows = [
+        heading,
+        f"{title_label}: {finding.title or '—'}",
+        f"{description_label}: {finding.description or '—'}",
+    ]
+    if finding.remediation:
+        rows.append(f"{remediation_label}: {finding.remediation}")
+    return "\n".join(rows)
 
+
+def _localized_unknown_fallback(finding: Finding, locale: Locale) -> ReportFinding:
+    """Localized wrapper for rules absent from the catalog; engine text stays technical."""
+    tool = finding.source_tool or "scanner"
+    rule = finding.source_rule_id or finding.correlation_key or "—"
+    if locale == "de":
+        severity = SEVERITY_LABEL_DE.get(finding.severity, finding.severity)
+        return ReportFinding.from_finding(
+            finding,
+            title=f"Nicht katalogisierter Sicherheitsbefund ({tool}: {rule})",
+            description=(
+                "Die Scan-Engine hat einen Befund gemeldet, für den noch keine geprüfte "
+                "deutsche Fachübersetzung im Katalog vorhanden ist."
+            ),
+            risk_explanation=(
+                f"Der Befund muss technisch geprüft werden. Gemeldeter Schweregrad: {severity}. "
+                "Die Originalmeldung ist getrennt im technischen Anhang aufgeführt."
+            ),
+            remediation=(
+                "Originalnachweis und betroffene Komponente prüfen; eine Änderung erst nach "
+                "technischer Bestätigung in einer Testumgebung umsetzen."
+            ),
+            remediation_steps=[
+                "Regel-ID, betroffene URL und unveränderten Nachweis gemeinsam prüfen.",
+                "Hersteller- oder Engine-Dokumentation zur angegebenen Regel-ID heranziehen.",
+                "Korrektur zuerst in Staging testen und danach erneut scannen.",
+            ],
+            config_file_paths=finding.config_file_paths,
+            config_snippet=finding.config_snippet,
+            technical_details=_technical_details(finding, locale),
+            ai_summary=None,
+            ai_remediation=None,
+        )
+
+    severity = SEVERITY_LABEL_TR.get(finding.severity, finding.severity)
     return ReportFinding.from_finding(
         finding,
-        risk_explanation=risk_explanation,
-        remediation_steps=remediation_steps,
-        config_file_paths=config_file_paths,
+        title=f"Katalogda bulunmayan güvenlik bulgusu ({tool}: {rule})",
+        description=(
+            "Tarama motoru, doğrulanmış Türkçe teknik çevirisi henüz katalogda bulunmayan "
+            "bir bulgu bildirdi."
+        ),
+        risk_explanation=(
+            f"Bulgu teknik olarak incelenmelidir. Bildirilen önem derecesi: {severity}. "
+            "Özgün motor metni teknik ekte ayrı olarak gösterilmiştir."
+        ),
+        remediation=(
+            "Özgün kanıtı ve etkilenen bileşeni inceleyin; teknik doğrulama yapılmadan "
+            "üretim ortamında değişiklik uygulamayın."
+        ),
+        remediation_steps=[
+            "Kural kimliği, etkilenen URL ve değiştirilmemiş kanıtı birlikte inceleyin.",
+            "Belirtilen kural kimliği için üretici veya tarama motoru belgelerine bakın.",
+            "Düzeltmeyi önce test ortamında uygulayın ve ardından yeniden tarayın.",
+        ],
+        config_file_paths=finding.config_file_paths,
+        config_snippet=finding.config_snippet,
+        technical_details=_technical_details(finding, locale),
+        ai_summary=None,
+        ai_remediation=None,
     )
 
 
@@ -134,28 +180,26 @@ def localize_finding_for_report(finding: Finding, locale: Locale) -> ReportFindi
                 config_snippet=snippet_override if use_override else entry["config_snippet"],
                 evidence_text=evidence_text,
                 source_rule_id=finding.source_rule_id,
+                status_label=FINDING_STATUS_LABELS[locale].get(finding.status, finding.status),
+                ai_summary=None,
+                ai_remediation=None,
             )
 
-    if locale != "de":
-        return ReportFinding.from_finding(
-            finding,
-            evidence_text=evidence_text,
-            risk_explanation=risk,
-            remediation=rem_override or finding.remediation,
-            remediation_steps=steps_override or finding.remediation_steps,
-            config_snippet=snippet_override if snippet_override is not None else finding.config_snippet,
-        )
-
-    fb = _german_fallback(finding, domain)
+    fb = _localized_unknown_fallback(finding, locale)
     return ReportFinding.from_finding(
         finding,
         title=fb.title,
-        risk_explanation=fb.risk_explanation or risk,
-        remediation=rem_override or fb.remediation,
-        remediation_steps=steps_override or fb.remediation_steps,
+        description=fb.description,
+        risk_explanation=fb.risk_explanation,
+        remediation=fb.remediation,
+        remediation_steps=fb.remediation_steps,
         config_file_paths=fb.config_file_paths,
-        config_snippet=snippet_override if snippet_override is not None else fb.config_snippet,
+        config_snippet=fb.config_snippet,
         evidence_text=evidence_text,
+        status_label=FINDING_STATUS_LABELS[locale].get(finding.status, finding.status),
+        technical_details=fb.technical_details,
+        ai_summary=None,
+        ai_remediation=None,
     )
 
 
